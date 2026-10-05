@@ -265,7 +265,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             dockItems: sanitizedItems,
             selectedItemID: nil,
             placement: loadedSnapshot.preferences.placement,
-            isDockRevealed: true,
+            isDockRevealed: false,
             flyout: FlyoutState(activeItemID: nil, isVisible: false)
         )
 

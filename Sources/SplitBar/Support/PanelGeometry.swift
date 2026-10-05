@@ -39,6 +39,10 @@ public func edgePanelFrame(
         let unclampedX = screen.visibleFrame.midX - (panelSize.width / 2.0)
         x = min(max(unclampedX, screen.visibleFrame.minX), screen.visibleFrame.maxX - panelSize.width)
         y = screen.visibleFrame.maxY - panelSize.height - edgeInset
+    case .bottom:
+        let unclampedX = screen.visibleFrame.midX - (panelSize.width / 2.0)
+        x = min(max(unclampedX, screen.visibleFrame.minX), screen.visibleFrame.maxX - panelSize.width)
+        y = screen.visibleFrame.minY + edgeInset
     }
     return CGRect(x: x, y: y, width: panelSize.width, height: panelSize.height)
 }
@@ -62,6 +66,9 @@ public func flyoutPanelFrame(
     case .top:
         unclampedX = anchorFrame.midX - (flyoutSize.width / 2.0)
         unclampedY = anchorFrame.minY - flyoutSize.height - gap
+    case .bottom:
+        unclampedX = anchorFrame.midX - (flyoutSize.width / 2.0)
+        unclampedY = anchorFrame.maxY + gap
     }
 
     let clampedX = min(max(unclampedX, screen.visibleFrame.minX), screen.visibleFrame.maxX - flyoutSize.width)
@@ -97,6 +104,13 @@ public func edgeActivationFrame(
             width: screen.visibleFrame.width,
             height: thickness
         )
+    case .bottom:
+        return CGRect(
+            x: screen.visibleFrame.minX,
+            y: screen.visibleFrame.minY,
+            width: screen.visibleFrame.width,
+            height: thickness
+        )
     }
 }
 
@@ -116,6 +130,8 @@ public func edgeHandleFrame(
         return CGRect(x: screen.visibleFrame.minX + inset, y: dockFrame.midY - length / 2.0, width: thickness, height: length)
     case .top:
         return CGRect(x: dockFrame.midX - length / 2.0, y: screen.visibleFrame.maxY - thickness - inset, width: length, height: thickness)
+    case .bottom:
+        return CGRect(x: dockFrame.midX - length / 2.0, y: screen.visibleFrame.minY + inset, width: length, height: thickness)
     }
 }
 

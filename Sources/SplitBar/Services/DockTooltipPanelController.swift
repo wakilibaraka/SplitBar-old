@@ -138,6 +138,9 @@ public final class DockTooltipPanelController {
         case .top:
             targetX = screenX - (width / 2.0)
             targetY = anchorFrame.minY - height - 10.0
+        case .bottom:
+            targetX = screenX - (width / 2.0)
+            targetY = anchorFrame.maxY + 10.0
         }
 
         panel.setFrame(

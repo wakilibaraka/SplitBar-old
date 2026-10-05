@@ -1,17 +1,6 @@
 import AppKit
+import Combine
 import SwiftUI
-
-@main
-struct TaskbarDesignApp: App {
-    var body: some Scene {
-        WindowGroup {
-            DesktopView()
-                .frame(minWidth: 1080, minHeight: 700)
-        }
-        .defaultSize(width: 1440, height: 920)
-        .windowStyle(.hiddenTitleBar)
-    }
-}
 
 private enum OpenPanel: Equatable {
     case widgets
@@ -234,29 +223,89 @@ private extension EnvironmentValues {
     }
 }
 
-private struct DesktopView: View {
-    @State private var openPanel: OpenPanel?
-    @State private var surfaceStyle = SurfaceStyle.glass
-    @State private var usesDockPresentation = false
-    @State private var isDarkMode = false
-    @State private var usesPastelGradient = true
-    @State private var pastelTint = Color(red: 0.91, green: 0.69, blue: 0.87)
-    @State private var gradientEndTint = Color(red: 0.47, green: 0.70, blue: 0.86)
-    @State private var gradientAngle = 35.0
-    @State private var interfaceTransparency = 0.68
-    @State private var usesTaskbarGradient = false
-    @State private var taskbarGradientStart = Color(red: 0.78, green: 0.48, blue: 0.86)
-    @State private var taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)
-    @State private var taskbarHeight: CGFloat = 46
-    @State private var showsClockSettings = false
-    @State private var uses24HourTime = false
-    @State private var showsSeconds = false
-    @State private var dateStyle = ClockDateStyle.compact
-    @State private var clockTint = Color.roseAccent
-    @State private var displayedMonth = Calendar.current.startOfMonth(for: .now)
-    @State private var selectedDate = Date.now
+@MainActor
+final class TaskbarConceptState: ObservableObject {
+    @Published fileprivate var openPanel: OpenPanel?
+    @Published fileprivate var surfaceStyle = SurfaceStyle.glass
+    @Published fileprivate var usesDockPresentation = false
+    @Published fileprivate var isDarkMode = false
+    @Published fileprivate var usesPastelGradient = true
+    @Published fileprivate var pastelTint = Color(red: 0.91, green: 0.69, blue: 0.87)
+    @Published fileprivate var gradientEndTint = Color(red: 0.47, green: 0.70, blue: 0.86)
+    @Published fileprivate var gradientAngle = 35.0
+    @Published fileprivate var interfaceTransparency = 0.68
+    @Published fileprivate var usesTaskbarGradient = false
+    @Published fileprivate var taskbarGradientStart = Color(red: 0.78, green: 0.48, blue: 0.86)
+    @Published fileprivate var taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)
+    @Published fileprivate var taskbarHeight: CGFloat = 46
+    @Published fileprivate var showsClockSettings = false
+    @Published fileprivate var uses24HourTime = false
+    @Published fileprivate var showsSeconds = false
+    @Published fileprivate var dateStyle = ClockDateStyle.compact
+    @Published fileprivate var clockTint = Color.roseAccent
+    @Published fileprivate var displayedMonth = Calendar.current.startOfMonth(for: .now)
+    @Published fileprivate var selectedDate = Date.now
+    @Published fileprivate var widgetSizePresetName = "balanced" {
+        didSet { UserDefaults.standard.set(widgetSizePresetName, forKey: "widgets.sizePreset") }
+    }
+    @Published fileprivate var hiddenQuickSettingTitles: Set<String> = [] {
+        didSet { UserDefaults.standard.set(hiddenQuickSettingTitles.sorted().joined(separator: "|"), forKey: "quickSettings.hiddenTiles") }
+    }
+    @Published fileprivate var enabledQuickSettings: Set<String> = [
+        "Finder Path Bar", "Show Extension", "True Tone"
+    ]
+    @Published fileprivate var wifiEnabled = true
+    @Published fileprivate var bluetoothEnabled = true
+    @Published fileprivate var vpnEnabled = false
+    @Published fileprivate var volume: Double = 0.68
+    @Published fileprivate var appVolume: Double = 0.52
+    @Published fileprivate var brightness: Double = 0.82
+    @Published fileprivate var isPlaying = false
 
-    var body: some View {
+    init() {
+        widgetSizePresetName = UserDefaults.standard.string(forKey: "widgets.sizePreset") ?? "balanced"
+        hiddenQuickSettingTitles = Set(
+            (UserDefaults.standard.string(forKey: "quickSettings.hiddenTiles") ?? "")
+                .split(separator: "|")
+                .map(String.init)
+        )
+    }
+}
+
+public struct TaskbarConceptView: View {
+    @ObservedObject private var model: TaskbarConceptState
+    private let onLaunchApplication: (String) -> Void
+
+    init(model: TaskbarConceptState, onLaunchApplication: @escaping (String) -> Void) {
+        self._model = ObservedObject(wrappedValue: model)
+        self.onLaunchApplication = onLaunchApplication
+    }
+
+    private var openPanel: OpenPanel? {
+        get { model.openPanel }
+        nonmutating set { model.openPanel = newValue }
+    }
+    private var surfaceStyle: SurfaceStyle { model.surfaceStyle }
+    private var usesDockPresentation: Bool { model.usesDockPresentation }
+    private var isDarkMode: Bool { model.isDarkMode }
+    private var usesPastelGradient: Bool { model.usesPastelGradient }
+    private var pastelTint: Color { model.pastelTint }
+    private var gradientEndTint: Color { model.gradientEndTint }
+    private var gradientAngle: Double { model.gradientAngle }
+    private var interfaceTransparency: Double { model.interfaceTransparency }
+    private var usesTaskbarGradient: Bool { model.usesTaskbarGradient }
+    private var taskbarGradientStart: Color { model.taskbarGradientStart }
+    private var taskbarGradientEnd: Color { model.taskbarGradientEnd }
+    private var taskbarHeight: CGFloat { model.taskbarHeight }
+    private var showsClockSettings: Bool { model.showsClockSettings }
+    private var uses24HourTime: Bool { model.uses24HourTime }
+    private var showsSeconds: Bool { model.showsSeconds }
+    private var dateStyle: ClockDateStyle { model.dateStyle }
+    private var clockTint: Color { model.clockTint }
+    private var displayedMonth: Date { model.displayedMonth }
+    private var selectedDate: Date { model.selectedDate }
+
+    public var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
                 DesktopBackdrop(
@@ -297,7 +346,7 @@ private struct DesktopView: View {
                 }
 
                 if openPanel == .widgets {
-                    WidgetsPanel(onClose: { openPanel = nil }, accent: clockTint)
+                    WidgetsPanel(onClose: { openPanel = nil }, accent: clockTint, model: model)
                         .frame(
                             width: min(520, geometry.size.width - 36),
                             height: max(300, geometry.size.height - taskbarHeight - 28)
@@ -312,13 +361,13 @@ private struct DesktopView: View {
 
                 if openPanel == .calendar {
                     ClockFlyout(
-                        displayedMonth: $displayedMonth,
-                        selectedDate: $selectedDate,
-                        showsClockSettings: $showsClockSettings,
-                        uses24HourTime: $uses24HourTime,
-                        showsSeconds: $showsSeconds,
-                        dateStyle: $dateStyle,
-                        clockTint: $clockTint,
+                        displayedMonth: $model.displayedMonth,
+                        selectedDate: $model.selectedDate,
+                        showsClockSettings: $model.showsClockSettings,
+                        uses24HourTime: $model.uses24HourTime,
+                        showsSeconds: $model.showsSeconds,
+                        dateStyle: $model.dateStyle,
+                        clockTint: $model.clockTint,
                         accent: clockTint
                     )
                     .frame(width: min(520, geometry.size.width - 36), height: max(300, geometry.size.height - taskbarHeight - 28))
@@ -331,7 +380,7 @@ private struct DesktopView: View {
                 }
 
                 if openPanel == .controls {
-                    ControlsFlyout(accent: clockTint, isDarkMode: $isDarkMode)
+                    ControlsFlyout(accent: clockTint, model: model)
                         .frame(width: min(520, geometry.size.width - 36), height: max(300, geometry.size.height - taskbarHeight - 28))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         .padding(.trailing, 14)
@@ -342,7 +391,7 @@ private struct DesktopView: View {
                 }
 
                 if openPanel == .start {
-                    StartFlyout(onClose: { openPanel = nil }, accent: clockTint)
+                    StartFlyout(onClose: { openPanel = nil }, accent: clockTint, onLaunchApplication: onLaunchApplication)
                         .frame(width: min(860, geometry.size.width - 48), height: min(820, geometry.size.height - taskbarHeight - 36))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .padding(.bottom, taskbarHeight + 12)
@@ -353,18 +402,18 @@ private struct DesktopView: View {
 
                 if openPanel == .settings {
                     SettingsFlyout(
-                        surfaceStyle: $surfaceStyle,
-                        usesDockPresentation: $usesDockPresentation,
-                        isDarkMode: $isDarkMode,
-                        usesPastelGradient: $usesPastelGradient,
-                        pastelTint: $pastelTint,
-                        gradientEndTint: $gradientEndTint,
-                        gradientAngle: $gradientAngle,
-                        interfaceTransparency: $interfaceTransparency,
-                        usesTaskbarGradient: $usesTaskbarGradient,
-                        taskbarGradientStart: $taskbarGradientStart,
-                        taskbarGradientEnd: $taskbarGradientEnd,
-                        taskbarHeight: $taskbarHeight,
+                        surfaceStyle: $model.surfaceStyle,
+                        usesDockPresentation: $model.usesDockPresentation,
+                        isDarkMode: $model.isDarkMode,
+                        usesPastelGradient: $model.usesPastelGradient,
+                        pastelTint: $model.pastelTint,
+                        gradientEndTint: $model.gradientEndTint,
+                        gradientAngle: $model.gradientAngle,
+                        interfaceTransparency: $model.interfaceTransparency,
+                        usesTaskbarGradient: $model.usesTaskbarGradient,
+                        taskbarGradientStart: $model.taskbarGradientStart,
+                        taskbarGradientEnd: $model.taskbarGradientEnd,
+                        taskbarHeight: $model.taskbarHeight,
                         accent: clockTint,
                         onClose: { openPanel = nil }
                     )
@@ -377,8 +426,8 @@ private struct DesktopView: View {
                 }
 
                 Taskbar(
-                    openPanel: $openPanel,
-                    height: $taskbarHeight,
+                    openPanel: $model.openPanel,
+                    height: $model.taskbarHeight,
                     usesDockPresentation: usesDockPresentation,
                     surfaceStyle: surfaceStyle,
                     isDarkMode: isDarkMode,
@@ -388,7 +437,8 @@ private struct DesktopView: View {
                     tint: clockTint,
                     dateStyle: dateStyle,
                     uses24HourTime: uses24HourTime,
-                    showsSeconds: showsSeconds
+                    showsSeconds: showsSeconds,
+                    onLaunchApplication: onLaunchApplication
                 )
                 .zIndex(3)
             }
@@ -489,6 +539,7 @@ private struct Taskbar: View {
     let dateStyle: ClockDateStyle
     let uses24HourTime: Bool
     let showsSeconds: Bool
+    let onLaunchApplication: (String) -> Void
 
     private let appItems: [(String, String, String, Color)] = [
         ("com.apple.Safari", "safari.fill", "Safari", Color(red: 0.15, green: 0.58, blue: 0.86)),
@@ -636,6 +687,8 @@ private struct Taskbar: View {
                     Button {
                         if title == "System Settings" {
                             toggle(.settings)
+                        } else {
+                            onLaunchApplication(bundleIdentifier)
                         }
                     } label: {
                         MacOSAppIcon(
@@ -794,15 +847,15 @@ private enum WidgetSizePreset: String, CaseIterable, Identifiable {
 private struct WidgetsPanel: View {
     let onClose: () -> Void
     let accent: Color
+    @ObservedObject var model: TaskbarConceptState
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
-    @AppStorage("widgets.sizePreset") private var widgetSizePresetName = WidgetSizePreset.balanced.rawValue
     @State private var showsSizeOptions = false
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
 
     private var sizePreset: WidgetSizePreset {
-        WidgetSizePreset(rawValue: widgetSizePresetName) ?? .balanced
+        WidgetSizePreset(rawValue: model.widgetSizePresetName) ?? .balanced
     }
 
     var body: some View {
@@ -832,7 +885,7 @@ private struct WidgetsPanel: View {
                             .font(.system(size: 13, weight: .semibold))
                         ForEach(WidgetSizePreset.allCases) { preset in
                             Button {
-                                widgetSizePresetName = preset.rawValue
+                                model.widgetSizePresetName = preset.rawValue
                                 showsSizeOptions = false
                             } label: {
                                 HStack {
@@ -870,7 +923,7 @@ private struct WidgetsPanel: View {
                         .gridCellColumns(2)
                     SystemResourcesWidget(contentHeight: sizePreset.cardContentHeight)
                     BackgroundAppsWidget(contentHeight: sizePreset.cardContentHeight)
-                    MediaWidget(contentHeight: sizePreset.cardContentHeight)
+                    MediaWidget(model: model, contentHeight: sizePreset.cardContentHeight)
                     PhotosWidget(contentHeight: sizePreset.cardContentHeight)
                     StickyNotesWidget(contentHeight: sizePreset.cardContentHeight)
                     WatchlistWidget(contentHeight: sizePreset.cardContentHeight)
@@ -1286,8 +1339,8 @@ private struct WatchlistWidget: View {
 }
 
 private struct MediaWidget: View {
+    @ObservedObject var model: TaskbarConceptState
     let contentHeight: CGFloat
-    @State private var isPlaying = false
 
     var body: some View {
         WidgetCard(title: "Now playing", symbol: "music.note", tint: .purple, minContentHeight: contentHeight) {
@@ -1308,9 +1361,9 @@ private struct MediaWidget: View {
                 }
                 Spacer(minLength: 0)
                 Button {
-                    isPlaying.toggle()
+                    model.isPlaying.toggle()
                 } label: {
-                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 13, weight: .semibold))
                         .frame(width: 30, height: 30)
                         .background(Color.white.opacity(0.75), in: Circle())
@@ -1420,21 +1473,11 @@ private struct QuickSetting: Identifiable {
 
 private struct ControlsFlyout: View {
     let accent: Color
-    @Binding var isDarkMode: Bool
+    @ObservedObject var model: TaskbarConceptState
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
-    @State private var wifiEnabled = true
-    @State private var bluetoothEnabled = true
-    @State private var vpnEnabled = false
-    @State private var volume: Double = 0.68
-    @State private var appVolume: Double = 0.52
-    @State private var brightness: Double = 0.82
     @State private var isEditingQuickSettings = false
-    @AppStorage("quickSettings.hiddenTiles") private var hiddenQuickSettingTitles = ""
-    @State private var enabledQuickSettings: Set<String> = [
-        "Finder Path Bar", "Show Extension", "True Tone"
-    ]
 
     private let quickSettings: [QuickSetting] = [
         QuickSetting(title: "Bluetooth", symbol: "bluetooth"),
@@ -1468,7 +1511,7 @@ private struct ControlsFlyout: View {
     }
 
     private var visibleQuickSettings: Set<String> {
-        Set(quickSettings.map(\.title)).subtracting(hiddenQuickSettingTitles.split(separator: "|").map(String.init))
+        Set(quickSettings.map(\.title)).subtracting(model.hiddenQuickSettingTitles)
     }
 
     var body: some View {
@@ -1507,16 +1550,16 @@ private struct ControlsFlyout: View {
                             .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .topLeading)
                         networkTile(
                             title: "Wi-Fi",
-                            detail: wifiEnabled ? "Connected · Home Wi-Fi" : "Off",
+                            detail: model.wifiEnabled ? "Connected · Home Wi-Fi" : "Off",
                             symbol: "wifi",
-                            isOn: wifiEnabled
+                            isOn: model.wifiEnabled
                         ) {
-                            wifiEnabled.toggle()
+                            model.wifiEnabled.toggle()
                         }
                         .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112)
                     }
 
-                    BluetoothWidget(isEnabled: bluetoothEnabled)
+                    BluetoothWidget(isEnabled: model.bluetoothEnabled)
 
                     LazyVGrid(columns: gridColumns, spacing: 6) {
                         ForEach(quickSettings.filter { visibleQuickSettings.contains($0.title) }) { setting in
@@ -1537,9 +1580,9 @@ private struct ControlsFlyout: View {
             .scrollIndicators(.hidden)
 
             WidgetCard(title: "Volume mixer", symbol: "speaker.wave.2.fill", tint: .blue) {
-                controlSlider("System", symbol: "speaker.wave.2.fill", value: $volume)
-                controlSlider("App audio", symbol: "waveform", value: $appVolume)
-                controlSlider("Brightness", symbol: "sun.max.fill", value: $brightness)
+                controlSlider("System", symbol: "speaker.wave.2.fill", value: $model.volume)
+                controlSlider("App audio", symbol: "waveform", value: $model.appVolume)
+                controlSlider("Brightness", symbol: "sun.max.fill", value: $model.brightness)
             }
             .padding(.horizontal, 14)
             .padding(.top, 9)
@@ -1561,7 +1604,7 @@ private struct ControlsFlyout: View {
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
                 Button("All") {
-                    hiddenQuickSettingTitles = ""
+                    model.hiddenQuickSettingTitles = []
                 }
                 .font(.system(size: 10, weight: .semibold))
                 .buttonStyle(.plain)
@@ -1595,13 +1638,13 @@ private struct ControlsFlyout: View {
     }
 
     private func setQuickSettingVisibility(_ title: String, isVisible: Bool) {
-        var hiddenTitles = Set(hiddenQuickSettingTitles.split(separator: "|").map(String.init))
+        var hiddenTitles = model.hiddenQuickSettingTitles
         if isVisible {
             hiddenTitles.remove(title)
         } else {
             hiddenTitles.insert(title)
         }
-        hiddenQuickSettingTitles = hiddenTitles.sorted().joined(separator: "|")
+        model.hiddenQuickSettingTitles = hiddenTitles
     }
 
     private func networkTile(
@@ -1669,26 +1712,26 @@ private struct ControlsFlyout: View {
 
     private func quickSettingIsOn(_ title: String) -> Bool {
         switch title {
-        case "Bluetooth": bluetoothEnabled
-        case "Dark Mode": isDarkMode
-        case "VPN": vpnEnabled
-        default: enabledQuickSettings.contains(title)
+        case "Bluetooth": model.bluetoothEnabled
+        case "Dark Mode": model.isDarkMode
+        case "VPN": model.vpnEnabled
+        default: model.enabledQuickSettings.contains(title)
         }
     }
 
     private func activateQuickSetting(_ title: String) {
         switch title {
         case "Bluetooth":
-            bluetoothEnabled.toggle()
+            model.bluetoothEnabled.toggle()
         case "Dark Mode":
-            isDarkMode.toggle()
+            model.isDarkMode.toggle()
         case "VPN":
-            vpnEnabled.toggle()
+            model.vpnEnabled.toggle()
         default:
-            if enabledQuickSettings.contains(title) {
-                enabledQuickSettings.remove(title)
+            if model.enabledQuickSettings.contains(title) {
+                model.enabledQuickSettings.remove(title)
             } else {
-                enabledQuickSettings.insert(title)
+                model.enabledQuickSettings.insert(title)
             }
         }
     }
@@ -2315,6 +2358,7 @@ private struct SettingsFlyout: View {
 private struct StartFlyout: View {
     let onClose: () -> Void
     let accent: Color
+    let onLaunchApplication: (String) -> Void
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
@@ -2372,18 +2416,23 @@ private struct StartFlyout: View {
 
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 19) {
                         ForEach(apps, id: \.2) { bundleIdentifier, symbol, title, color in
-                            VStack(spacing: 8) {
-                                MacOSAppIcon(
-                                    bundleIdentifier: bundleIdentifier,
-                                    fallbackSymbol: symbol,
-                                    fallbackColor: color,
-                                    size: 34
-                                )
+                            Button {
+                                onLaunchApplication(bundleIdentifier)
+                            } label: {
+                                VStack(spacing: 8) {
+                                    MacOSAppIcon(
+                                        bundleIdentifier: bundleIdentifier,
+                                        fallbackSymbol: symbol,
+                                        fallbackColor: color,
+                                        size: 34
+                                    )
                                     .frame(width: 54, height: 54)
                                     .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 15))
-                                Text(title).font(.system(size: 10, weight: .medium))
+                                    Text(title).font(.system(size: 10, weight: .medium))
+                                }
+                                .frame(maxWidth: .infinity)
                             }
-                            .frame(maxWidth: .infinity)
+                            .buttonStyle(.plain)
                         }
                     }
 

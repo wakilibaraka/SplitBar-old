@@ -1,5 +1,10 @@
 # Phase 1: Skeleton Checklist
 
+> Historical checklist. The current implementation and future build sequence
+> are maintained in [MIGRATION_AND_BUILD_PLAN.md](./MIGRATION_AND_BUILD_PLAN.md).
+> In particular, real Dock mutation is deferred until its opt-in and recovery
+> gates in that plan are satisfied.
+
 1. **App shell**
    - LSUIElement app, menu-bar item with Quit and Settings placeholders. App launches with no dock icon.
 

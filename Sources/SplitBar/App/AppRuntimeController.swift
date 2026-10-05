@@ -174,6 +174,9 @@ public final class AppRuntimeController {
     private var flyoutGlobalMonitor: Any?
     private var flyoutLocalMonitor: Any?
     private var detailedSystemMonitorWindow: NSWindow?
+    private var taskbarConceptWindow: NSWindow?
+    private let taskbarConceptState = TaskbarConceptState()
+    private var isLegacyEdgeDockEnabled = false
     private var settingsWindow: NSWindow?
     private var detailedMonitorHostingView: NSHostingView<DetailedSystemMonitorView>?
     private var settingsHostingView: NSHostingView<SettingsView>?
@@ -255,6 +258,9 @@ public final class AppRuntimeController {
             onOpenCommandPalette: {
                 statusSelf?.openCommandPalette()
             },
+            onOpenTaskbarPreview: {
+                statusSelf?.openTaskbarConceptWindow()
+            },
             onOpenSystemMonitor: {
                 statusSelf?.openDetailedSystemMonitor()
             },
@@ -300,6 +306,7 @@ public final class AppRuntimeController {
         self.setupClipboardMonitoring()
         self.setupLiveStreaming()
         Logger.lifecycle.info("AppRuntimeController initialized")
+        openTaskbarConceptWindow()
     }
 
     public var isLaunchAtLoginEnabled: Bool {
@@ -338,6 +345,86 @@ public final class AppRuntimeController {
         window.makeKeyAndOrderFront(nil)
     }
 
+    public func openTaskbarConceptWindow() {
+        let window: NSWindow
+        if let existing = taskbarConceptWindow {
+            window = existing
+        } else {
+            let conceptView = TaskbarConceptView(model: taskbarConceptState) { [weak self] bundleIdentifier in
+                self?.launchPinnedApplication(bundleIdentifier: bundleIdentifier)
+            }
+            let hostingView = NSHostingView(rootView: conceptView)
+            hostingView.sizingOptions = []
+            window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 1440, height: 920),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "SplitBar Taskbar Preview"
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.isReleasedWhenClosed = false
+            window.minSize = NSSize(width: 1080, height: 700)
+            window.contentView = hostingView
+            window.center()
+            taskbarConceptWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    private func launchPinnedApplication(bundleIdentifier: String) {
+        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
+            Logger.lifecycle.error("Pinned application is not installed bundle=\(bundleIdentifier, privacy: .public)")
+            let alert = NSAlert()
+            alert.messageText = "Application Not Found"
+            alert.informativeText = "The application \(bundleIdentifier) could not be found on this Mac."
+            alert.alertStyle = .warning
+            alert.runModal()
+            return
+        }
+
+        launchTarget(.application(bundleIdentifier: bundleIdentifier, url: appURL))
+    }
+
+    private func launchTarget(_ target: LaunchTarget) {
+        Task { [weak self] in
+            guard let self else { return }
+            let result = await self.launchService.launch(target: target)
+            self.presentLaunchResult(result, target: target)
+        }
+    }
+
+    private func presentLaunchResult(_ result: LaunchResult, target: LaunchTarget) {
+        guard result != .launched else { return }
+        let targetName: String
+        switch target {
+        case .application(let bundleIdentifier, _):
+            targetName = bundleIdentifier
+        case .link(let url):
+            targetName = url.absoluteString
+        }
+
+        let message: String
+        switch result {
+        case .launched:
+            return
+        case .invalidTarget:
+            message = "The launch target is invalid."
+            Logger.lifecycle.error("Launch target is invalid target=\(targetName, privacy: .public)")
+        case .systemFailure(let detail):
+            message = detail
+            Logger.lifecycle.error("Launch failed target=\(targetName, privacy: .public) error=\(detail, privacy: .public)")
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "Could Not Open Item"
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.runModal()
+    }
+
     private func refreshSettingsWindow() {
         settingsHostingView?.rootView = makeSettingsView()
     }
@@ -356,7 +443,10 @@ public final class AppRuntimeController {
     }
 
     public func toggleDockVisibility() {
-        if state.isDockRevealed {
+        if !isLegacyEdgeDockEnabled {
+            isLegacyEdgeDockEnabled = true
+            dispatch(action: .revealDock)
+        } else if state.isDockRevealed {
             dispatch(action: .hideDock)
         } else {
             dispatch(action: .revealDock)
@@ -548,9 +638,9 @@ public final class AppRuntimeController {
             if let id = id, let item = state.dockItems.first(where: { $0.id == id }) {
                 switch item.kind {
                 case .application(let bundleID, let url):
-                    _ = launchService.launch(target: .application(bundleIdentifier: bundleID, url: url))
+                    launchTarget(.application(bundleIdentifier: bundleID, url: url))
                 case .link(let url):
-                    _ = launchService.launch(target: .link(url))
+                    launchTarget(.link(url))
                 case .widget:
                     // İç içe dispatch yerine flyout doğrudan uygulanır; aksi halde dock iki kez yeniden kurulur
                     let flyoutAction = nextFlyoutAction(forWidgetItemID: id)
@@ -1637,7 +1727,7 @@ public final class AppRuntimeController {
                     iconColor: .blue,
                     category: .applications,
                     action: { [weak self] in
-                        _ = self?.launchService.launch(target: .application(bundleIdentifier: bundleID, url: appURL))
+                        self?.launchTarget(.application(bundleIdentifier: bundleID, url: appURL))
                     }
                 )
             )
@@ -2048,6 +2138,19 @@ public final class AppRuntimeController {
 
     public func syncPanels() {
         Logger.panels.debug("Synchronizing panel frames and auto-hide")
+        guard isLegacyEdgeDockEnabled else {
+            panelController.setAutoHide(
+                enabled: false,
+                handleFrame: .zero,
+                edge: state.placement.edge,
+                style: preferences.materialStyle
+            )
+            if panelController.dockPanel.isVisible {
+                panelController.hide(edge: state.placement.edge)
+            }
+            tooltipController.hide()
+            return
+        }
         guard let screen = screenService.primaryScreen() else {
             return
         }
@@ -2057,7 +2160,7 @@ public final class AppRuntimeController {
         let itemSlotSize = iconBaseSize + 8.0
 
         let panelSize: CGSize
-        if state.placement.edge == .top {
+        if state.placement.edge == .top || state.placement.edge == .bottom {
             let width = max(160.0, CGFloat(state.dockItems.count) * itemSlotSize + 72.0)
             panelSize = CGSize(width: width, height: capsuleThickness)
         } else {

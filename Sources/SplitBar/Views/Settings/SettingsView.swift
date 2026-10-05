@@ -159,6 +159,7 @@ public struct SettingsView: View {
                     Text("Right Edge").tag(DockEdge.right)
                     Text("Left Edge").tag(DockEdge.left)
                     Text("Top Edge").tag(DockEdge.top)
+                    Text("Bottom Edge").tag(DockEdge.bottom)
                 }
             }
 

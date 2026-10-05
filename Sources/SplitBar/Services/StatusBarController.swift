@@ -7,6 +7,7 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private let onToggleDock: () -> Void
     private let onOpenCommandPalette: () -> Void
+    private let onOpenTaskbarPreview: () -> Void
     private let onOpenSystemMonitor: () -> Void
     private let onOpenSettings: () -> Void
     private let onChangeEdge: (DockEdge) -> Void
@@ -19,6 +20,7 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
     public init(
         onToggleDock: @escaping () -> Void,
         onOpenCommandPalette: @escaping () -> Void,
+        onOpenTaskbarPreview: @escaping () -> Void,
         onOpenSystemMonitor: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
         onChangeEdge: @escaping (DockEdge) -> Void,
@@ -30,6 +32,7 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
     ) {
         self.onToggleDock = onToggleDock
         self.onOpenCommandPalette = onOpenCommandPalette
+        self.onOpenTaskbarPreview = onOpenTaskbarPreview
         self.onOpenSystemMonitor = onOpenSystemMonitor
         self.onOpenSettings = onOpenSettings
         self.onChangeEdge = onChangeEdge
@@ -58,13 +61,21 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         menu.delegate = self
 
         let toggleItem = NSMenuItem(
-            title: "Toggle EdgeDock",
+            title: "Toggle Legacy Edge Dock",
             action: #selector(handleToggleDock),
             keyEquivalent: "d"
         )
         toggleItem.keyEquivalentModifierMask = [.option]
         toggleItem.target = self
         menu.addItem(toggleItem)
+
+        let taskbarPreviewItem = NSMenuItem(
+            title: "Taskbar Design Preview...",
+            action: #selector(handleOpenTaskbarPreview),
+            keyEquivalent: ""
+        )
+        taskbarPreviewItem.target = self
+        menu.addItem(taskbarPreviewItem)
 
         let paletteItem = NSMenuItem(
             title: "Command Palette...",
@@ -118,6 +129,14 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         )
         topItem.target = self
         positionSubmenu.addItem(topItem)
+
+        let bottomItem = NSMenuItem(
+            title: "Bottom Edge",
+            action: #selector(handleSetBottomEdge),
+            keyEquivalent: ""
+        )
+        bottomItem.target = self
+        positionSubmenu.addItem(bottomItem)
 
         let positionMenuItem = NSMenuItem(title: "Dock Position", action: nil, keyEquivalent: "")
         positionMenuItem.submenu = positionSubmenu
@@ -187,6 +206,10 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         onOpenCommandPalette()
     }
 
+    @objc private func handleOpenTaskbarPreview() {
+        onOpenTaskbarPreview()
+    }
+
     @objc private func handleOpenSystemMonitor() {
         onOpenSystemMonitor()
     }
@@ -205,6 +228,10 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func handleSetTopEdge() {
         onChangeEdge(.top)
+    }
+
+    @objc private func handleSetBottomEdge() {
+        onChangeEdge(.bottom)
     }
 
     @objc private func handleSelectTheme(_ sender: NSMenuItem) {

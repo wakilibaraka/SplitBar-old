@@ -6,24 +6,22 @@ public final class AppLaunchService {
     public init() {
     }
 
-    public func launch(target: LaunchTarget) -> LaunchResult {
+    public func launch(target: LaunchTarget) async -> LaunchResult {
         switch target {
         case .application(_, let url):
             let config = NSWorkspace.OpenConfiguration()
             config.activates = true
-            nonisolated(unsafe) var launchError: Error?
-            let semaphore = DispatchSemaphore(value: 0)
-
-            NSWorkspace.shared.openApplication(at: url, configuration: config) { _, error in
-                launchError = error
-                semaphore.signal()
+            return await withCheckedContinuation { continuation in
+                NSWorkspace.shared.openApplication(at: url, configuration: config) { application, error in
+                    if let error {
+                        continuation.resume(returning: .systemFailure(error.localizedDescription))
+                    } else if application != nil {
+                        continuation.resume(returning: .launched)
+                    } else {
+                        continuation.resume(returning: .systemFailure("The system did not return the launched application."))
+                    }
+                }
             }
-            _ = semaphore.wait(timeout: .now() + 2.0)
-
-            if let error = launchError {
-                return .systemFailure(error.localizedDescription)
-            }
-            return .launched
 
         case .link(let url):
             if NSWorkspace.shared.open(url) {

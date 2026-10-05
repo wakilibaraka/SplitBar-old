@@ -43,7 +43,7 @@ struct EdgeHandleView: View {
     let style: DockMaterialStyle
 
     var body: some View {
-        let isVertical = edge != .top
+        let isVertical = edge == .left || edge == .right
         ZStack {
             ThemedGlassBackground(style: style, cornerRadius: 8.0)
             Group {
@@ -141,6 +141,8 @@ public final class EdgePanelController {
             return CGVector(dx: -Self.slideDistance, dy: 0.0)
         case .top:
             return CGVector(dx: 0.0, dy: Self.slideDistance)
+        case .bottom:
+            return CGVector(dx: 0.0, dy: -Self.slideDistance)
         }
     }
 
