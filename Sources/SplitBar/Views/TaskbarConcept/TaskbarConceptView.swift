@@ -1180,6 +1180,15 @@ private struct Taskbar: View {
         HStack(spacing: 4) {
             DownloadsTile(tileSide: tileSide, glyphSize: glyphSize)
             TrashTile(tileSide: tileSide, glyphSize: glyphSize, darkMode: isDarkMode)
+            Button {
+                toggle(.controls)
+            } label: {
+                SystemStatusIcon(snapshot: systemStatus, glyphSize: glyphSize)
+                    .frame(width: tileSide, height: tileSide)
+                    .taskbarTile()
+            }
+            .buttonStyle(.plain)
+            .help("Open quick controls, volume, Bluetooth and battery")
         }
     }
 
@@ -1189,15 +1198,6 @@ private struct Taskbar: View {
                 taskbarDivider
                 trashCluster
             }
-            Button {
-                toggle(.controls)
-            } label: {
-                SystemStatusIcon(snapshot: systemStatus, tileHeight: height - 8)
-                    .frame(height: height - 8)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Open quick controls, volume, Bluetooth and battery")
 
             clockSchedule { date in
                 Button {
@@ -1447,9 +1447,9 @@ private struct DownloadsTile: View {
 
 private struct SystemStatusIcon: View {
     let snapshot: SystemStatusSnapshot
-    let tileHeight: CGFloat
+    let glyphSize: CGFloat
 
-    private var ringDiameter: CGFloat { tileHeight * 0.40 }
+    private var ringDiameter: CGFloat { glyphSize * 0.92 }
 
     private var batteryColor: Color {
         if snapshot.batteryLevel <= 15 { return .red }
@@ -1457,28 +1457,22 @@ private struct SystemStatusIcon: View {
         return .green
     }
 
-    private var filledDotCount: Int {
-        snapshot.isMuted ? 0 : Int((snapshot.volumeLevel * 4).rounded())
-    }
-
     var body: some View {
-        VStack(spacing: 2.5) {
+        HStack(spacing: glyphSize * 0.12) {
             batteryRing
             wifiGlyph
-            statusDots
         }
-        .frame(height: tileHeight)
         .accessibilityHidden(true)
     }
 
     private var batteryRing: some View {
         ZStack {
             Circle()
-                .stroke(Color.primary.opacity(0.18), lineWidth: 2.5)
+                .stroke(Color.primary.opacity(0.18), lineWidth: max(2, glyphSize * 0.09))
                 .frame(width: ringDiameter, height: ringDiameter)
             Circle()
                 .trim(from: 0, to: CGFloat(snapshot.batteryLevel) / 100)
-                .stroke(batteryColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .stroke(batteryColor, style: StrokeStyle(lineWidth: max(2, glyphSize * 0.09), lineCap: .round))
                 .frame(width: ringDiameter, height: ringDiameter)
                 .rotationEffect(.degrees(-90))
             if snapshot.isCharging {
@@ -1487,35 +1481,23 @@ private struct SystemStatusIcon: View {
                     .foregroundStyle(.yellow)
             } else {
                 Text("\(snapshot.batteryLevel)")
-                    .font(.system(size: ringDiameter * 0.32, weight: .bold, design: .rounded))
+                    .font(.system(size: ringDiameter * 0.30, weight: .bold, design: .rounded))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.6)
             }
         }
     }
 
     private var wifiGlyph: some View {
         Image(systemName: snapshot.wifiOn ? "wifi" : "wifi.slash")
-            .font(.system(size: tileHeight * 0.22, weight: .medium))
+            .font(.system(size: glyphSize * 0.5, weight: .medium))
             .foregroundStyle(snapshot.wifiOn ? .primary : .secondary)
-    }
-
-    private var statusDots: some View {
-        HStack(spacing: 2.5) {
-            ForEach(0..<4, id: \.self) { index in
-                Circle()
-                    .fill(index < filledDotCount ? Color.primary : Color.primary.opacity(0.22))
-                    .frame(width: 3.5, height: 3.5)
-            }
-            Circle()
-                .fill(snapshot.bluetoothOn ? .blue : Color.primary.opacity(0.22))
-                .frame(width: 3.5, height: 3.5)
-        }
     }
 }
 
-private struct TrashTile: View {    let tileSide: CGFloat
+private struct TrashTile: View {
+    let tileSide: CGFloat
     let glyphSize: CGFloat
     let darkMode: Bool
     @ObservedObject private var store = TrashStore.shared
