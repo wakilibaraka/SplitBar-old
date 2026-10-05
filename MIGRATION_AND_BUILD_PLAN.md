@@ -49,6 +49,18 @@ explicit user controls.
   Downloads tile pinned to its left, full/empty state, and Open/Empty actions.
 - [x] Narrow the five flyouts to Windows 11-style default widths, each with its
   own width slider back up toward the previous wide layout.
+- [x] Seat the quick-controls cluster immediately left of the date as one
+  indivisible trailing unit.
+- [x] Replace the three separate Wi-Fi/volume/battery glyphs with one dynamic
+  system-status icon: battery ring with level/charging/low states, Wi-Fi
+  on/off glyph, volume dots, and a Bluetooth power dot. Live data comes from
+  public IOKit, CoreWLAN, CoreAudio, and IOBluetooth APIs through the new
+  SystemStatusService (10 s cadence, off-main sampling, publishes only on
+  change). The design is inspired by Status Trio (Apache-2.0, attributed in
+  NOTICE); the renderer is an original implementation and no reference source
+  is included. Deliberately excluded: display-brightness control via DDC
+  private APIs, per-device Bluetooth batteries (needs a Bluetooth permission
+  prompt), and Wi-Fi SSID text (needs a Location prompt).
 
 ## Architecture inventory and disposition
 
@@ -400,4 +412,5 @@ build or test against. What has been established instead:
   Verified so far: DatWeatherDoe is Apache-2.0 (adaptable with attribution);
   BoringNotch, DockDoor, and AltTab are GPL-3.0 (study only, reimplement
   clean); rajeshgoli/deskbar carries no license grant (study only);
-  OpenSwitchr is MIT (adaptable with attribution).
+  OpenSwitchr is MIT (adaptable with attribution); Status Trio is Apache-2.0
+  (design-adaptable with attribution, recorded in NOTICE).

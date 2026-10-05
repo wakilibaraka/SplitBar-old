@@ -19,3 +19,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Attribution — Status Trio design inspiration
+
+The taskbar system-status icon (battery ring, Wi-Fi glyph, and volume dots in
+one tile, backed by SystemStatusService sampling public IOKit, CoreWLAN,
+CoreAudio, and IOBluetooth APIs) is an original, clean-room implementation
+inspired by the design of Status Trio by lingyired
+(https://github.com/lingyired/status-trio), which is licensed under the Apache
+License, Version 2.0. No Status Trio source code is included in this project.

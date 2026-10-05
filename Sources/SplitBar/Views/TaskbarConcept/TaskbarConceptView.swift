@@ -527,6 +527,8 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var trashPlacement = TrashPlacement.withApps {
         didSet { UserDefaults.standard.set(trashPlacement.rawValue, forKey: "taskbar.trashPlacement") }
     }
+    @Published fileprivate var systemStatus = SystemStatusSnapshot.placeholder()
+    private let systemStatusService = SystemStatusService()
     @Published fileprivate var panelWidths: [PanelKind: CGFloat] = [:] {
         didSet {
             UserDefaults.standard.set(
@@ -631,6 +633,9 @@ final class TaskbarConceptState: ObservableObject {
                 .split(separator: "|")
                 .map(String.init)
         )
+        systemStatusService.startMonitoring(interval: 10.0) { [weak self] snapshot in
+            self?.systemStatus = snapshot
+        }
     }
 
     private var pendingPersistenceWorkItems: [String: DispatchWorkItem] = [:]
@@ -868,6 +873,7 @@ public struct TaskbarConceptView: View {
                     pinnedBundleIDs: model.pinnedAppBundleIDs,
                     iconSize: model.taskbarIconSize,
                     trashPlacement: model.trashPlacement,
+                    systemStatus: model.systemStatus,
                     onLaunchApplication: onLaunchApplication
                 )
                 .zIndex(3)
@@ -971,6 +977,7 @@ private struct Taskbar: View {
     let pinnedBundleIDs: [String]
     let iconSize: TaskbarIconSize
     let trashPlacement: TrashPlacement
+    let systemStatus: SystemStatusSnapshot
     let onLaunchApplication: (String) -> Void
 
     private var glyphSize: CGFloat { height * iconSize.glyphFraction }
@@ -1185,15 +1192,9 @@ private struct Taskbar: View {
             Button {
                 toggle(.controls)
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "wifi")
-                    Image(systemName: "speaker.wave.2.fill")
-                    Image(systemName: "battery.75percent")
-                }
-                .font(.system(size: height * 0.27, weight: .medium))
-                .foregroundStyle(.primary.opacity(0.78))
-                .frame(height: height - 8)
-                .contentShape(Rectangle())
+                SystemStatusIcon(snapshot: systemStatus, tileHeight: height - 8)
+                    .frame(height: height - 8)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("Open quick controls, volume, Bluetooth and battery")
@@ -1441,6 +1442,76 @@ private struct DownloadsTile: View {
         .buttonStyle(.plain)
         .help("Open Downloads")
         .disabled(downloadsURL == nil)
+    }
+}
+
+private struct SystemStatusIcon: View {
+    let snapshot: SystemStatusSnapshot
+    let tileHeight: CGFloat
+
+    private var ringDiameter: CGFloat { tileHeight * 0.40 }
+
+    private var batteryColor: Color {
+        if snapshot.batteryLevel <= 15 { return .red }
+        if snapshot.batteryLevel <= 30 { return .orange }
+        return .green
+    }
+
+    private var filledDotCount: Int {
+        snapshot.isMuted ? 0 : Int((snapshot.volumeLevel * 4).rounded())
+    }
+
+    var body: some View {
+        VStack(spacing: 2.5) {
+            batteryRing
+            wifiGlyph
+            statusDots
+        }
+        .frame(height: tileHeight)
+        .accessibilityHidden(true)
+    }
+
+    private var batteryRing: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.primary.opacity(0.18), lineWidth: 2.5)
+                .frame(width: ringDiameter, height: ringDiameter)
+            Circle()
+                .trim(from: 0, to: CGFloat(snapshot.batteryLevel) / 100)
+                .stroke(batteryColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .frame(width: ringDiameter, height: ringDiameter)
+                .rotationEffect(.degrees(-90))
+            if snapshot.isCharging {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: ringDiameter * 0.44, weight: .bold))
+                    .foregroundStyle(.yellow)
+            } else {
+                Text("\(snapshot.batteryLevel)")
+                    .font(.system(size: ringDiameter * 0.32, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+    }
+
+    private var wifiGlyph: some View {
+        Image(systemName: snapshot.wifiOn ? "wifi" : "wifi.slash")
+            .font(.system(size: tileHeight * 0.22, weight: .medium))
+            .foregroundStyle(snapshot.wifiOn ? .primary : .secondary)
+    }
+
+    private var statusDots: some View {
+        HStack(spacing: 2.5) {
+            ForEach(0..<4, id: \.self) { index in
+                Circle()
+                    .fill(index < filledDotCount ? Color.primary : Color.primary.opacity(0.22))
+                    .frame(width: 3.5, height: 3.5)
+            }
+            Circle()
+                .fill(snapshot.bluetoothOn ? .blue : Color.primary.opacity(0.22))
+                .frame(width: 3.5, height: 3.5)
+        }
     }
 }
 
