@@ -800,11 +800,12 @@ private struct WidgetsPanel: View {
             ScrollView {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
                     WeatherWidget()
-                    DailyWonderWidget()
+                        .gridCellColumns(2)
+                    SystemResourcesWidget()
+                    MediaWidget()
                     PhotosWidget()
                     StickyNotesWidget()
                     WatchlistWidget()
-                    MediaWidget()
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
@@ -827,6 +828,7 @@ private struct WidgetCard<Content: View>: View {
     let title: String
     let symbol: String
     let tint: Color
+    let minContentHeight: CGFloat
     let content: Content
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
@@ -836,11 +838,13 @@ private struct WidgetCard<Content: View>: View {
         title: String,
         symbol: String,
         tint: Color = .blue,
+        minContentHeight: CGFloat = 0,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.symbol = symbol
         self.tint = tint
+        self.minContentHeight = minContentHeight
         self.content = content()
     }
 
@@ -858,6 +862,7 @@ private struct WidgetCard<Content: View>: View {
             .font(.system(size: 12, weight: .semibold))
 
             content
+                .frame(maxWidth: .infinity, minHeight: minContentHeight, alignment: .topLeading)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -923,36 +928,80 @@ private struct WeatherWidget: View {
     }
 }
 
-private struct DailyWonderWidget: View {
+private struct SystemResourcesWidget: View {
+    private let backgroundApps: [(String, String, Color)] = [
+        ("Browser", "1.2 GB", .blue),
+        ("Cloud Sync", "640 MB", .purple),
+        ("Video Call", "420 MB", .green),
+        ("Photo Editor", "310 MB", .orange)
+    ]
+
     var body: some View {
-        WidgetCard(title: "Daily wonder", symbol: "sparkles", tint: .purple) {
-            HStack(spacing: 11) {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(red: 0.39, green: 0.69, blue: 0.76), Color(red: 0.85, green: 0.73, blue: 0.59)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay {
-                        Image(systemName: "paperplane.fill")
-                            .font(.system(size: 19))
-                            .foregroundStyle(.white.opacity(0.9))
+        WidgetCard(
+            title: "System resources",
+            symbol: "chart.bar.fill",
+            tint: .blue,
+            minContentHeight: 246
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Storage")
+                        .font(.system(size: 10, weight: .semibold))
+                    Spacer()
+                    Text("412 GB / 512 GB")
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.blue)
+                }
+
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.primary.opacity(0.08))
+                        Capsule()
+                            .fill(LinearGradient(colors: [.blue, .cyan], startPoint: .leading, endPoint: .trailing))
+                            .frame(width: geometry.size.width * 0.80)
                     }
-                    .frame(width: 58, height: 54)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Explore somewhere new")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text("A daily moment of inspiration")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.secondary)
+                }
+                .frame(height: 7)
+
+                HStack {
+                    Text("Memory")
+                        .font(.system(size: 10, weight: .semibold))
+                    Spacer()
+                    Text("12.9 GB in use")
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.purple)
+                }
+
+                Rectangle()
+                    .fill(Color.primary.opacity(0.08))
+                    .frame(height: 1)
+                    .padding(.vertical, 1)
+
+                Text("Background apps")
+                    .font(.system(size: 10, weight: .semibold))
+
+                VStack(spacing: 9) {
+                    ForEach(backgroundApps, id: \.0) { name, memory, tint in
+                        HStack(spacing: 7) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(tint.opacity(0.16))
+                                .overlay {
+                                    Image(systemName: "app.fill")
+                                        .font(.system(size: 8))
+                                        .foregroundStyle(tint)
+                                }
+                                .frame(width: 19, height: 19)
+                            Text(name)
+                                .font(.system(size: 9, weight: .medium))
+                                .lineLimit(1)
+                            Spacer(minLength: 2)
+                            Text(memory)
+                                .font(.system(size: 9, weight: .medium, design: .rounded))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
-            Text("Discover today's story  ›")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Color.blue)
-                .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 }
@@ -1041,7 +1090,7 @@ private struct MediaWidget: View {
     @State private var isPlaying = false
 
     var body: some View {
-        WidgetCard(title: "Now playing", symbol: "music.note", tint: .purple) {
+        WidgetCard(title: "Now playing", symbol: "music.note", tint: .purple, minContentHeight: 246) {
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 9)
                     .fill(LinearGradient(colors: [.purple.opacity(0.8), .pink.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing))
@@ -1177,11 +1226,12 @@ private struct ControlsFlyout: View {
     @Environment(\.surfaceTransparency) private var transparency
     @State private var wifiEnabled = true
     @State private var bluetoothEnabled = true
-    @State private var airplaneEnabled = false
     @State private var vpnEnabled = false
     @State private var volume: Double = 0.68
     @State private var appVolume: Double = 0.52
     @State private var brightness: Double = 0.82
+    @State private var isEditingQuickSettings = false
+    @AppStorage("quickSettings.hiddenTiles") private var hiddenQuickSettingTitles = ""
     @State private var enabledQuickSettings: Set<String> = [
         "Finder Path Bar", "Show Extension", "True Tone"
     ]
@@ -1209,13 +1259,16 @@ private struct ControlsFlyout: View {
         QuickSetting(title: "Small Launchpad", symbol: "square.grid.3x3.fill"),
         QuickSetting(title: "Speed Test", symbol: "globe"),
         QuickSetting(title: "True Tone", symbol: "sun.max.fill"),
-        QuickSetting(title: "Wi-Fi", symbol: "wifi"),
-        QuickSetting(title: "Xcode Cache", symbol: "hammer.fill"),
-        QuickSetting(title: "Airplane Mode", symbol: "airplane")
+        QuickSetting(title: "VPN", symbol: "lock.shield.fill"),
+        QuickSetting(title: "Xcode Cache", symbol: "hammer.fill")
     ]
 
     private var gridColumns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: 6), count: 3)
+    }
+
+    private var visibleQuickSettings: Set<String> {
+        Set(quickSettings.map(\.title)).subtracting(hiddenQuickSettingTitles.split(separator: "|").map(String.init))
     }
 
     var body: some View {
@@ -1229,8 +1282,19 @@ private struct ControlsFlyout: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "slider.horizontal.3")
-                    .foregroundStyle(accent)
+                Button {
+                    isEditingQuickSettings.toggle()
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .foregroundStyle(accent)
+                        .frame(width: 34, height: 34)
+                        .background(accent.opacity(0.10), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Choose which quick settings are shown")
+                .popover(isPresented: $isEditingQuickSettings, arrowEdge: .trailing) {
+                    quickSettingsEditor
+                }
             }
             .padding(.horizontal, 18)
             .padding(.top, 18)
@@ -1238,9 +1302,9 @@ private struct ControlsFlyout: View {
 
             ScrollView {
                 VStack(spacing: 10) {
-                    BatteryWidget()
-
                     HStack(spacing: 8) {
+                        BatteryWidget()
+                            .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .topLeading)
                         networkTile(
                             title: "Wi-Fi",
                             detail: wifiEnabled ? "Connected · Home Wi-Fi" : "Off",
@@ -1249,22 +1313,22 @@ private struct ControlsFlyout: View {
                         ) {
                             wifiEnabled.toggle()
                         }
-                        networkTile(
-                            title: "VPN",
-                            detail: vpnEnabled ? "Connected" : "Not connected",
-                            symbol: "lock.shield",
-                            isOn: vpnEnabled
-                        ) {
-                            vpnEnabled.toggle()
-                        }
+                        .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112)
                     }
 
                     BluetoothWidget(isEnabled: bluetoothEnabled)
 
                     LazyVGrid(columns: gridColumns, spacing: 6) {
-                        ForEach(quickSettings) { setting in
+                        ForEach(quickSettings.filter { visibleQuickSettings.contains($0.title) }) { setting in
                             quickSettingTile(setting)
                         }
+                    }
+                    if quickSettings.filter({ visibleQuickSettings.contains($0.title) }).isEmpty {
+                        Text("No quick settings selected")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 18)
                     }
                 }
                 .padding(.horizontal, 14)
@@ -1288,6 +1352,56 @@ private struct ControlsFlyout: View {
                 .strokeBorder(surfaceStyle == .classic98 ? Color.white : Color.white.opacity(0.76), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
         }
         .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
+    }
+
+    private var quickSettingsEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Show in Quick Settings")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Button("All") {
+                    hiddenQuickSettingTitles = ""
+                }
+                .font(.system(size: 10, weight: .semibold))
+                .buttonStyle(.plain)
+                .foregroundStyle(accent)
+            }
+
+            Text("Choose which tiles appear in the grid.")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(quickSettings) { setting in
+                        Toggle(setting.title, isOn: Binding(
+                            get: { visibleQuickSettings.contains(setting.title) },
+                            set: { isVisible in
+                                setQuickSettingVisibility(setting.title, isVisible: isVisible)
+                            }
+                        ))
+                        .toggleStyle(.checkbox)
+                        .font(.system(size: 11, weight: .medium))
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            .frame(height: 330)
+            .scrollIndicators(.hidden)
+        }
+        .padding(14)
+        .frame(width: 260)
+    }
+
+    private func setQuickSettingVisibility(_ title: String, isVisible: Bool) {
+        var hiddenTitles = Set(hiddenQuickSettingTitles.split(separator: "|").map(String.init))
+        if isVisible {
+            hiddenTitles.remove(title)
+        } else {
+            hiddenTitles.insert(title)
+        }
+        hiddenQuickSettingTitles = hiddenTitles.sorted().joined(separator: "|")
     }
 
     private func networkTile(
@@ -1316,7 +1430,7 @@ private struct ControlsFlyout: View {
                 Spacer(minLength: 0)
             }
             .padding(9)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .leading)
             .background(cardBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: 13))
         }
         .buttonStyle(.plain)
@@ -1357,8 +1471,7 @@ private struct ControlsFlyout: View {
         switch title {
         case "Bluetooth": bluetoothEnabled
         case "Dark Mode": isDarkMode
-        case "Wi-Fi": wifiEnabled
-        case "Airplane Mode": airplaneEnabled
+        case "VPN": vpnEnabled
         default: enabledQuickSettings.contains(title)
         }
     }
@@ -1369,10 +1482,8 @@ private struct ControlsFlyout: View {
             bluetoothEnabled.toggle()
         case "Dark Mode":
             isDarkMode.toggle()
-        case "Wi-Fi":
-            wifiEnabled.toggle()
-        case "Airplane Mode":
-            airplaneEnabled.toggle()
+        case "VPN":
+            vpnEnabled.toggle()
         default:
             if enabledQuickSettings.contains(title) {
                 enabledQuickSettings.remove(title)
