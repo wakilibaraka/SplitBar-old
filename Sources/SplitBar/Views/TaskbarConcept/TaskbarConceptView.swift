@@ -315,6 +315,96 @@ private enum ClockDisplayStyle: String, CaseIterable, Identifiable {
     }
 }
 
+private enum TaskbarIconSize: String, CaseIterable, Identifiable {
+    case small
+    case medium
+    case large
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .small: "Small"
+        case .medium: "Medium"
+        case .large: "Large"
+        }
+    }
+
+    var glyphFraction: CGFloat {
+        switch self {
+        case .small: 0.42
+        case .medium: 0.54
+        case .large: 0.64
+        }
+    }
+}
+
+private enum TrashPlacement: String, CaseIterable, Identifiable {
+    case withApps
+    case beforeTray
+    case farRight
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .withApps: "With apps"
+        case .beforeTray: "Before tray"
+        case .farRight: "Far right"
+        }
+    }
+}
+
+private enum PanelKind: String, CaseIterable, Identifiable {
+    case start
+    case widgets
+    case calendar
+    case controls
+    case settings
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .start: "Start"
+        case .widgets: "Widgets"
+        case .calendar: "Calendar"
+        case .controls: "Quick Settings"
+        case .settings: "Personalisation"
+        }
+    }
+
+    var defaultWidth: CGFloat {
+        switch self {
+        case .start: 640
+        case .widgets: 480
+        case .calendar: 380
+        case .controls: 360
+        case .settings: 560
+        }
+    }
+
+    var minimumWidth: CGFloat {
+        switch self {
+        case .start: 560
+        case .widgets: 400
+        case .calendar: 340
+        case .controls: 320
+        case .settings: 480
+        }
+    }
+
+    var maximumWidth: CGFloat {
+        switch self {
+        case .start: 860
+        case .widgets: 640
+        case .calendar: 520
+        case .controls: 520
+        case .settings: 680
+        }
+    }
+}
+
 private enum WallpaperPreset: String, CaseIterable, Identifiable {
     case pastelBloom
     case ocean
@@ -431,6 +521,20 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var taskbarGradientStart = Color(red: 0.78, green: 0.48, blue: 0.86)
     @Published fileprivate var taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)
     @Published fileprivate var taskbarHeight: CGFloat = 46
+    @Published fileprivate var taskbarIconSize = TaskbarIconSize.medium {
+        didSet { UserDefaults.standard.set(taskbarIconSize.rawValue, forKey: "taskbar.iconSize") }
+    }
+    @Published fileprivate var trashPlacement = TrashPlacement.withApps {
+        didSet { UserDefaults.standard.set(trashPlacement.rawValue, forKey: "taskbar.trashPlacement") }
+    }
+    @Published fileprivate var panelWidths: [PanelKind: CGFloat] = [:] {
+        didSet {
+            UserDefaults.standard.set(
+                Dictionary(uniqueKeysWithValues: panelWidths.map { ($0.key.rawValue, Double($0.value)) }),
+                forKey: "panels.widths"
+            )
+        }
+    }
     @Published fileprivate var showsClockSettings = false
     @Published fileprivate var uses24HourTime = false
     @Published fileprivate var showsSeconds = false
@@ -503,6 +607,17 @@ final class TaskbarConceptState: ObservableObject {
         if let savedClockStyle = defaults.string(forKey: "clock.displayStyle").flatMap(ClockDisplayStyle.init(rawValue:)) {
             clockDisplayStyle = savedClockStyle
         }
+        if let savedIconSize = defaults.string(forKey: "taskbar.iconSize").flatMap(TaskbarIconSize.init(rawValue:)) {
+            taskbarIconSize = savedIconSize
+        }
+        if let savedTrashPlacement = defaults.string(forKey: "taskbar.trashPlacement").flatMap(TrashPlacement.init(rawValue:)) {
+            trashPlacement = savedTrashPlacement
+        }
+        let savedWidths = defaults.dictionary(forKey: "panels.widths") as? [String: Double] ?? [:]
+        panelWidths = Dictionary(uniqueKeysWithValues: savedWidths.compactMap { key, value in
+            guard let kind = PanelKind(rawValue: key) else { return nil }
+            return (kind, CGFloat(value))
+        })
         var restoredPins: [String] = []
         for bundleID in defaults.stringArray(forKey: "launcher.pinnedApps") ?? LauncherDefaults.pinnedBundleIDs
         where LauncherDefaults.apps.contains(where: { $0.bundleIdentifier == bundleID })
@@ -532,6 +647,14 @@ final class TaskbarConceptState: ObservableObject {
 
     fileprivate func widgetSize(for widget: DashboardWidget) -> WidgetSizePreset {
         widgetSizes[widget] ?? widget.defaultSize
+    }
+
+    fileprivate func panelWidth(for kind: PanelKind) -> CGFloat {
+        panelWidths[kind] ?? kind.defaultWidth
+    }
+
+    fileprivate func setPanelWidth(_ width: CGFloat, for kind: PanelKind) {
+        panelWidths[kind] = min(kind.maximumWidth, max(kind.minimumWidth, width))
     }
 
     fileprivate func setWidgetSize(_ size: WidgetSizePreset, for widget: DashboardWidget) {
@@ -595,6 +718,10 @@ public struct TaskbarConceptView: View {
     private var displayedMonth: Date { model.displayedMonth }
     private var selectedDate: Date { model.selectedDate }
 
+    private func panelFrameWidth(_ kind: PanelKind, available: CGFloat) -> CGFloat {
+        min(model.panelWidth(for: kind), available)
+    }
+
     public var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
@@ -638,7 +765,7 @@ public struct TaskbarConceptView: View {
                 if openPanel == .widgets {
                     WidgetsPanel(onClose: { openPanel = nil }, accent: clockTint, model: model)
                         .frame(
-                            width: min(520, geometry.size.width - 36),
+                            width: panelFrameWidth(.widgets, available: geometry.size.width - 36),
                             height: max(300, geometry.size.height - taskbarHeight - 28)
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -672,7 +799,7 @@ public struct TaskbarConceptView: View {
 
                 if openPanel == .controls {
                     ControlsFlyout(accent: clockTint, model: model)
-                        .frame(width: min(520, geometry.size.width - 36), height: max(300, geometry.size.height - taskbarHeight - 28))
+                        .frame(width: panelFrameWidth(.controls, available: geometry.size.width - 36), height: max(300, geometry.size.height - taskbarHeight - 28))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         .padding(.trailing, 14)
                         .padding(.top, 14)
@@ -688,7 +815,7 @@ public struct TaskbarConceptView: View {
                         model: model,
                         onLaunchApplication: onLaunchApplication
                     )
-                        .frame(width: min(860, geometry.size.width - 48), height: min(820, geometry.size.height - taskbarHeight - 36))
+                        .frame(width: panelFrameWidth(.start, available: geometry.size.width - 48), height: min(820, geometry.size.height - taskbarHeight - 36))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .padding(.bottom, taskbarHeight + 12)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -710,10 +837,13 @@ public struct TaskbarConceptView: View {
                         taskbarGradientStart: $model.taskbarGradientStart,
                         taskbarGradientEnd: $model.taskbarGradientEnd,
                         taskbarHeight: $model.taskbarHeight,
+                        taskbarIconSize: $model.taskbarIconSize,
+                        trashPlacement: $model.trashPlacement,
+                        panelWidths: $model.panelWidths,
                         accent: clockTint,
                         onClose: { openPanel = nil }
                     )
-                    .frame(width: min(560, geometry.size.width - 40), height: min(680, geometry.size.height - taskbarHeight - 34))
+                    .frame(width: panelFrameWidth(.settings, available: geometry.size.width - 40), height: min(680, geometry.size.height - taskbarHeight - 34))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .padding(.bottom, taskbarHeight)
                     .transition(.scale(scale: 0.94).combined(with: .opacity))
@@ -736,6 +866,8 @@ public struct TaskbarConceptView: View {
                     showsSeconds: showsSeconds,
                     clockDisplayStyle: model.clockDisplayStyle,
                     pinnedBundleIDs: model.pinnedAppBundleIDs,
+                    iconSize: model.taskbarIconSize,
+                    trashPlacement: model.trashPlacement,
                     onLaunchApplication: onLaunchApplication
                 )
                 .zIndex(3)
@@ -837,7 +969,12 @@ private struct Taskbar: View {
     let showsSeconds: Bool
     let clockDisplayStyle: ClockDisplayStyle
     let pinnedBundleIDs: [String]
+    let iconSize: TaskbarIconSize
+    let trashPlacement: TrashPlacement
     let onLaunchApplication: (String) -> Void
+
+    private var glyphSize: CGFloat { height * iconSize.glyphFraction }
+    private var tileSide: CGFloat { max(28, height - 4) }
 
     private func clockSchedule<Content: View>(@ViewBuilder content: @escaping (Date) -> Content) -> some View {
         if showsSeconds {
@@ -905,7 +1042,7 @@ private struct Taskbar: View {
                         Image(systemName: "cloud.sun.fill")
                             .symbolRenderingMode(.palette)
                             .foregroundStyle(Color(red: 0.94, green: 0.63, blue: 0.18), Color(red: 0.45, green: 0.69, blue: 0.89))
-                            .font(.system(size: height * 0.48))
+                            .font(.system(size: glyphSize))
                         VStack(alignment: .leading, spacing: 2) {
                             Text("13°")
                                 .font(.system(size: 13, weight: .semibold))
@@ -924,6 +1061,10 @@ private struct Taskbar: View {
                 Spacer(minLength: 0)
 
                 HStack(spacing: 8) {
+                    if trashPlacement == .beforeTray {
+                        taskbarDivider
+                        trashCluster
+                    }
                     Button {
                         toggle(.controls)
                     } label: {
@@ -959,6 +1100,11 @@ private struct Taskbar: View {
                         .buttonStyle(.plain)
                         .help("Open calendar")
                     }
+
+                    if trashPlacement == .farRight {
+                        taskbarDivider
+                        trashCluster
+                    }
                 }
                 .padding(.trailing, 12)
             }
@@ -977,12 +1123,12 @@ private struct Taskbar: View {
                         bundleIdentifier: "com.apple.launchpad",
                         fallbackSymbol: "square.grid.3x3.fill",
                         fallbackColor: isDarkMode ? Color(red: 0.54, green: 0.76, blue: 1) : .blue,
-                        size: height * 0.46
+                        size: glyphSize
                     )
-                    .frame(width: max(28, height * 0.74), height: height - 8)
+                    .frame(width: tileSide, height: tileSide)
+                    .taskbarTile()
                 }
                 .help("Open Start")
-                .taskbarButton()
 
                 ForEach(pinnedBundleIDs, id: \.self) { bundleIdentifier in
                     let app = LauncherDefaults.apps.first { $0.bundleIdentifier == bundleIdentifier }
@@ -993,12 +1139,18 @@ private struct Taskbar: View {
                             bundleIdentifier: bundleIdentifier,
                             fallbackSymbol: app?.symbol ?? "app.fill",
                             fallbackColor: app?.color ?? .secondary,
-                            size: height * 0.44
+                            size: glyphSize
                         )
-                        .frame(width: max(28, height * 0.74), height: height - 8)
+                        .frame(width: tileSide, height: tileSide)
+                        .taskbarTile()
                     }
                     .help(app?.title ?? bundleIdentifier)
-                    .taskbarButton()
+                }
+
+                if trashPlacement == .withApps {
+                    taskbarDivider
+                        .padding(.vertical, 6)
+                    trashCluster
                 }
             }
             .buttonStyle(.plain)
@@ -1053,6 +1205,19 @@ private struct Taskbar: View {
             } label: {
                 Label("Quit Taskbar", systemImage: "power")
             }
+        }
+    }
+
+    private var taskbarDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.14))
+            .frame(width: 1)
+    }
+
+    private var trashCluster: some View {
+        HStack(spacing: 4) {
+            DownloadsTile(tileSide: tileSide, glyphSize: glyphSize)
+            TrashTile(tileSide: tileSide, glyphSize: glyphSize, darkMode: isDarkMode)
         }
     }
 
@@ -1185,6 +1350,152 @@ private final class AppIconStore: ObservableObject {
     }
 }
 
+private final class TrashStore: ObservableObject {
+    static let shared = TrashStore()
+
+    @Published private(set) var isEmpty = true
+
+    private let queue = DispatchQueue(label: "com.baraka.splitbar.trash", qos: .utility)
+    private let metadataQuery = NSMetadataQuery()
+
+    private var trashURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash", isDirectory: true)
+    }
+
+    private init() {
+        metadataQuery.searchScopes = [trashURL]
+        metadataQuery.predicate = NSPredicate(format: "%K LIKE '*'", NSMetadataItemFSNameKey)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(queryUpdated),
+            name: .NSMetadataQueryDidFinishGathering,
+            object: metadataQuery
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(queryUpdated),
+            name: .NSMetadataQueryDidUpdate,
+            object: metadataQuery
+        )
+        refresh()
+        metadataQuery.start()
+    }
+
+    @objc private func queryUpdated() {
+        refresh()
+    }
+
+    func refresh() {
+        let url = trashURL
+        queue.async { [weak self] in
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
+            let hasVisibleItems = names.contains { !$0.hasPrefix(".") }
+            DispatchQueue.main.async {
+                self?.isEmpty = !hasVisibleItems
+            }
+        }
+    }
+
+    func openTrash() {
+        NSWorkspace.shared.open(trashURL)
+        refresh()
+    }
+
+    func emptyTrash() {
+        queue.async { [weak self] in
+            guard let script = NSAppleScript(source: "tell application \"Finder\" to empty trash") else { return }
+            var errorDict: NSDictionary?
+            script.executeAndReturnError(&errorDict)
+            DispatchQueue.main.async {
+                self?.refresh()
+            }
+        }
+    }
+}
+
+private struct DownloadsTile: View {
+    let tileSide: CGFloat
+    let glyphSize: CGFloat
+
+    private var downloadsURL: URL? {
+        FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+    }
+
+    var body: some View {
+        Button {
+            if let url = downloadsURL {
+                NSWorkspace.shared.open(url)
+            }
+        } label: {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: glyphSize, weight: .medium))
+                .foregroundStyle(.teal)
+                .frame(width: tileSide, height: tileSide)
+                .taskbarTile()
+        }
+        .buttonStyle(.plain)
+        .help("Open Downloads")
+        .disabled(downloadsURL == nil)
+    }
+}
+
+private struct TrashTile: View {    let tileSide: CGFloat
+    let glyphSize: CGFloat
+    let darkMode: Bool
+    @ObservedObject private var store = TrashStore.shared
+
+    var body: some View {
+        Button {
+            store.openTrash()
+        } label: {
+            Image(systemName: store.isEmpty ? "trash" : "trash.fill")
+                .font(.system(size: glyphSize, weight: .medium))
+                .foregroundStyle(darkMode ? Color(red: 0.72, green: 0.78, blue: 0.88) : .secondary)
+                .frame(width: tileSide, height: tileSide)
+                .taskbarTile()
+        }
+        .buttonStyle(.plain)
+        .help(store.isEmpty ? "Open Trash (empty)" : "Open Trash")
+        .contextMenu {
+            Button("Open Trash") { store.openTrash() }
+            Button("Empty Trash") { store.emptyTrash() }
+                .disabled(store.isEmpty)
+        }
+        .onAppear { store.refresh() }
+    }
+}
+
+private struct TaskbarTileStyle: ViewModifier {
+    @Environment(\.surfaceStyle) private var surfaceStyle
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.5), lineWidth: 1)
+                    }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.pointingHand.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+    }
+}
+
+private extension View {
+    func taskbarTile() -> some View {
+        modifier(TaskbarTileStyle())
+    }
+}
+
 private struct MacOSAppIcon: View {
     let bundleIdentifier: String
     let fallbackSymbol: String
@@ -1213,30 +1524,6 @@ private struct MacOSAppIcon: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
-    }
-}
-
-private struct TaskbarButtonStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .background {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(Color.white.opacity(0.001))
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.pointingHand.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
-    }
-}
-
-private extension View {
-    func taskbarButton() -> some View {
-        modifier(TaskbarButtonStyle())
     }
 }
 
@@ -2626,6 +2913,9 @@ private struct SettingsFlyout: View {
     @Binding var taskbarGradientStart: Color
     @Binding var taskbarGradientEnd: Color
     @Binding var taskbarHeight: CGFloat
+    @Binding var taskbarIconSize: TaskbarIconSize
+    @Binding var trashPlacement: TrashPlacement
+    @Binding var panelWidths: [PanelKind: CGFloat]
     let accent: Color
     let onClose: () -> Void
     @Environment(\.surfaceStyle) private var currentStyle
@@ -2695,6 +2985,64 @@ private struct SettingsFlyout: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private func panelWidthBinding(for kind: PanelKind) -> Binding<Double> {
+        Binding(
+            get: { Double(panelWidths[kind] ?? kind.defaultWidth) },
+            set: { panelWidths[kind] = min(kind.maximumWidth, max(kind.minimumWidth, CGFloat($0))) }
+        )
+    }
+
+    private func iconSizePresetButton(_ size: TaskbarIconSize) -> some View {
+        Button {
+            taskbarIconSize = size
+        } label: {
+            VStack(spacing: 7) {
+                Image(systemName: "app.fill")
+                    .font(.system(size: 14 + CGFloat(TaskbarIconSize.allCases.firstIndex(of: size) ?? 1) * 4, weight: .medium))
+                    .foregroundStyle(accent)
+                    .frame(height: 26)
+                Text(size.title)
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity)
+            .background(
+                taskbarIconSize == size ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                in: RoundedRectangle(cornerRadius: 10)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func trashPlacementButton(_ placement: TrashPlacement) -> some View {
+        Button {
+            trashPlacement = placement
+        } label: {
+            Text(placement.title)
+                .font(.system(size: 9, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(
+                    trashPlacement == placement ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                    in: RoundedRectangle(cornerRadius: 9)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func panelWidthRow(_ kind: PanelKind) -> some View {
+        HStack {
+            Text(kind.title)
+                .font(.system(size: 10, weight: .medium))
+                .frame(width: 96, alignment: .leading)
+            Slider(value: panelWidthBinding(for: kind), in: Double(kind.minimumWidth)...Double(kind.maximumWidth), step: 10)
+                .tint(accent)
+            sliderValueLabel("\(Int(panelWidths[kind] ?? kind.defaultWidth)) pt")
+        }
     }
 
     private func wallpaperPresetButton(_ preset: WallpaperPreset) -> some View {
@@ -2826,6 +3174,31 @@ private struct SettingsFlyout: View {
             }
 
             quickSettingsGrid
+
+            settingsSection("Taskbar icons") {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                    ForEach(TaskbarIconSize.allCases) { size in
+                        iconSizePresetButton(size)
+                    }
+                }
+                Text("Trash position")
+                    .font(.system(size: 10, weight: .medium))
+                    .padding(.top, 2)
+                HStack(spacing: 8) {
+                    ForEach(TrashPlacement.allCases) { placement in
+                        trashPlacementButton(placement)
+                    }
+                }
+            }
+
+            settingsSection("Panel widths") {
+                ForEach(PanelKind.allCases) { kind in
+                    panelWidthRow(kind)
+                }
+                Text("Windows 11-style narrow defaults; widen any panel back toward its previous width.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
 
             settingsSection("Surface style") {
                 ForEach(SurfaceStyle.allCases) { style in

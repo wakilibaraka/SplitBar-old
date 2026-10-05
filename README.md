@@ -22,7 +22,13 @@ performed by the design window.
 The widget board has an Edit mode for drag reordering and per-widget Small,
 Medium, Large, and Extra large sizing; layout choices persist locally. The
 launcher supports up to eight pinned apps, and that same pin list drives the
-taskbar launch icons. Weather includes a 14-day forecast. The launcher shows
+taskbar launch icons. Taskbar icons render as full-height tiles with Small,
+Medium, and Large size presets shared with the taskbar weather glyph. A Trash
+tile with full/empty state sits beside a Downloads tile; its position (with the
+app icons, before the tray, or far right) is a Personalisation setting. Each of
+the five flyouts (Start, Widgets, Calendar, Quick Settings, Personalisation)
+has a Windows 11-style narrow default width with its own slider back toward the
+previous wide layout. Weather includes a 14-day forecast. The launcher shows
 background activity separately from the widget board, and its second column
 holds a Folders block (Desktop, Documents, Movies, Music, Pictures, Downloads)
 that resolves real, iCloud-aware user directories and opens them in Finder.

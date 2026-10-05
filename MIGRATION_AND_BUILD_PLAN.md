@@ -43,6 +43,12 @@ explicit user controls.
 - [x] Stop background polling at presentation cadence while nothing is on screen,
   move AppleScript playback queries off the main actor, cache app icons, and
   debounce slider persistence. See "Resource budget and forward compatibility".
+- [x] Render taskbar app icons as full-height tiles with Small/Medium/Large size
+  presets; the weather glyph uses the same sizing. Trash is a three-position
+  setting (with apps by default, before the tray, or far right) with a
+  Downloads tile pinned to its left, full/empty state, and Open/Empty actions.
+- [x] Narrow the five flyouts to Windows 11-style default widths, each with its
+  own width slider back up toward the previous wide layout.
 
 ## Architecture inventory and disposition
 
@@ -190,6 +196,44 @@ without blocking the main thread.
 **Gate:** each live tile has permission, error, unavailable, and success states;
 mock mode remains available for UI work.
 
+#### Weather, planned against the DatWeatherDoe pattern
+
+- Verified: DatWeatherDoe (inderdhir/DatWeatherDoe) is Apache-2.0 and may be
+  adapted with attribution, a license copy, and change notices.
+- Its verified mechanism: a URL builder for WeatherAPI
+  `forecast.json?key=&q=lat,lon&aqi=yes`; a repository factory choosing
+  CoreLocation coordinates or an explicit lat/long; a cancellable `Task` loop
+  sleeping a configurable refresh interval with a reachability-triggered retry;
+  a condition-to-SF-Symbol map rendered as a template `Image(systemName:)` plus
+  text in the status item. It ships no custom icon assets and performs no icon
+  animation.
+- SplitBar keeps its keyless Open-Meteo provider rather than adopting
+  WeatherAPI, because WeatherAPI requires every user to supply a personal key
+  that must never be bundled. Adopt the repository shape, the cancellable
+  polling task, and the condition-to-SF-Symbol rendering instead.
+- Store locally as a Codable snapshot (payload, fetchedAt, coordinates) under
+  Application Support with a single writer; serve the stale snapshot on launch
+  and on fetch failure, and mark it stale in the UI.
+- The requested weather animation has no counterpart in the reference. If
+  pursued, use SF Symbol variable-color effects on the taskbar glyph only, and
+  keep them static while the widgets panel is closed.
+
+#### Now Playing, planned against the BoringNotch approach
+
+- Verified: BoringNotch (TheBoredTeam/boring.notch) is GPL-3.0: STUDY ONLY,
+  reimplement clean, never paste.
+- Its verified mechanism: Now Playing comes from the private
+  `MediaRemote.framework`, bridged through a `mediaremote-adapter` framework
+  and consumed out-of-process via an XPC helper, so the private API is isolated
+  from the main app.
+- SplitBar's Phase-2 default stays on the current AppleScript provider, which
+  uses only public API for Music and Spotify and already runs off the main
+  actor with a player-running gate. A MediaRemote provider for all-players
+  coverage is optional later work, and if built it must live behind a protocol
+  in Core/, be feature-detected, stay XPC-isolated like the reference, and be
+  flagged in the PR description as a notarization risk. No private API in the
+  default path.
+
 ### Phase 7 — Calendar, launcher, and customization
 
 - Replace sample events/tasks/alarms with clear providers; request calendar
@@ -207,7 +251,6 @@ mock mode remains available for UI work.
 customization pass manual checks.
 
 ### Phase 8 — Real Dock integration, only after explicit safety review
-
 - Design a `DockController` protocol and a no-op/mock implementation first.
 - Before any system Dock mutation, persist original settings and prove recovery
   on normal quit, forced termination, app crash, and relaunch.
@@ -234,6 +277,37 @@ failure/termination paths.
 
 **Gate:** release checklist passes on supported macOS versions and a clean user
 profile.
+
+### Phase 10 — Window previews and switcher (planned, not started)
+
+Chosen scope for now is plan-only. When implementation starts, each slice below
+is its own PR, each independently reversible, and none of them changes macOS
+Dock behavior implicitly.
+
+- Verified references and their license verdicts: DockDoor (ejbills/DockDoor)
+  and AltTab (lwouis/alt-tab-macos) are GPL-3.0; rajeshgoli/deskbar ships with
+  no license grant. All three are STUDY ONLY: reimplement clean, never paste.
+  OpenSwitchr (trsdn/OpenSwitchr) is MIT and may be adapted with attribution.
+- The mechanism all four converge on: enumerate and raise/minimize/close
+  windows through public Accessibility APIs (`AXUIElement`, `AXObserver`);
+  capture thumbnails with ScreenCaptureKit behind the Screen Recording
+  permission, with a short-lived cache (DeskBar uses ~2 s) and a
+  `CGWindowList` fallback when capture is unavailable; show the preview in a
+  hover `NSPanel` after a short hover delay.
+- Follow the OpenSwitchr shape: one shared window index plus an event bus plus
+  one thumbnail cache, with the hover preview and any switcher overlay as thin
+  readers on top. Do not build a second enumeration path per surface.
+- Slice order: (1) per-app window list with names and icons only, behind an
+  explicit opt-in, requiring no new permission beyond what the slice needs;
+  (2) live thumbnails behind Screen Recording, with a static-icon fallback when
+  denied; (3) an Option-Tab style switcher overlay only after (1) and (2) are
+  proven. Accessibility and Screen Recording are requested lazily, at the
+  moment each slice is enabled, never at launch.
+- Flagged risk carried over from the references: DeskBar resolves the private
+  `_AXUIElementGetWindow` via dlsym. If SplitBar ever needs it, it goes behind
+  a protocol in Core/, is feature-detected with a frame-matching fallback, and
+  is flagged in the PR description as a notarization risk, exactly like the
+  existing login.framework lock-screen lookup.
 
 ## Resource budget and forward compatibility
 
@@ -319,7 +393,11 @@ build or test against. What has been established instead:
   current UI base; it is not yet an always-on-top edge replacement and does not
   hide the macOS Dock. Phase 4 and Phase 8 are separate gates for those
   behaviors.
-- **Repository inspirations:** “DockBar”, Deskbar, Eskele, and other projects
+- **Repository inspirations:** "DockBar", Deskbar, Eskele, and other projects
   are research inputs only until their exact repository URLs, license terms,
   ownership, and reusable files are audited. Adapt ideas freely; copy code only
   when the license explicitly permits the intended use and attribution is kept.
+  Verified so far: DatWeatherDoe is Apache-2.0 (adaptable with attribution);
+  BoringNotch, DockDoor, and AltTab are GPL-3.0 (study only, reimplement
+  clean); rajeshgoli/deskbar carries no license grant (study only);
+  OpenSwitchr is MIT (adaptable with attribution).
