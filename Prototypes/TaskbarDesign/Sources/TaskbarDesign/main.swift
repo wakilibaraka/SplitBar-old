@@ -759,13 +759,51 @@ private extension View {
     }
 }
 
+private enum WidgetSizePreset: String, CaseIterable, Identifiable {
+    case compact
+    case balanced
+    case spacious
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .compact: "Compact"
+        case .balanced: "Balanced"
+        case .spacious: "Spacious"
+        }
+    }
+
+    var cardContentHeight: CGFloat {
+        switch self {
+        case .compact: 126
+        case .balanced: 160
+        case .spacious: 194
+        }
+    }
+
+    var weatherContentHeight: CGFloat {
+        switch self {
+        case .compact: 310
+        case .balanced: 350
+        case .spacious: 390
+        }
+    }
+}
+
 private struct WidgetsPanel: View {
     let onClose: () -> Void
     let accent: Color
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
+    @AppStorage("widgets.sizePreset") private var widgetSizePresetName = WidgetSizePreset.balanced.rawValue
+    @State private var showsSizeOptions = false
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
+
+    private var sizePreset: WidgetSizePreset {
+        WidgetSizePreset(rawValue: widgetSizePresetName) ?? .balanced
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -778,13 +816,42 @@ private struct WidgetsPanel: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button {} label: {
+                Button {
+                    showsSizeOptions.toggle()
+                } label: {
                     Image(systemName: "slider.horizontal.3")
                         .font(.system(size: 14, weight: .semibold))
                         .frame(width: 34, height: 34)
                 }
                 .buttonStyle(.plain)
                 .background(.white.opacity(0.6), in: Circle())
+                .help("Choose widget size")
+                .popover(isPresented: $showsSizeOptions, arrowEdge: .top) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Widget size")
+                            .font(.system(size: 13, weight: .semibold))
+                        ForEach(WidgetSizePreset.allCases) { preset in
+                            Button {
+                                widgetSizePresetName = preset.rawValue
+                                showsSizeOptions = false
+                            } label: {
+                                HStack {
+                                    Text(preset.title)
+                                    Spacer()
+                                    if sizePreset == preset {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(accent)
+                                    }
+                                }
+                                .font(.system(size: 11, weight: .medium))
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(14)
+                    .frame(width: 180)
+                }
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .semibold))
@@ -799,13 +866,14 @@ private struct WidgetsPanel: View {
 
             ScrollView {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-                    WeatherWidget()
+                    WeatherWidget(contentHeight: sizePreset.weatherContentHeight)
                         .gridCellColumns(2)
-                    SystemResourcesWidget()
-                    MediaWidget()
-                    PhotosWidget()
-                    StickyNotesWidget()
-                    WatchlistWidget()
+                    SystemResourcesWidget(contentHeight: sizePreset.cardContentHeight)
+                    BackgroundAppsWidget(contentHeight: sizePreset.cardContentHeight)
+                    MediaWidget(contentHeight: sizePreset.cardContentHeight)
+                    PhotosWidget(contentHeight: sizePreset.cardContentHeight)
+                    StickyNotesWidget(contentHeight: sizePreset.cardContentHeight)
+                    WatchlistWidget(contentHeight: sizePreset.cardContentHeight)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
@@ -881,67 +949,158 @@ private struct WidgetCard<Content: View>: View {
 }
 
 private struct WeatherWidget: View {
-    private let forecast: [(String, String, String)] = [
-        ("Now", "sun.max.fill", "13°"),
-        ("1 PM", "sun.max.fill", "15°"),
-        ("2 PM", "cloud.sun.fill", "14°"),
-        ("3 PM", "cloud.fill", "14°"),
-        ("4 PM", "cloud.sun.fill", "13°")
+    let contentHeight: CGFloat
+    @State private var hourlyMetric = "Sky"
+
+    private let hourlyForecast: [(String, String, String, String)] = [
+        ("Now", "cloud.sun.fill", "13°", "50%"),
+        ("19:00", "cloud.rain.fill", "12°", "70%"),
+        ("20:00", "cloud.rain.fill", "11°", "65%"),
+        ("21:00", "cloud.moon.fill", "10°", "40%"),
+        ("22:00", "moon.fill", "9°", "25%"),
+        ("23:00", "moon.fill", "8°", "20%")
+    ]
+
+    private let tenDayForecast: [(String, String, String, String)] = [
+        ("Today", "cloud.sun.rain.fill", "20°", "13°"),
+        ("Tue", "cloud.sun.fill", "21°", "14°"),
+        ("Wed", "sun.max.fill", "23°", "15°"),
+        ("Thu", "sun.max.fill", "24°", "16°"),
+        ("Fri", "cloud.sun.fill", "22°", "15°"),
+        ("Sat", "cloud.rain.fill", "19°", "12°"),
+        ("Sun", "cloud.sun.fill", "21°", "13°"),
+        ("Mon", "sun.max.fill", "25°", "16°"),
+        ("Tue", "sun.max.fill", "26°", "17°"),
+        ("Wed", "cloud.sun.fill", "23°", "15°")
     ]
 
     var body: some View {
-        WidgetCard(title: "Weather", symbol: "cloud.sun.fill", tint: .blue) {
-            HStack(spacing: 12) {
-                Image(systemName: "cloud.sun.fill")
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(Color.orange, Color.blue.opacity(0.75))
-                    .font(.system(size: 37))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("13°")
-                        .font(.system(size: 27, weight: .semibold, design: .rounded))
-                    Text("Mostly clear · Durres")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            HStack(spacing: 0) {
-                ForEach(forecast, id: \.0) { hour, symbol, temperature in
-                    VStack(spacing: 7) {
-                        Text(hour)
+        WidgetCard(title: "Weather", symbol: "cloud.sun.fill", tint: .blue, minContentHeight: contentHeight) {
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(spacing: 12) {
+                    Image(systemName: "cloud.sun.fill")
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(Color.orange, Color.blue.opacity(0.75))
+                        .font(.system(size: 36))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("13°")
+                            .font(.system(size: 26, weight: .semibold, design: .rounded))
+                        Text("Mostly clear · Durres")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text("Feels like 12°")
+                            .font(.system(size: 10, weight: .medium))
+                        Label("50% humidity", systemImage: "humidity.fill")
                             .font(.system(size: 9, weight: .medium))
                             .foregroundStyle(.secondary)
-                        Image(systemName: symbol)
-                            .font(.system(size: 13))
-                            .foregroundStyle(symbol == "cloud.fill" ? Color.gray : Color.orange)
-                        Text(temperature)
-                            .font(.system(size: 10, weight: .semibold))
                     }
-                    .frame(maxWidth: .infinity)
+                }
+
+                forecastSectionHeader("Hourly forecast")
+
+                HStack(spacing: 0) {
+                    ForEach(Array(hourlyForecast.enumerated()), id: \.element.0) { index, forecast in
+                        let (hour, symbol, temperature, humidity) = forecast
+                        VStack(spacing: 6) {
+                            Text(hour)
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Image(systemName: symbol)
+                                .symbolRenderingMode(.multicolor)
+                                .font(.system(size: 15))
+                            Text(temperature)
+                                .font(.system(size: 9, weight: .semibold))
+                            Text(hourlyMetric == "Humidity" ? humidity : hourlyMetric == "Wind" ? "\(index * 3 + 5) km/h" : " ")
+                                .font(.system(size: 7, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    ForEach(["Sky", "Humidity", "Wind"], id: \.self) { metric in
+                        Button {
+                            hourlyMetric = metric
+                        } label: {
+                            Label(metric, systemImage: metricSymbol(metric))
+                                .font(.system(size: 8, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(
+                                    hourlyMetric == metric ? Color.blue.opacity(0.14) : Color.primary.opacity(0.045),
+                                    in: RoundedRectangle(cornerRadius: 8)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                forecastSectionHeader("10-day forecast")
+
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 5), spacing: 7) {
+                    ForEach(tenDayForecast, id: \.0) { day, symbol, high, low in
+                        VStack(spacing: 4) {
+                            Text(day)
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Image(systemName: symbol)
+                                .symbolRenderingMode(.multicolor)
+                                .font(.system(size: 15))
+                                .frame(height: 18)
+                            HStack(spacing: 3) {
+                                Text(high)
+                                    .font(.system(size: 8, weight: .semibold))
+                                Text(low)
+                                    .font(.system(size: 8, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
+                    }
                 }
             }
-            .padding(.top, 10)
-            .overlay(alignment: .top) {
-                Rectangle().fill(Color.black.opacity(0.07)).frame(height: 1)
+        }
+    }
+
+    private func forecastSectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+            Spacer()
+            if title == "10-day forecast" {
+                Text("Next 10 days")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(.secondary)
             }
+        }
+        .padding(.top, 2)
+    }
+
+    private func metricSymbol(_ metric: String) -> String {
+        switch metric {
+        case "Humidity": "humidity.fill"
+        case "Wind": "wind"
+        default: "cloud.fill"
         }
     }
 }
 
 private struct SystemResourcesWidget: View {
-    private let backgroundApps: [(String, String, Color)] = [
-        ("Browser", "1.2 GB", .blue),
-        ("Cloud Sync", "640 MB", .purple),
-        ("Video Call", "420 MB", .green),
-        ("Photo Editor", "310 MB", .orange)
-    ]
+    let contentHeight: CGFloat
 
     var body: some View {
         WidgetCard(
             title: "System resources",
             symbol: "chart.bar.fill",
             tint: .blue,
-            minContentHeight: 246
+            minContentHeight: contentHeight
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
@@ -972,33 +1131,68 @@ private struct SystemResourcesWidget: View {
                         .foregroundStyle(.purple)
                 }
 
-                Rectangle()
-                    .fill(Color.primary.opacity(0.08))
-                    .frame(height: 1)
-                    .padding(.vertical, 1)
+                resourceBar("CPU", value: 0.31, valueText: "31%", tint: .blue)
+                resourceBar("GPU", value: 0.57, valueText: "57%", tint: .purple)
+            }
+        }
+    }
 
-                Text("Background apps")
-                    .font(.system(size: 10, weight: .semibold))
+    private func resourceBar(_ title: String, value: CGFloat, valueText: String, tint: Color) -> some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 9, weight: .medium))
+                Spacer()
+                Text(valueText)
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(tint)
+            }
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.primary.opacity(0.08))
+                    Capsule().fill(tint.opacity(0.7)).frame(width: geometry.size.width * value)
+                }
+            }
+            .frame(height: 4)
+        }
+    }
+}
 
-                VStack(spacing: 9) {
-                    ForEach(backgroundApps, id: \.0) { name, memory, tint in
-                        HStack(spacing: 7) {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(tint.opacity(0.16))
-                                .overlay {
-                                    Image(systemName: "app.fill")
-                                        .font(.system(size: 8))
-                                        .foregroundStyle(tint)
-                                }
-                                .frame(width: 19, height: 19)
-                            Text(name)
-                                .font(.system(size: 9, weight: .medium))
-                                .lineLimit(1)
-                            Spacer(minLength: 2)
-                            Text(memory)
-                                .font(.system(size: 9, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                        }
+private struct BackgroundAppsWidget: View {
+    let contentHeight: CGFloat
+
+    private let backgroundApps: [(String, String, Color)] = [
+        ("Browser", "1.2 GB", .blue),
+        ("Cloud Sync", "640 MB", .purple),
+        ("Video Call", "420 MB", .green),
+        ("Photo Editor", "310 MB", .orange)
+    ]
+
+    var body: some View {
+        WidgetCard(
+            title: "Background apps",
+            symbol: "app.badge",
+            tint: .purple,
+            minContentHeight: contentHeight
+        ) {
+            VStack(spacing: 8) {
+                ForEach(backgroundApps, id: \.0) { name, memory, tint in
+                    HStack(spacing: 7) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(tint.opacity(0.16))
+                            .overlay {
+                                Image(systemName: "app.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(tint)
+                            }
+                            .frame(width: 19, height: 19)
+                        Text(name)
+                            .font(.system(size: 9, weight: .medium))
+                            .lineLimit(1)
+                        Spacer(minLength: 2)
+                        Text(memory)
+                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -1007,8 +1201,10 @@ private struct SystemResourcesWidget: View {
 }
 
 private struct PhotosWidget: View {
+    let contentHeight: CGFloat
+
     var body: some View {
-        WidgetCard(title: "Photos", symbol: "photo.on.rectangle.angled", tint: .blue) {
+        WidgetCard(title: "Photos", symbol: "photo.on.rectangle.angled", tint: .blue, minContentHeight: contentHeight) {
             HStack(spacing: 6) {
                 ForEach(0..<3) { index in
                     RoundedRectangle(cornerRadius: 9)
@@ -1043,8 +1239,10 @@ private struct PhotosWidget: View {
 }
 
 private struct StickyNotesWidget: View {
+    let contentHeight: CGFloat
+
     var body: some View {
-        WidgetCard(title: "Sticky notes", symbol: "note.text", tint: .orange) {
+        WidgetCard(title: "Sticky notes", symbol: "note.text", tint: .orange, minContentHeight: contentHeight) {
             Text("Remember to take a pause, stretch, and enjoy the little things.")
                 .font(.system(size: 12, weight: .medium, design: .rounded))
                 .lineSpacing(3)
@@ -1059,6 +1257,7 @@ private struct StickyNotesWidget: View {
 }
 
 private struct WatchlistWidget: View {
+    let contentHeight: CGFloat
     private let assets: [(String, String, String, Color)] = [
         ("NVDA", "$203.65", "+2.4%", .green),
         ("META", "$151.74", "+1.2%", .green),
@@ -1066,7 +1265,7 @@ private struct WatchlistWidget: View {
     ]
 
     var body: some View {
-        WidgetCard(title: "Watchlist", symbol: "chart.xyaxis.line", tint: .green) {
+        WidgetCard(title: "Watchlist", symbol: "chart.xyaxis.line", tint: .green, minContentHeight: contentHeight) {
             VStack(spacing: 9) {
                 ForEach(assets, id: \.0) { ticker, price, change, color in
                     HStack {
@@ -1087,10 +1286,11 @@ private struct WatchlistWidget: View {
 }
 
 private struct MediaWidget: View {
+    let contentHeight: CGFloat
     @State private var isPlaying = false
 
     var body: some View {
-        WidgetCard(title: "Now playing", symbol: "music.note", tint: .purple, minContentHeight: 246) {
+        WidgetCard(title: "Now playing", symbol: "music.note", tint: .purple, minContentHeight: contentHeight) {
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 9)
                     .fill(LinearGradient(colors: [.purple.opacity(0.8), .pink.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing))
