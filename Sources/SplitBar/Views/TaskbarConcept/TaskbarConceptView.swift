@@ -567,7 +567,6 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var enabledQuickSettings: Set<String> = [
         "Finder Path Bar", "Show Extension", "True Tone"
     ]
-    @Published fileprivate var wifiEnabled = true
     @Published fileprivate var bluetoothEnabled = true
     @Published fileprivate var vpnEnabled = false
     @Published fileprivate var volume: Double = 0.68
@@ -2225,49 +2224,55 @@ private struct MediaWidget: View {
 }
 
 private struct BluetoothWidget: View {
-    let isEnabled: Bool
-
-    private let devices: [(String, String, String)] = [
-        ("keyboard", "Wireless keyboard", "82%"),
-        ("computermouse.fill", "Bluetooth mouse", "100%"),
-        ("headphones", "Headphones", "45%")
-    ]
+    let powerOn: Bool
 
     var body: some View {
         WidgetCard(title: "Bluetooth devices", symbol: "bluetooth", tint: .blue) {
-            VStack(spacing: 12) {
-                ForEach(devices, id: \.1) { symbol, title, charge in
-                    HStack(spacing: 9) {
-                        Image(systemName: symbol)
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 18)
-                        Text(title)
-                            .font(.system(size: 9, weight: .medium))
-                            .lineLimit(1)
-                        Spacer(minLength: 0)
-                        Circle().fill(isEnabled ? Color.green : Color.secondary.opacity(0.45)).frame(width: 5, height: 5)
-                        Text(isEnabled ? charge : "Off")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 9) {
+                    Circle()
+                        .fill(powerOn ? Color.green : Color.secondary.opacity(0.45))
+                        .frame(width: 6, height: 6)
+                    Text(powerOn ? "Bluetooth on" : "Bluetooth off")
+                        .font(.system(size: 10, weight: .semibold))
+                    Spacer(minLength: 0)
                 }
+                Text("Pairing and per-device batteries arrive with the Bluetooth panel.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 }
 
 private struct BatteryWidget: View {
+    let level: Int
+    let isCharging: Bool
+    let isPluggedIn: Bool
+
+    private var stateText: String {
+        if isCharging { return "Charging" }
+        if isPluggedIn { return "Plugged in" }
+        return "On battery"
+    }
+
+    private var ringColor: Color {
+        if level <= 15 { return .red }
+        if level <= 30 { return .orange }
+        return .green
+    }
+
     var body: some View {
         WidgetCard(title: "Battery", symbol: "battery.75percent", tint: .green) {
             HStack(spacing: 13) {
                 ZStack {
                     Circle().stroke(Color.green.opacity(0.16), lineWidth: 6)
                     Circle()
-                        .trim(from: 0, to: 0.72)
-                        .stroke(Color.green, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                        .trim(from: 0, to: CGFloat(level) / 100)
+                        .stroke(ringColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                    Text("72")
+                    Text("\(level)")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                     Text("%")
                         .font(.system(size: 8, weight: .medium))
@@ -2276,9 +2281,9 @@ private struct BatteryWidget: View {
                 .frame(width: 48, height: 48)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Powering your day")
+                    Text("\(level)% · \(stateText)")
                         .font(.system(size: 10, weight: .semibold))
-                    Text("About 4 hours remaining")
+                    Text(isPluggedIn ? "Adapter connected" : "Discharging")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                 }
@@ -2395,20 +2400,22 @@ private struct ControlsFlyout: View {
             ScrollView {
                 VStack(spacing: 10) {
                     HStack(spacing: 8) {
-                        BatteryWidget()
-                            .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .topLeading)
-                        networkTile(
+                        BatteryWidget(
+                            level: model.systemStatus.batteryLevel,
+                            isCharging: model.systemStatus.isCharging,
+                            isPluggedIn: model.systemStatus.isPluggedIn
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .topLeading)
+                        statusReadoutTile(
                             title: "Wi-Fi",
-                            detail: model.wifiEnabled ? "Connected · Home Wi-Fi" : "Off",
-                            symbol: "wifi",
-                            isOn: model.wifiEnabled
-                        ) {
-                            model.wifiEnabled.toggle()
-                        }
+                            detail: model.systemStatus.wifiOn ? "On · \(model.systemStatus.wifiBars)/3 bars" : "Off",
+                            symbol: model.systemStatus.wifiOn ? "wifi" : "wifi.slash",
+                            isOn: model.systemStatus.wifiOn
+                        )
                         .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112)
                     }
 
-                    BluetoothWidget(isEnabled: model.bluetoothEnabled)
+                    BluetoothWidget(powerOn: model.systemStatus.bluetoothOn)
 
                     LazyVGrid(columns: gridColumns, spacing: 6) {
                         ForEach(quickSettings.filter { visibleQuickSettings.contains($0.title) }) { setting in
@@ -2497,36 +2504,32 @@ private struct ControlsFlyout: View {
         model.hiddenQuickSettingTitles = hiddenTitles
     }
 
-    private func networkTile(
+    private func statusReadoutTile(
         title: String,
         detail: String,
         symbol: String,
-        isOn: Bool,
-        action: @escaping () -> Void
+        isOn: Bool
     ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 9) {
-                Image(systemName: symbol)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(isOn ? .white : accent)
-                    .frame(width: 31, height: 31)
-                    .background(isOn ? accent : accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.system(size: 11, weight: .semibold))
-                    Text(detail)
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                }
-                Spacer(minLength: 0)
+        HStack(spacing: 9) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(isOn ? .white : accent)
+                .frame(width: 31, height: 31)
+                .background(isOn ? accent : accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(detail)
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
-            .padding(9)
-            .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .leading)
-            .background(cardBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: 13))
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
+        .padding(9)
+        .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .leading)
+        .background(cardBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: 13))
     }
 
     private func quickSettingTile(_ setting: QuickSetting) -> some View {
