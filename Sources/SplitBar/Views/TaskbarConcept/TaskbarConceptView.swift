@@ -223,16 +223,209 @@ private extension EnvironmentValues {
     }
 }
 
+private enum DashboardWidget: String, CaseIterable, Identifiable {
+    case weather
+    case systemResources
+    case nowPlaying
+    case photos
+    case stickyNotes
+    case watchlist
+
+    var id: String { rawValue }
+
+    var defaultSize: WidgetSizePreset {
+        switch self {
+        case .weather: .large
+        case .systemResources: .medium
+        case .nowPlaying, .photos, .stickyNotes, .watchlist: .small
+        }
+    }
+}
+
+private enum WidgetSizePreset: String, CaseIterable, Identifiable {
+    case small
+    case medium
+    case large
+    case extraLarge
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .small: "Small"
+        case .medium: "Medium"
+        case .large: "Large"
+        case .extraLarge: "Extra large"
+        }
+    }
+
+    var spansBoard: Bool {
+        self == .large || self == .extraLarge
+    }
+
+    var cardContentHeight: CGFloat {
+        switch self {
+        case .small: 78
+        case .medium: 126
+        case .large: 162
+        case .extraLarge: 210
+        }
+    }
+
+    var weatherContentHeight: CGFloat {
+        switch self {
+        case .small: 220
+        case .medium: 285
+        case .large: 350
+        case .extraLarge: 405
+        }
+    }
+
+    var estimatedHeight: CGFloat {
+        cardContentHeight + 56
+    }
+}
+
+private enum WidgetBoardSection: Identifiable {
+    case columns(id: Int, leading: [DashboardWidget], trailing: [DashboardWidget])
+    case fullWidth(id: Int, widget: DashboardWidget)
+
+    var id: Int {
+        switch self {
+        case let .columns(id, _, _), let .fullWidth(id, _): id
+        }
+    }
+}
+
+private enum ClockDisplayStyle: String, CaseIterable, Identifiable {
+    case stacked
+    case inline
+    case digital
+    case analog
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .stacked: "Stacked"
+        case .inline: "Inline"
+        case .digital: "Digital"
+        case .analog: "Analog"
+        }
+    }
+}
+
+private enum WallpaperPreset: String, CaseIterable, Identifiable {
+    case pastelBloom
+    case ocean
+    case sunset
+    case midnight
+    case graphite
+    case custom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .pastelBloom: "Pastel bloom"
+        case .ocean: "Ocean"
+        case .sunset: "Sunset"
+        case .midnight: "Midnight"
+        case .graphite: "Graphite"
+        case .custom: "Custom"
+        }
+    }
+
+    var colors: [Color] {
+        switch self {
+        case .pastelBloom:
+            [Color(red: 0.30, green: 0.48, blue: 0.67), Color(red: 0.91, green: 0.69, blue: 0.87), Color(red: 0.47, green: 0.70, blue: 0.86)]
+        case .ocean:
+            [Color(red: 0.02, green: 0.24, blue: 0.38), Color(red: 0.05, green: 0.49, blue: 0.62), Color(red: 0.36, green: 0.76, blue: 0.78)]
+        case .sunset:
+            [Color(red: 0.28, green: 0.20, blue: 0.42), Color(red: 0.83, green: 0.36, blue: 0.48), Color(red: 0.98, green: 0.67, blue: 0.41)]
+        case .midnight:
+            [Color(red: 0.015, green: 0.025, blue: 0.08), Color(red: 0.08, green: 0.08, blue: 0.20), Color(red: 0.05, green: 0.17, blue: 0.22)]
+        case .graphite:
+            [Color(red: 0.055, green: 0.065, blue: 0.08), Color(red: 0.15, green: 0.17, blue: 0.20), Color(red: 0.085, green: 0.10, blue: 0.12)]
+        case .custom:
+            []
+        }
+    }
+
+    var isDark: Bool {
+        self == .midnight || self == .graphite
+    }
+}
+
+private struct LauncherApp: Identifiable {
+    let bundleIdentifier: String
+    let symbol: String
+    let title: String
+    let color: Color
+
+    var id: String { bundleIdentifier }
+}
+
+private struct LauncherFolder: Identifiable {
+    let title: String
+    let symbol: String
+    let tint: Color
+    let directory: FileManager.SearchPathDirectory
+
+    var id: String { title }
+
+    var url: URL? {
+        FileManager.default.urls(for: directory, in: .userDomainMask).first
+    }
+}
+
+private enum LauncherDefaults {
+    static let folders: [LauncherFolder] = [
+        LauncherFolder(title: "Desktop", symbol: "desktopcomputer", tint: .blue, directory: .desktopDirectory),
+        LauncherFolder(title: "Documents", symbol: "doc.text.fill", tint: .indigo, directory: .documentDirectory),
+        LauncherFolder(title: "Movies", symbol: "film.fill", tint: .purple, directory: .moviesDirectory),
+        LauncherFolder(title: "Music", symbol: "music.note", tint: .pink, directory: .musicDirectory),
+        LauncherFolder(title: "Pictures", symbol: "photo.fill", tint: .orange, directory: .picturesDirectory),
+        LauncherFolder(title: "Downloads", symbol: "arrow.down.circle.fill", tint: .teal, directory: .downloadsDirectory)
+    ]
+
+    static let apps: [LauncherApp] = [
+        LauncherApp(bundleIdentifier: "com.apple.Safari", symbol: "safari.fill", title: "Safari", color: .blue),
+        LauncherApp(bundleIdentifier: "com.apple.finder", symbol: "folder.fill", title: "Finder", color: .orange),
+        LauncherApp(bundleIdentifier: "com.apple.mail", symbol: "envelope.fill", title: "Mail", color: .cyan),
+        LauncherApp(bundleIdentifier: "com.apple.iCal", symbol: "calendar", title: "Calendar", color: .red),
+        LauncherApp(bundleIdentifier: "com.apple.MobileSMS", symbol: "message.fill", title: "Messages", color: .green),
+        LauncherApp(bundleIdentifier: "com.apple.Music", symbol: "music.note", title: "Music", color: .purple),
+        LauncherApp(bundleIdentifier: "com.apple.systempreferences", symbol: "gearshape.fill", title: "System Settings", color: .gray),
+        LauncherApp(bundleIdentifier: "com.apple.Photos", symbol: "photo.fill", title: "Photos", color: .pink),
+        LauncherApp(bundleIdentifier: "com.apple.Terminal", symbol: "terminal.fill", title: "Terminal", color: .primary),
+        LauncherApp(bundleIdentifier: "com.apple.Notes", symbol: "doc.text.fill", title: "Notes", color: .orange),
+        LauncherApp(bundleIdentifier: "com.apple.TV", symbol: "video.fill", title: "TV", color: .purple),
+        LauncherApp(bundleIdentifier: "com.apple.Maps", symbol: "map.fill", title: "Maps", color: .green),
+        LauncherApp(bundleIdentifier: "com.apple.calculator", symbol: "calculator.fill", title: "Calculator", color: .blue)
+    ]
+    static let pinnedBundleIDs = Array(apps.prefix(8).map(\.bundleIdentifier))
+}
+
 @MainActor
 final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var openPanel: OpenPanel?
     @Published fileprivate var surfaceStyle = SurfaceStyle.glass
     @Published fileprivate var usesDockPresentation = false
     @Published fileprivate var isDarkMode = false
-    @Published fileprivate var usesPastelGradient = true
-    @Published fileprivate var pastelTint = Color(red: 0.91, green: 0.69, blue: 0.87)
-    @Published fileprivate var gradientEndTint = Color(red: 0.47, green: 0.70, blue: 0.86)
-    @Published fileprivate var gradientAngle = 35.0
+    @Published fileprivate var wallpaperPreset = WallpaperPreset.pastelBloom {
+        didSet { UserDefaults.standard.set(wallpaperPreset.rawValue, forKey: "wallpaper.preset") }
+    }
+    @Published fileprivate var pastelTint = Color(red: 0.91, green: 0.69, blue: 0.87) {
+        didSet { persist(key: "wallpaper.customStart", value: pastelTint.storedRGBA) }
+    }
+    @Published fileprivate var gradientEndTint = Color(red: 0.47, green: 0.70, blue: 0.86) {
+        didSet { persist(key: "wallpaper.customEnd", value: gradientEndTint.storedRGBA) }
+    }
+    @Published fileprivate var gradientAngle = 35.0 {
+        didSet { persist(key: "wallpaper.gradientAngle", value: gradientAngle) }
+    }
     @Published fileprivate var interfaceTransparency = 0.68
     @Published fileprivate var usesTaskbarGradient = false
     @Published fileprivate var taskbarGradientStart = Color(red: 0.78, green: 0.48, blue: 0.86)
@@ -242,11 +435,25 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var uses24HourTime = false
     @Published fileprivate var showsSeconds = false
     @Published fileprivate var dateStyle = ClockDateStyle.compact
+    @Published fileprivate var clockDisplayStyle = ClockDisplayStyle.stacked {
+        didSet { UserDefaults.standard.set(clockDisplayStyle.rawValue, forKey: "clock.displayStyle") }
+    }
     @Published fileprivate var clockTint = Color.roseAccent
     @Published fileprivate var displayedMonth = Calendar.current.startOfMonth(for: .now)
     @Published fileprivate var selectedDate = Date.now
-    @Published fileprivate var widgetSizePresetName = "balanced" {
-        didSet { UserDefaults.standard.set(widgetSizePresetName, forKey: "widgets.sizePreset") }
+    @Published fileprivate var widgetOrder = DashboardWidget.allCases {
+        didSet { UserDefaults.standard.set(widgetOrder.map(\.rawValue), forKey: "widgets.order") }
+    }
+    @Published fileprivate var widgetSizes: [DashboardWidget: WidgetSizePreset] = [:] {
+        didSet {
+            UserDefaults.standard.set(
+                Dictionary(uniqueKeysWithValues: widgetSizes.map { ($0.key.rawValue, $0.value.rawValue) }),
+                forKey: "widgets.sizes"
+            )
+        }
+    }
+    @Published fileprivate var pinnedAppBundleIDs = LauncherDefaults.pinnedBundleIDs {
+        didSet { UserDefaults.standard.set(pinnedAppBundleIDs, forKey: "launcher.pinnedApps") }
     }
     @Published fileprivate var hiddenQuickSettingTitles: Set<String> = [] {
         didSet { UserDefaults.standard.set(hiddenQuickSettingTitles.sorted().joined(separator: "|"), forKey: "quickSettings.hiddenTiles") }
@@ -263,12 +470,95 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var isPlaying = false
 
     init() {
-        widgetSizePresetName = UserDefaults.standard.string(forKey: "widgets.sizePreset") ?? "balanced"
+        let defaults = UserDefaults.standard
+        if let savedWallpaper = defaults.string(forKey: "wallpaper.preset").flatMap(WallpaperPreset.init(rawValue:)) {
+            wallpaperPreset = savedWallpaper
+        }
+        if let values = defaults.array(forKey: "wallpaper.customStart") as? [Double],
+           let color = Color.fromStoredRGBA(values) {
+            pastelTint = color
+        }
+        if let values = defaults.array(forKey: "wallpaper.customEnd") as? [Double],
+           let color = Color.fromStoredRGBA(values) {
+            gradientEndTint = color
+        }
+        if defaults.object(forKey: "wallpaper.gradientAngle") != nil {
+            gradientAngle = defaults.double(forKey: "wallpaper.gradientAngle")
+        }
+        if let savedOrder = defaults.stringArray(forKey: "widgets.order") {
+            let savedWidgets = savedOrder.compactMap(DashboardWidget.init(rawValue:))
+            var uniqueWidgets: [DashboardWidget] = []
+            for widget in savedWidgets where !uniqueWidgets.contains(widget) {
+                uniqueWidgets.append(widget)
+            }
+            widgetOrder = uniqueWidgets + DashboardWidget.allCases.filter { !uniqueWidgets.contains($0) }
+        }
+        let savedSizes = defaults.dictionary(forKey: "widgets.sizes") as? [String: String] ?? [:]
+        widgetSizes = Dictionary(uniqueKeysWithValues: savedSizes.compactMap { key, value in
+            guard let widget = DashboardWidget(rawValue: key), let size = WidgetSizePreset(rawValue: value) else {
+                return nil
+            }
+            return (widget, size)
+        })
+        if let savedClockStyle = defaults.string(forKey: "clock.displayStyle").flatMap(ClockDisplayStyle.init(rawValue:)) {
+            clockDisplayStyle = savedClockStyle
+        }
+        var restoredPins: [String] = []
+        for bundleID in defaults.stringArray(forKey: "launcher.pinnedApps") ?? LauncherDefaults.pinnedBundleIDs
+        where LauncherDefaults.apps.contains(where: { $0.bundleIdentifier == bundleID })
+            && !restoredPins.contains(bundleID)
+            && restoredPins.count < 8 {
+            restoredPins.append(bundleID)
+        }
+        pinnedAppBundleIDs = restoredPins
         hiddenQuickSettingTitles = Set(
-            (UserDefaults.standard.string(forKey: "quickSettings.hiddenTiles") ?? "")
+            (defaults.string(forKey: "quickSettings.hiddenTiles") ?? "")
                 .split(separator: "|")
                 .map(String.init)
         )
+    }
+
+    private var pendingPersistenceWorkItems: [String: DispatchWorkItem] = [:]
+
+    fileprivate func persist(key: String, value: Any) {
+        pendingPersistenceWorkItems[key]?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            UserDefaults.standard.set(value, forKey: key)
+            self?.pendingPersistenceWorkItems[key] = nil
+        }
+        pendingPersistenceWorkItems[key] = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: workItem)
+    }
+
+    fileprivate func widgetSize(for widget: DashboardWidget) -> WidgetSizePreset {
+        widgetSizes[widget] ?? widget.defaultSize
+    }
+
+    fileprivate func setWidgetSize(_ size: WidgetSizePreset, for widget: DashboardWidget) {
+        widgetSizes[widget] = size
+    }
+
+    fileprivate func moveWidget(_ widget: DashboardWidget, before target: DashboardWidget) {
+        guard widget != target, let sourceIndex = widgetOrder.firstIndex(of: widget) else { return }
+        var updatedOrder = widgetOrder
+        updatedOrder.remove(at: sourceIndex)
+        let targetIndex = updatedOrder.firstIndex(of: target) ?? updatedOrder.endIndex
+        updatedOrder.insert(widget, at: targetIndex)
+        widgetOrder = updatedOrder
+    }
+
+    fileprivate func setPinned(_ bundleID: String, isPinned: Bool) {
+        if isPinned {
+            guard LauncherDefaults.apps.contains(where: { $0.bundleIdentifier == bundleID }),
+                  !pinnedAppBundleIDs.contains(bundleID),
+                  pinnedAppBundleIDs.count < 8
+            else {
+                return
+            }
+            pinnedAppBundleIDs.append(bundleID)
+        } else {
+            pinnedAppBundleIDs.removeAll { $0 == bundleID }
+        }
     }
 }
 
@@ -288,7 +578,7 @@ public struct TaskbarConceptView: View {
     private var surfaceStyle: SurfaceStyle { model.surfaceStyle }
     private var usesDockPresentation: Bool { model.usesDockPresentation }
     private var isDarkMode: Bool { model.isDarkMode }
-    private var usesPastelGradient: Bool { model.usesPastelGradient }
+    private var wallpaperPreset: WallpaperPreset { model.wallpaperPreset }
     private var pastelTint: Color { model.pastelTint }
     private var gradientEndTint: Color { model.gradientEndTint }
     private var gradientAngle: Double { model.gradientAngle }
@@ -310,7 +600,7 @@ public struct TaskbarConceptView: View {
             ZStack(alignment: .bottom) {
                 DesktopBackdrop(
                     isDarkMode: isDarkMode,
-                    usesPastelGradient: usesPastelGradient,
+                    preset: wallpaperPreset,
                     pastelTint: pastelTint,
                     gradientEndTint: gradientEndTint,
                     gradientAngle: gradientAngle
@@ -367,6 +657,7 @@ public struct TaskbarConceptView: View {
                         uses24HourTime: $model.uses24HourTime,
                         showsSeconds: $model.showsSeconds,
                         dateStyle: $model.dateStyle,
+                        clockDisplayStyle: $model.clockDisplayStyle,
                         clockTint: $model.clockTint,
                         accent: clockTint
                     )
@@ -391,7 +682,12 @@ public struct TaskbarConceptView: View {
                 }
 
                 if openPanel == .start {
-                    StartFlyout(onClose: { openPanel = nil }, accent: clockTint, onLaunchApplication: onLaunchApplication)
+                    StartFlyout(
+                        onClose: { openPanel = nil },
+                        accent: clockTint,
+                        model: model,
+                        onLaunchApplication: onLaunchApplication
+                    )
                         .frame(width: min(860, geometry.size.width - 48), height: min(820, geometry.size.height - taskbarHeight - 36))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .padding(.bottom, taskbarHeight + 12)
@@ -405,7 +701,7 @@ public struct TaskbarConceptView: View {
                         surfaceStyle: $model.surfaceStyle,
                         usesDockPresentation: $model.usesDockPresentation,
                         isDarkMode: $model.isDarkMode,
-                        usesPastelGradient: $model.usesPastelGradient,
+                        wallpaperPreset: $model.wallpaperPreset,
                         pastelTint: $model.pastelTint,
                         gradientEndTint: $model.gradientEndTint,
                         gradientAngle: $model.gradientAngle,
@@ -438,6 +734,8 @@ public struct TaskbarConceptView: View {
                     dateStyle: dateStyle,
                     uses24HourTime: uses24HourTime,
                     showsSeconds: showsSeconds,
+                    clockDisplayStyle: model.clockDisplayStyle,
+                    pinnedBundleIDs: model.pinnedAppBundleIDs,
                     onLaunchApplication: onLaunchApplication
                 )
                 .zIndex(3)
@@ -453,7 +751,7 @@ public struct TaskbarConceptView: View {
 
 private struct DesktopBackdrop: View {
     let isDarkMode: Bool
-    let usesPastelGradient: Bool
+    let preset: WallpaperPreset
     let pastelTint: Color
     let gradientEndTint: Color
     let gradientAngle: Double
@@ -466,38 +764,36 @@ private struct DesktopBackdrop: View {
         UnitPoint(x: 0.5 + cos(gradientAngle * .pi / 180) / 2, y: 0.5 + sin(gradientAngle * .pi / 180) / 2)
     }
 
+    private var wallpaperColors: [Color] {
+        if preset == .custom {
+            return [pastelTint, gradientEndTint]
+        }
+        if isDarkMode && !preset.isDark {
+            return [
+                Color(red: 0.035, green: 0.055, blue: 0.10),
+                Color(red: 0.10, green: 0.075, blue: 0.14),
+                Color(red: 0.045, green: 0.10, blue: 0.16)
+            ]
+        }
+        return preset.colors
+    }
+
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: isDarkMode
-                    ? [
-                        Color(red: 0.035, green: 0.055, blue: 0.10),
-                        Color(red: 0.10, green: 0.075, blue: 0.14),
-                        Color(red: 0.045, green: 0.10, blue: 0.16)
-                    ]
-                    : usesPastelGradient
-                    ? [
-                        Color(red: 0.30, green: 0.48, blue: 0.67),
-                        pastelTint,
-                        gradientEndTint
-                    ]
-                    : [
-                        Color(red: 0.10, green: 0.22, blue: 0.39),
-                        Color(red: 0.13, green: 0.31, blue: 0.50),
-                        Color(red: 0.16, green: 0.22, blue: 0.42)
-                    ],
+                colors: wallpaperColors,
                 startPoint: gradientStart,
                 endPoint: gradientEnd
             )
 
             Circle()
-                .fill((isDarkMode ? Color(red: 0.21, green: 0.36, blue: 0.57) : (usesPastelGradient ? pastelTint : Color(red: 0.37, green: 0.71, blue: 0.87))).opacity(0.47))
+                .fill((preset == .custom ? pastelTint : wallpaperColors.first ?? pastelTint).opacity(0.47))
                 .frame(width: 520, height: 520)
                 .blur(radius: 85)
                 .offset(x: 380, y: -170)
 
             Circle()
-                .fill((isDarkMode ? Color(red: 0.39, green: 0.18, blue: 0.33) : (usesPastelGradient ? Color.roseAccent : Color(red: 0.28, green: 0.30, blue: 0.67))).opacity(0.31))
+                .fill((preset == .custom ? gradientEndTint : wallpaperColors.last ?? gradientEndTint).opacity(0.31))
                 .frame(width: 460, height: 460)
                 .blur(radius: 100)
                 .offset(x: -430, y: 140)
@@ -539,17 +835,21 @@ private struct Taskbar: View {
     let dateStyle: ClockDateStyle
     let uses24HourTime: Bool
     let showsSeconds: Bool
+    let clockDisplayStyle: ClockDisplayStyle
+    let pinnedBundleIDs: [String]
     let onLaunchApplication: (String) -> Void
 
-    private let appItems: [(String, String, String, Color)] = [
-        ("com.apple.Safari", "safari.fill", "Safari", Color(red: 0.15, green: 0.58, blue: 0.86)),
-        ("com.apple.finder", "folder.fill", "Finder", Color(red: 0.18, green: 0.56, blue: 0.91)),
-        ("com.apple.mail", "envelope.fill", "Mail", Color(red: 0.28, green: 0.54, blue: 0.85)),
-        ("com.apple.iCal", "calendar", "Calendar", Color.roseAccent),
-        ("com.apple.MobileSMS", "message.fill", "Messages", .green),
-        ("com.apple.Terminal", "terminal.fill", "Terminal", .primary),
-        ("com.apple.systempreferences", "gearshape.fill", "System Settings", .secondary)
-    ]
+    private func clockSchedule<Content: View>(@ViewBuilder content: @escaping (Date) -> Content) -> some View {
+        if showsSeconds {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                content(context.date)
+            }
+        } else {
+            TimelineView(.periodic(from: .now.nextMinuteBoundary, by: 60)) { context in
+                content(context.date)
+            }
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -623,11 +923,11 @@ private struct Taskbar: View {
 
                 Spacer(minLength: 0)
 
-                HStack(spacing: 13) {
+                HStack(spacing: 8) {
                     Button {
                         toggle(.controls)
                     } label: {
-                        HStack(spacing: 9) {
+                        HStack(spacing: 6) {
                             Image(systemName: "wifi")
                             Image(systemName: "speaker.wave.2.fill")
                             Image(systemName: "battery.75percent")
@@ -640,26 +940,27 @@ private struct Taskbar: View {
                     .buttonStyle(.plain)
                     .help("Open quick controls, volume, Bluetooth and battery")
 
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                    clockSchedule { date in
                         Button {
                             toggle(.calendar)
                         } label: {
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text(clockTime(context.date, uses24HourTime: uses24HourTime, showsSeconds: showsSeconds))
-                                    .font(.system(size: height * 0.27, weight: .semibold, design: .rounded))
-                                Text(dateStyle.string(from: context.date))
-                                    .font(.system(size: height * 0.22, weight: .medium))
-                            }
-                            .foregroundStyle(tint)
-                            .frame(minWidth: 78, minHeight: height - 8, alignment: .trailing)
+                            TaskbarClockDisplay(
+                                date: date,
+                                style: clockDisplayStyle,
+                                dateStyle: dateStyle,
+                                uses24HourTime: uses24HourTime,
+                                showsSeconds: showsSeconds,
+                                tint: tint,
+                                height: height
+                            )
+                            .frame(minWidth: 88, minHeight: height - 8, alignment: .trailing)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .help("Open calendar and notifications")
+                        .help("Open calendar")
                     }
                 }
-                .padding(.trailing, 20)
-                .frame(width: 245, alignment: .trailing)
+                .padding(.trailing, 12)
             }
             .padding(.horizontal, usesDockPresentation ? 18 : 8)
             .frame(maxWidth: .infinity)
@@ -683,23 +984,20 @@ private struct Taskbar: View {
                 .help("Open Start")
                 .taskbarButton()
 
-                ForEach(appItems, id: \.2) { bundleIdentifier, symbol, title, color in
+                ForEach(pinnedBundleIDs, id: \.self) { bundleIdentifier in
+                    let app = LauncherDefaults.apps.first { $0.bundleIdentifier == bundleIdentifier }
                     Button {
-                        if title == "System Settings" {
-                            toggle(.settings)
-                        } else {
-                            onLaunchApplication(bundleIdentifier)
-                        }
+                        onLaunchApplication(bundleIdentifier)
                     } label: {
                         MacOSAppIcon(
                             bundleIdentifier: bundleIdentifier,
-                            fallbackSymbol: symbol,
-                            fallbackColor: color,
+                            fallbackSymbol: app?.symbol ?? "app.fill",
+                            fallbackColor: app?.color ?? .secondary,
                             size: height * 0.44
                         )
                         .frame(width: max(28, height * 0.74), height: height - 8)
                     }
-                    .help(title)
+                    .help(app?.title ?? bundleIdentifier)
                     .taskbarButton()
                 }
             }
@@ -763,24 +1061,154 @@ private struct Taskbar: View {
     }
 }
 
+private struct TaskbarClockDisplay: View {
+    let date: Date
+    let style: ClockDisplayStyle
+    let dateStyle: ClockDateStyle
+    let uses24HourTime: Bool
+    let showsSeconds: Bool
+    let tint: Color
+    let height: CGFloat
+
+    private var time: String {
+        clockTime(date, uses24HourTime: uses24HourTime, showsSeconds: showsSeconds)
+    }
+
+    var body: some View {
+        Group {
+            switch style {
+            case .stacked:
+                VStack(alignment: .trailing, spacing: 2) {
+                    timeLabel
+                    dateLabel
+                }
+            case .inline:
+                HStack(spacing: 6) {
+                    timeLabel
+                    Text(dateStyle.string(from: date))
+                        .font(.system(size: height * 0.19, weight: .medium))
+                        .lineLimit(1)
+                }
+            case .digital:
+                timeLabel
+            case .analog:
+                HStack(spacing: 6) {
+                    AnalogClockFace(date: date, tint: tint, size: min(height - 12, 24))
+                    VStack(alignment: .trailing, spacing: 2) {
+                        timeLabel
+                        dateLabel
+                    }
+                }
+            }
+        }
+        .foregroundStyle(tint)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    private var timeLabel: some View {
+        Text(time)
+            .font(.system(size: height * (style == .digital ? 0.32 : 0.27), weight: .semibold, design: .rounded))
+            .lineLimit(1)
+    }
+
+    private var dateLabel: some View {
+        Text(dateStyle.string(from: date))
+            .font(.system(size: height * 0.20, weight: .medium))
+            .lineLimit(1)
+    }
+}
+
+private struct AnalogClockFace: View {
+    let date: Date
+    let tint: Color
+    let size: CGFloat
+
+    private var hourAngle: Double {
+        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+        return Double((components.hour ?? 0) % 12) * 30 + Double(components.minute ?? 0) / 2
+    }
+
+    private var minuteAngle: Double {
+        Double(Calendar.current.component(.minute, from: date)) * 6
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .strokeBorder(tint.opacity(0.7), lineWidth: 1.2)
+            Capsule()
+                .fill(tint)
+                .frame(width: 2, height: size * 0.24)
+                .offset(y: -size * 0.12)
+                .rotationEffect(.degrees(hourAngle))
+            Capsule()
+                .fill(tint)
+                .frame(width: 1.3, height: size * 0.34)
+                .offset(y: -size * 0.17)
+                .rotationEffect(.degrees(minuteAngle))
+            Circle()
+                .fill(tint)
+                .frame(width: 3, height: 3)
+        }
+        .frame(width: size, height: size)
+        .accessibilityLabel(date.formatted(date: .omitted, time: .shortened))
+    }
+}
+
+private final class AppIconStore: ObservableObject {
+    static let shared = AppIconStore()
+
+    @Published private(set) var icons: [String: NSImage] = [:]
+
+    private let queue = DispatchQueue(label: "com.baraka.splitbar.appicon", qos: .userInitiated)
+    private var resolved = Set<String>()
+
+    private init() {}
+
+    func icon(for bundleIdentifier: String) -> NSImage? {
+        if let cached = icons[bundleIdentifier] {
+            return cached
+        }
+        resolve(bundleIdentifier)
+        return nil
+    }
+
+    private func resolve(_ bundleIdentifier: String) {
+        guard resolved.insert(bundleIdentifier).inserted else { return }
+        queue.async { [weak self] in
+            guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else { return }
+            let image = NSWorkspace.shared.icon(forFile: appURL.path)
+            DispatchQueue.main.async {
+                self?.icons[bundleIdentifier] = image
+            }
+        }
+    }
+}
+
 private struct MacOSAppIcon: View {
     let bundleIdentifier: String
     let fallbackSymbol: String
     let fallbackColor: Color
     let size: CGFloat
+    @ObservedObject private var store = AppIconStore.shared
 
     var body: some View {
         Group {
-            if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: appURL.path))
+            if let icon = store.icons[bundleIdentifier] {
+                Image(nsImage: icon)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
-                Image(systemName: fallbackSymbol)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .foregroundStyle(fallbackColor)
-                    .padding(size * 0.14)
+                ZStack {
+                    Image(systemName: fallbackSymbol)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .foregroundStyle(fallbackColor)
+                        .padding(size * 0.14)
+                }
+                .task(id: bundleIdentifier) {
+                    _ = store.icon(for: bundleIdentifier)
+                }
             }
         }
         .frame(width: size, height: size)
@@ -812,38 +1240,6 @@ private extension View {
     }
 }
 
-private enum WidgetSizePreset: String, CaseIterable, Identifiable {
-    case compact
-    case balanced
-    case spacious
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .compact: "Compact"
-        case .balanced: "Balanced"
-        case .spacious: "Spacious"
-        }
-    }
-
-    var cardContentHeight: CGFloat {
-        switch self {
-        case .compact: 126
-        case .balanced: 160
-        case .spacious: 194
-        }
-    }
-
-    var weatherContentHeight: CGFloat {
-        switch self {
-        case .compact: 310
-        case .balanced: 350
-        case .spacious: 390
-        }
-    }
-}
-
 private struct WidgetsPanel: View {
     let onClose: () -> Void
     let accent: Color
@@ -851,11 +1247,42 @@ private struct WidgetsPanel: View {
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
-    @State private var showsSizeOptions = false
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
+    @State private var isEditingWidgets = false
 
-    private var sizePreset: WidgetSizePreset {
-        WidgetSizePreset(rawValue: model.widgetSizePresetName) ?? .balanced
+    private var boardSections: [WidgetBoardSection] {
+        var sections: [WidgetBoardSection] = []
+        var leading: [DashboardWidget] = []
+        var trailing: [DashboardWidget] = []
+        var leadingHeight: CGFloat = 0
+        var trailingHeight: CGFloat = 0
+        var nextID = 0
+
+        func flushColumns() {
+            guard !leading.isEmpty || !trailing.isEmpty else { return }
+            sections.append(.columns(id: nextID, leading: leading, trailing: trailing))
+            nextID += 1
+            leading = []
+            trailing = []
+            leadingHeight = 0
+            trailingHeight = 0
+        }
+
+        for widget in model.widgetOrder {
+            let size = model.widgetSize(for: widget)
+            if size.spansBoard {
+                flushColumns()
+                sections.append(.fullWidth(id: nextID, widget: widget))
+                nextID += 1
+            } else if leadingHeight <= trailingHeight {
+                leading.append(widget)
+                leadingHeight += size.estimatedHeight
+            } else {
+                trailing.append(widget)
+                trailingHeight += size.estimatedHeight
+            }
+        }
+        flushColumns()
+        return sections
     }
 
     var body: some View {
@@ -864,47 +1291,22 @@ private struct WidgetsPanel: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Widgets")
                         .font(.system(size: 25, weight: .semibold, design: .rounded))
-                    Text("A little overview of your day")
+                    Text(isEditingWidgets ? "Drag to rearrange · Choose a size on each card" : "A little overview of your day")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button {
-                    showsSizeOptions.toggle()
+                    isEditingWidgets.toggle()
                 } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 34, height: 34)
+                    Text(isEditingWidgets ? "Done" : "Edit")
+                        .font(.system(size: 11, weight: .semibold))
+                        .padding(.horizontal, 13)
+                        .frame(height: 34)
                 }
                 .buttonStyle(.plain)
-                .background(.white.opacity(0.6), in: Circle())
-                .help("Choose widget size")
-                .popover(isPresented: $showsSizeOptions, arrowEdge: .top) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Widget size")
-                            .font(.system(size: 13, weight: .semibold))
-                        ForEach(WidgetSizePreset.allCases) { preset in
-                            Button {
-                                model.widgetSizePresetName = preset.rawValue
-                                showsSizeOptions = false
-                            } label: {
-                                HStack {
-                                    Text(preset.title)
-                                    Spacer()
-                                    if sizePreset == preset {
-                                        Image(systemName: "checkmark")
-                                            .foregroundStyle(accent)
-                                    }
-                                }
-                                .font(.system(size: 11, weight: .medium))
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(14)
-                    .frame(width: 180)
-                }
+                .background(.white.opacity(0.6), in: Capsule())
+                .help("Rearrange and resize widgets")
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .semibold))
@@ -918,18 +1320,31 @@ private struct WidgetsPanel: View {
             .padding(.bottom, 16)
 
             ScrollView {
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-                    WeatherWidget(contentHeight: sizePreset.weatherContentHeight)
-                        .gridCellColumns(2)
-                    SystemResourcesWidget(contentHeight: sizePreset.cardContentHeight)
-                    BackgroundAppsWidget(contentHeight: sizePreset.cardContentHeight)
-                    MediaWidget(model: model, contentHeight: sizePreset.cardContentHeight)
-                    PhotosWidget(contentHeight: sizePreset.cardContentHeight)
-                    StickyNotesWidget(contentHeight: sizePreset.cardContentHeight)
-                    WatchlistWidget(contentHeight: sizePreset.cardContentHeight)
+                VStack(spacing: 12) {
+                    ForEach(boardSections) { section in
+                        switch section {
+                        case let .columns(_, leading, trailing):
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(spacing: 12) {
+                                    ForEach(leading) { widget in
+                                        widgetTile(widget)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .top)
+                                VStack(spacing: 12) {
+                                    ForEach(trailing) { widget in
+                                        widgetTile(widget)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .top)
+                            }
+                        case let .fullWidth(_, widget):
+                            widgetTile(widget)
+                        }
+                    }
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
             }
             .scrollIndicators(.hidden)
         }
@@ -942,6 +1357,73 @@ private struct WidgetsPanel: View {
         }
         .shadow(color: .black.opacity(surfaceStyle == .classic98 ? 0.12 : 0.18), radius: surfaceStyle == .glass ? 22 : 14, x: 0, y: surfaceStyle == .classic98 ? 3 : 8)
         .aeroSheen()
+    }
+
+    @ViewBuilder
+    private func widgetTile(_ widget: DashboardWidget) -> some View {
+        let size = model.widgetSize(for: widget)
+        let tile = widgetContent(widget, size: size)
+            .overlay(alignment: .topTrailing) {
+                if isEditingWidgets {
+                    Menu {
+                        ForEach(WidgetSizePreset.allCases) { preset in
+                            Button {
+                                model.setWidgetSize(preset, for: widget)
+                            } label: {
+                                if preset == size {
+                                    Label(preset.title, systemImage: "checkmark")
+                                } else {
+                                    Text(preset.title)
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.primary.opacity(0.75))
+                            .frame(width: 25, height: 25)
+                            .background(.regularMaterial, in: Circle())
+                    }
+                    .menuStyle(.borderlessButton)
+                    .padding(9)
+                    .help("Change widget size")
+                }
+            }
+            .animation(.snappy(duration: 0.22), value: size)
+
+        if isEditingWidgets {
+            tile
+                .draggable(widget.rawValue)
+                .dropDestination(for: String.self) { droppedItems, _ in
+                    guard let rawValue = droppedItems.first,
+                          let draggedWidget = DashboardWidget(rawValue: rawValue)
+                    else {
+                        return false
+                    }
+                    model.moveWidget(draggedWidget, before: widget)
+                    return true
+                }
+        } else {
+            tile
+        }
+    }
+
+    @ViewBuilder
+    private func widgetContent(_ widget: DashboardWidget, size: WidgetSizePreset) -> some View {
+        switch widget {
+        case .weather:
+            WeatherWidget(contentHeight: size.weatherContentHeight)
+        case .systemResources:
+            SystemResourcesWidget(contentHeight: size.cardContentHeight)
+        case .nowPlaying:
+            MediaWidget(model: model, contentHeight: size.cardContentHeight)
+        case .photos:
+            PhotosWidget(contentHeight: size.cardContentHeight)
+        case .stickyNotes:
+            StickyNotesWidget(contentHeight: size.cardContentHeight)
+        case .watchlist:
+            WatchlistWidget(contentHeight: size.cardContentHeight)
+        }
     }
 }
 
@@ -977,8 +1459,6 @@ private struct WidgetCard<Content: View>: View {
                 Text(title)
                     .foregroundStyle(.primary.opacity(0.84))
                 Spacer(minLength: 0)
-                Image(systemName: "ellipsis")
-                    .foregroundStyle(.secondary)
             }
             .font(.system(size: 12, weight: .semibold))
 
@@ -1014,7 +1494,7 @@ private struct WeatherWidget: View {
         ("23:00", "moon.fill", "8°", "20%")
     ]
 
-    private let tenDayForecast: [(String, String, String, String)] = [
+    private let fourteenDayForecast: [(String, String, String, String)] = [
         ("Today", "cloud.sun.rain.fill", "20°", "13°"),
         ("Tue", "cloud.sun.fill", "21°", "14°"),
         ("Wed", "sun.max.fill", "23°", "15°"),
@@ -1024,7 +1504,11 @@ private struct WeatherWidget: View {
         ("Sun", "cloud.sun.fill", "21°", "13°"),
         ("Mon", "sun.max.fill", "25°", "16°"),
         ("Tue", "sun.max.fill", "26°", "17°"),
-        ("Wed", "cloud.sun.fill", "23°", "15°")
+        ("Wed", "cloud.sun.fill", "23°", "15°"),
+        ("Thu", "cloud.sun.fill", "22°", "14°"),
+        ("Fri", "sun.max.fill", "24°", "16°"),
+        ("Sat", "cloud.rain.fill", "19°", "12°"),
+        ("Sun", "cloud.sun.fill", "21°", "13°")
     ]
 
     var body: some View {
@@ -1093,10 +1577,11 @@ private struct WeatherWidget: View {
                     }
                 }
 
-                forecastSectionHeader("10-day forecast")
+                forecastSectionHeader("14-day forecast")
 
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 5), spacing: 7) {
-                    ForEach(tenDayForecast, id: \.0) { day, symbol, high, low in
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 7) {
+                    ForEach(Array(fourteenDayForecast.enumerated()), id: \.offset) { _, forecast in
+                        let (day, symbol, high, low) = forecast
                         VStack(spacing: 4) {
                             Text(day)
                                 .font(.system(size: 8, weight: .medium))
@@ -1127,8 +1612,8 @@ private struct WeatherWidget: View {
             Text(title)
                 .font(.system(size: 10, weight: .semibold))
             Spacer()
-            if title == "10-day forecast" {
-                Text("Next 10 days")
+            if title == "14-day forecast" {
+                Text("Next 14 days")
                     .font(.system(size: 8, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -1211,23 +1696,36 @@ private struct SystemResourcesWidget: View {
     }
 }
 
-private struct BackgroundAppsWidget: View {
-    let contentHeight: CGFloat
-
+private struct LauncherBackgroundAppsCard: View {
     private let backgroundApps: [(String, String, Color)] = [
         ("Browser", "1.2 GB", .blue),
         ("Cloud Sync", "640 MB", .purple),
         ("Video Call", "420 MB", .green),
         ("Photo Editor", "310 MB", .orange)
     ]
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        WidgetCard(
-            title: "Background apps",
-            symbol: "app.badge",
-            tint: .purple,
-            minContentHeight: contentHeight
-        ) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Background activity", systemImage: "app.badge")
+                    .font(.system(size: 11, weight: .semibold))
+                Spacer(minLength: 4)
+                Text("2.6 GB")
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.purple)
+            }
+
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.primary.opacity(0.08))
+                    Capsule()
+                        .fill(LinearGradient(colors: [.purple, .blue], startPoint: .leading, endPoint: .trailing))
+                        .frame(width: geometry.size.width * 0.58)
+                }
+            }
+            .frame(height: 5)
+
             VStack(spacing: 8) {
                 ForEach(backgroundApps, id: \.0) { name, memory, tint in
                     HStack(spacing: 7) {
@@ -1250,6 +1748,12 @@ private struct BackgroundAppsWidget: View {
                 }
             }
         }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.045),
+            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+        )
     }
 }
 
@@ -1590,6 +2094,7 @@ private struct ControlsFlyout: View {
         }
         .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
         .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
+        .clipShape(RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous)
                 .strokeBorder(surfaceStyle == .classic98 ? Color.white : Color.white.opacity(0.76), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
@@ -1759,6 +2264,7 @@ private struct ClockFlyout: View {
     @Binding var uses24HourTime: Bool
     @Binding var showsSeconds: Bool
     @Binding var dateStyle: ClockDateStyle
+    @Binding var clockDisplayStyle: ClockDisplayStyle
     @Binding var clockTint: Color
     let accent: Color
     @Environment(\.surfaceStyle) private var surfaceStyle
@@ -1769,23 +2275,15 @@ private struct ClockFlyout: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                    Text(selectedDate.formatted(.dateTime.weekday(.wide).month(.wide).day()))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(accent)
-                    Text("Notifications")
+                    Text("Calendar")
                         .font(.system(size: 22, weight: .semibold, design: .rounded))
                 }
                 Spacer()
-                Button("Clear all") {}
-                    .font(.system(size: 10, weight: .semibold))
-                    .buttonStyle(.bordered)
-                    .tint(Color.roseAccent)
             }
             .padding(18)
-
-            NotificationCard()
-                .padding(.horizontal, 16)
-                .padding(.bottom, 14)
 
             Rectangle()
                 .fill(Color.black.opacity(0.07))
@@ -1833,6 +2331,7 @@ private struct ClockFlyout: View {
                         uses24HourTime: $uses24HourTime,
                         showsSeconds: $showsSeconds,
                         dateStyle: $dateStyle,
+                        clockDisplayStyle: $clockDisplayStyle,
                         clockTint: $clockTint
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -1866,42 +2365,6 @@ private struct ClockFlyout: View {
                 .background(Color.white.opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-    }
-}
-
-private struct NotificationCard: View {
-    @Environment(\.surfaceStyle) private var surfaceStyle
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.surfaceTransparency) private var transparency
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 11) {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(.blue)
-                .frame(width: 32, height: 32)
-                .background(Color.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 9))
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Settings").font(.system(size: 10, weight: .semibold))
-                    Spacer()
-                    Text("now").font(.system(size: 9)).foregroundStyle(.tertiary)
-                }
-                Text("Your desktop is ready")
-                    .font(.system(size: 11, weight: .semibold))
-                Text("Your taskbar design is looking good. Explore the new widget board.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(13)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.85), lineWidth: 1)
-        }
     }
 }
 
@@ -2094,6 +2557,7 @@ private struct ClockStyleSettings: View {
     @Binding var uses24HourTime: Bool
     @Binding var showsSeconds: Bool
     @Binding var dateStyle: ClockDateStyle
+    @Binding var clockDisplayStyle: ClockDisplayStyle
     @Binding var clockTint: Color
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
@@ -2114,6 +2578,14 @@ private struct ClockStyleSettings: View {
                 styleChip("12-hour", isSelected: !uses24HourTime) { uses24HourTime = false }
                 styleChip("24-hour", isSelected: uses24HourTime) { uses24HourTime = true }
                 styleChip("Seconds", isSelected: showsSeconds) { showsSeconds.toggle() }
+            }
+
+            HStack(spacing: 6) {
+                ForEach(ClockDisplayStyle.allCases) { style in
+                    styleChip(style.title, isSelected: clockDisplayStyle == style) {
+                        clockDisplayStyle = style
+                    }
+                }
             }
 
             HStack(spacing: 7) {
@@ -2145,7 +2617,7 @@ private struct SettingsFlyout: View {
     @Binding var surfaceStyle: SurfaceStyle
     @Binding var usesDockPresentation: Bool
     @Binding var isDarkMode: Bool
-    @Binding var usesPastelGradient: Bool
+    @Binding var wallpaperPreset: WallpaperPreset
     @Binding var pastelTint: Color
     @Binding var gradientEndTint: Color
     @Binding var gradientAngle: Double
@@ -2159,6 +2631,178 @@ private struct SettingsFlyout: View {
     @Environment(\.surfaceStyle) private var currentStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
+
+    private var sectionFill: Color {
+        Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.045)
+    }
+
+    private func settingsSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+            content()
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(sectionFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func sliderValueLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .medium, design: .rounded))
+            .foregroundStyle(.secondary)
+            .frame(minWidth: 38, alignment: .trailing)
+    }
+
+    private func surfaceStyleRow(_ style: SurfaceStyle) -> some View {
+        Button {
+            surfaceStyle = style
+        } label: {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: style == .classic98 ? 2 : 10)
+                    .fill(style.cardFill(darkMode: isDarkMode))
+                    .overlay {
+                        Circle()
+                            .fill(accent.opacity(0.75))
+                            .frame(width: 18, height: 18)
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: style == .classic98 ? 2 : 10)
+                            .strokeBorder(style == .classic98 ? Color.white : Color.white.opacity(0.9), lineWidth: style == .classic98 ? 2 : 1)
+                    }
+                    .frame(width: 48, height: 38)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(style.title)
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(style.subtitle)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if surfaceStyle == style {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(accent)
+                }
+            }
+            .padding(9)
+            .background(
+                surfaceStyle == style ? style.accent(darkMode: isDarkMode).opacity(0.1) : Color.primary.opacity(0.035),
+                in: RoundedRectangle(cornerRadius: style.cornerRadius)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func wallpaperPresetButton(_ preset: WallpaperPreset) -> some View {
+        Button {
+            wallpaperPreset = preset
+            isDarkMode = preset.isDark
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(
+                        LinearGradient(
+                            colors: preset == .custom ? [pastelTint, gradientEndTint] : preset.colors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(height: 38)
+                Text(preset.title)
+                    .font(.system(size: 9, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .padding(6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                wallpaperPreset == preset ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                in: RoundedRectangle(cornerRadius: 10)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var quickSettingsGrid: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 12) {
+            taskbarModeSection
+            appearanceSection
+            transparencySection
+            taskbarHeightSection
+        }
+    }
+
+    private var taskbarModeSection: some View {
+        settingsSection("Taskbar mode") {
+            Toggle(isOn: Binding(
+                get: { !usesDockPresentation },
+                set: { usesDockPresentation = !$0 }
+            )) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Windows taskbar UI")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Turn off to preview a macOS-style Dock presentation")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+        }
+    }
+
+    private var appearanceSection: some View {
+        settingsSection("Appearance") {
+            Toggle(isOn: $isDarkMode) {
+                Label(
+                    isDarkMode ? "Dark appearance" : "Light appearance",
+                    systemImage: isDarkMode ? "moon.stars.fill" : "sun.max.fill"
+                )
+                .font(.system(size: 11, weight: .medium))
+            }
+            .toggleStyle(.switch)
+        }
+    }
+
+    private var transparencySection: some View {
+        settingsSection("Transparency") {
+            Toggle(isOn: Binding(
+                get: { interfaceTransparency > 0 },
+                set: { interfaceTransparency = $0 ? 0.68 : 0 }
+            )) {
+                Text("Enable transparency")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .toggleStyle(.switch)
+            Slider(value: $interfaceTransparency, in: 0...0.9, step: 0.01)
+                .tint(accent)
+                .disabled(interfaceTransparency == 0)
+            HStack {
+                sliderValueLabel("\(Int(interfaceTransparency * 100))%")
+                Spacer(minLength: 0)
+                Text("Panels and taskbar")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var taskbarHeightSection: some View {
+        settingsSection("Taskbar height") {
+            Slider(value: $taskbarHeight, in: 32...48, step: 2)
+                .tint(accent)
+            HStack {
+                Text("Compact")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                sliderValueLabel("\(Int(taskbarHeight)) pt")
+            }
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -2176,168 +2820,53 @@ private struct SettingsFlyout: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .semibold))
                         .frame(width: 32, height: 32)
-                        .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.07), in: Circle())
+                        .background(sectionFill, in: Circle())
                 }
                 .buttonStyle(.plain)
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Taskbar mode")
-                    .font(.system(size: 13, weight: .semibold))
-                Toggle(isOn: Binding(
-                    get: { !usesDockPresentation },
-                    set: { usesDockPresentation = !$0 }
-                )) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Windows taskbar UI")
-                            .font(.system(size: 11, weight: .medium))
-                        Text("Turn off to preview a macOS-style Dock presentation")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.switch)
-            }
-            .padding(14)
-            .background(Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.045), in: RoundedRectangle(cornerRadius: 14))
+            quickSettingsGrid
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Appearance")
-                    .font(.system(size: 13, weight: .semibold))
-                Toggle(isOn: $isDarkMode) {
-                    Label(isDarkMode ? "Dark appearance" : "Light appearance", systemImage: isDarkMode ? "moon.stars.fill" : "sun.max.fill")
-                        .font(.system(size: 11, weight: .medium))
-                }
-                .toggleStyle(.switch)
-            }
-            .padding(14)
-            .background(Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.045), in: RoundedRectangle(cornerRadius: 14))
-
-            VStack(alignment: .leading, spacing: 11) {
-                Text("Surface style")
-                    .font(.system(size: 13, weight: .semibold))
+            settingsSection("Surface style") {
                 ForEach(SurfaceStyle.allCases) { style in
-                    Button {
-                        surfaceStyle = style
-                    } label: {
-                        HStack(spacing: 12) {
-                            RoundedRectangle(cornerRadius: style == .classic98 ? 2 : 10)
-                                .fill(style.cardFill(darkMode: isDarkMode))
-                                .overlay {
-                                    Circle()
-                                        .fill(accent.opacity(0.75))
-                                        .frame(width: 18, height: 18)
-                                }
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: style == .classic98 ? 2 : 10)
-                                        .strokeBorder(style == .classic98 ? Color.white : Color.white.opacity(0.9), lineWidth: style == .classic98 ? 2 : 1)
-                                }
-                                .frame(width: 48, height: 38)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(style.title)
-                                    .font(.system(size: 11, weight: .semibold))
-                                Text(style.subtitle)
-                                    .font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if surfaceStyle == style {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(accent)
-                            }
-                        }
-                        .padding(9)
-                        .background(surfaceStyle == style ? style.accent(darkMode: isDarkMode).opacity(0.1) : Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: style.cornerRadius))
-                    }
-                    .buttonStyle(.plain)
+                    surfaceStyleRow(style)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Pastel desktop")
-                    .font(.system(size: 13, weight: .semibold))
-                Toggle(isOn: $usesPastelGradient) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Use gradient wallpaper")
-                            .font(.system(size: 11, weight: .medium))
-                        Text("Try a soft, shifting pastel background")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
+            settingsSection("Desktop wallpaper") {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                    ForEach(WallpaperPreset.allCases) { preset in
+                        wallpaperPresetButton(preset)
                     }
                 }
-                .toggleStyle(.switch)
-                HStack {
-                    ColorPicker("Start colour", selection: $pastelTint, supportsOpacity: false)
-                    ColorPicker("End colour", selection: $gradientEndTint, supportsOpacity: false)
+                Text("Choose a preset or pick Custom to tune the gradient colours.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                if wallpaperPreset == .custom {
+                    HStack {
+                        ColorPicker("Start colour", selection: $pastelTint, supportsOpacity: false)
+                        ColorPicker("End colour", selection: $gradientEndTint, supportsOpacity: false)
+                    }
+                    .font(.system(size: 10, weight: .medium))
                 }
-                .font(.system(size: 10, weight: .medium))
                 HStack {
                     Text("Gradient angle")
                         .font(.system(size: 10, weight: .medium))
                     Slider(value: $gradientAngle, in: 0...360, step: 1)
                         .tint(accent)
-                    Text("\(Int(gradientAngle))°")
-                        .font(.system(size: 9, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 32, alignment: .trailing)
+                    sliderValueLabel("\(Int(gradientAngle))°")
                 }
             }
-            .padding(14)
-            .background(Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.045), in: RoundedRectangle(cornerRadius: 14))
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Taskbar gradient")
-                    .font(.system(size: 13, weight: .semibold))
+            settingsSection("Taskbar gradient") {
                 Toggle("Use custom taskbar gradient", isOn: $usesTaskbarGradient)
                     .toggleStyle(.switch)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                 HStack {
                     ColorPicker("Start", selection: $taskbarGradientStart, supportsOpacity: false)
                     ColorPicker("End", selection: $taskbarGradientEnd, supportsOpacity: false)
                 }
                 .font(.system(size: 10, weight: .medium))
-            }
-            .padding(14)
-            .background(Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.045), in: RoundedRectangle(cornerRadius: 14))
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Transparency")
-                        .font(.system(size: 11, weight: .semibold))
-                    Spacer()
-                    Text("\(Int(interfaceTransparency * 100))%")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-                Toggle(isOn: Binding(
-                    get: { interfaceTransparency > 0 },
-                    set: { interfaceTransparency = $0 ? 0.68 : 0 }
-                )) {
-                    Text("Enable transparency")
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .toggleStyle(.switch)
-                Slider(value: $interfaceTransparency, in: 0...0.9, step: 0.01)
-                    .tint(accent)
-                    .disabled(interfaceTransparency == 0)
-                Text("Adjust panels and taskbar together")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(14)
-            .background(Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.045), in: RoundedRectangle(cornerRadius: 14))
-
-            VStack(alignment: .leading, spacing: 9) {
-                HStack {
-                    Text("Taskbar height")
-                        .font(.system(size: 11, weight: .semibold))
-                    Spacer()
-                    Text("\(Int(taskbarHeight)) pt")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-                Slider(value: $taskbarHeight, in: 32...48, step: 2)
-                    .tint(accent)
             }
 
             Spacer(minLength: 0)
@@ -2347,6 +2876,7 @@ private struct SettingsFlyout: View {
         .scrollIndicators(.hidden)
         .background(panelBackground(style: currentStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: currentStyle.cornerRadius, style: .continuous))
         .background(surfaceWash(style: currentStyle, darkMode: colorScheme == .dark))
+        .clipShape(RoundedRectangle(cornerRadius: currentStyle.cornerRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: currentStyle.cornerRadius, style: .continuous)
                 .strokeBorder(currentStyle == .classic98 ? Color.white : Color.white.opacity(0.76), lineWidth: currentStyle == .classic98 ? 2 : 1)
@@ -2358,34 +2888,22 @@ private struct SettingsFlyout: View {
 private struct StartFlyout: View {
     let onClose: () -> Void
     let accent: Color
+    @ObservedObject var model: TaskbarConceptState
     let onLaunchApplication: (String) -> Void
+    @State private var isEditingPins = false
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
 
-    private let apps: [(String, String, String, Color)] = [
-        ("com.apple.Safari", "safari.fill", "Safari", .blue),
-        ("com.apple.finder", "folder.fill", "Finder", .orange),
-        ("com.apple.mail", "envelope.fill", "Mail", .cyan),
-        ("com.apple.iCal", "calendar", "Calendar", .red),
-        ("com.apple.MobileSMS", "message.fill", "Messages", .green),
-        ("com.apple.Music", "music.note", "Music", .purple),
-        ("com.apple.systempreferences", "gearshape.fill", "System Settings", .gray),
-        ("com.apple.Photos", "photo.fill", "Photos", .pink),
-        ("com.apple.Terminal", "terminal.fill", "Terminal", .primary),
-        ("com.apple.Notes", "doc.text.fill", "Notes", .orange),
-        ("com.apple.TV", "video.fill", "TV", .purple),
-        ("com.apple.Maps", "map.fill", "Maps", .green),
-        ("com.apple.calculator", "calculator.fill", "Calculator", .blue)
-    ]
+    private var apps: [LauncherApp] { LauncherDefaults.apps }
 
-    private let recentApps: [(String, String, Color, String)] = [
-        ("safari.fill", "Browser", .blue, "Opened 12 minutes ago"),
-        ("photo.fill", "Photos", .pink, "Opened 34 minutes ago"),
-        ("doc.text.fill", "Project notes", .orange, "Edited 1 hour ago"),
-        ("folder.fill", "Design assets", .yellow, "Opened yesterday"),
-        ("music.note", "Music", .purple, "Played recently")
-    ]
+    private var folders: [LauncherFolder] { LauncherDefaults.folders }
+
+    private var pinnedApps: [LauncherApp] {
+        model.pinnedAppBundleIDs.compactMap { bundleID in
+            apps.first { $0.bundleIdentifier == bundleID }
+        }
+    }
 
     var body: some View {
         VStack(spacing: 18) {
@@ -2409,140 +2927,127 @@ private struct StartFlyout: View {
                         Text("Pinned")
                             .font(.system(size: 15, weight: .semibold))
                         Spacer()
-                        Text("All apps  ›")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(accent)
+                        Button(isEditingPins ? "Done" : "Edit") {
+                            isEditingPins.toggle()
+                        }
+                        .font(.system(size: 10, weight: .semibold))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(accent)
                     }
 
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 19) {
-                        ForEach(apps, id: \.2) { bundleIdentifier, symbol, title, color in
+                        ForEach(pinnedApps) { app in
                             Button {
-                                onLaunchApplication(bundleIdentifier)
+                                if isEditingPins {
+                                    model.setPinned(app.bundleIdentifier, isPinned: false)
+                                } else {
+                                    onLaunchApplication(app.bundleIdentifier)
+                                }
                             } label: {
                                 VStack(spacing: 8) {
                                     MacOSAppIcon(
-                                        bundleIdentifier: bundleIdentifier,
-                                        fallbackSymbol: symbol,
-                                        fallbackColor: color,
+                                        bundleIdentifier: app.bundleIdentifier,
+                                        fallbackSymbol: app.symbol,
+                                        fallbackColor: app.color,
                                         size: 34
                                     )
                                     .frame(width: 54, height: 54)
                                     .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 15))
-                                    Text(title).font(.system(size: 10, weight: .medium))
+                                    Text(app.title).font(.system(size: 10, weight: .medium))
                                 }
                                 .frame(maxWidth: .infinity)
+                                .overlay(alignment: .topTrailing) {
+                                    if isEditingPins {
+                                        Image(systemName: "minus.circle.fill")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(.red)
+                                            .offset(x: 2, y: -2)
+                                    }
+                                }
                             }
                             .buttonStyle(.plain)
                         }
                     }
 
-                    HStack {
-                        Text("Recommended")
-                            .font(.system(size: 14, weight: .semibold))
-                        Spacer()
-                        Text("More  ›")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(accent)
-                    }
-                    .padding(.top, 4)
-
-                    HStack(spacing: 12) {
-                        Image(systemName: "doc.richtext")
-                            .font(.system(size: 20))
-                            .foregroundStyle(accent)
-                            .frame(width: 42, height: 42)
-                            .background(accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 10))
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Design concept")
-                                .font(.system(size: 11, weight: .semibold))
-                            Text("Recently opened · 10 min ago")
-                                .font(.system(size: 9))
+                    if isEditingPins {
+                        HStack {
+                            Text("All apps")
+                                .font(.system(size: 13, weight: .semibold))
+                            Spacer()
+                            Text("\(model.pinnedAppBundleIDs.count) of 8 pinned")
+                                .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
-                        Spacer(minLength: 0)
-                    }
-                    .padding(10)
-                    .background(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.05), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.top, 2)
 
-                    HStack {
-                        Text("Widgets")
-                            .font(.system(size: 14, weight: .semibold))
-                        Spacer()
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.top, 2)
-
-                    HStack(spacing: 10) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Label("Weather", systemImage: "cloud.sun.fill")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.blue)
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                Text("13°")
-                                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                                Text("Mostly clear")
-                                    .font(.system(size: 8, weight: .medium))
-                                    .foregroundStyle(.secondary)
-                            }
-                            Text("Durres")
-                                .font(.system(size: 8))
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(Color.blue.opacity(colorScheme == .dark ? 0.22 : 0.1), in: RoundedRectangle(cornerRadius: 13))
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Label("Now playing", systemImage: "music.note")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.purple)
-                            Text("Close to You")
-                                .font(.system(size: 10, weight: .semibold))
-                                .lineLimit(1)
-                            HStack {
-                                Text("Reality Club")
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Image(systemName: "play.fill")
-                                    .font(.system(size: 8, weight: .semibold))
-                                    .foregroundStyle(accent)
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
+                            ForEach(apps) { app in
+                                let isPinned = model.pinnedAppBundleIDs.contains(app.bundleIdentifier)
+                                Button {
+                                    model.setPinned(app.bundleIdentifier, isPinned: !isPinned)
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: isPinned ? "pin.fill" : "plus")
+                                            .font(.system(size: 8, weight: .semibold))
+                                            .foregroundStyle(isPinned ? accent : .secondary)
+                                        Text(app.title)
+                                            .font(.system(size: 9, weight: .medium))
+                                            .lineLimit(1)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 6)
+                                    .background(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.045), in: RoundedRectangle(cornerRadius: 7))
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(!isPinned && model.pinnedAppBundleIDs.count >= 8)
+                                .opacity(!isPinned && model.pinnedAppBundleIDs.count >= 8 ? 0.45 : 1)
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(Color.purple.opacity(colorScheme == .dark ? 0.2 : 0.08), in: RoundedRectangle(cornerRadius: 13))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Rectangle()
-                    .fill(Color.black.opacity(0.07))
+                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08))
                     .frame(width: 1)
 
                 VStack(alignment: .leading, spacing: 13) {
+                    LauncherBackgroundAppsCard()
+
                     HStack {
-                        Text("Most used")
+                        Text("Folders")
                             .font(.system(size: 15, weight: .semibold))
                         Spacer()
-                        Image(systemName: "ellipsis")
-                            .foregroundStyle(.secondary)
                     }
 
-                    ForEach(recentApps, id: \.1) { symbol, title, color, detail in
-                        HStack(spacing: 10) {
-                            Image(systemName: symbol)
-                                .font(.system(size: 16))
-                                .foregroundStyle(color)
-                                .frame(width: 33, height: 33)
-                                .background(Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.07), in: RoundedRectangle(cornerRadius: 9))
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(title).font(.system(size: 10, weight: .semibold))
-                                Text(detail).font(.system(size: 8)).foregroundStyle(.secondary)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
+                        ForEach(folders) { folder in
+                            Button {
+                                if let url = folder.url {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: folder.symbol)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(folder.tint)
+                                        .frame(width: 26, height: 26)
+                                        .background(folder.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                                    Text(folder.title)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.horizontal, 8)
+                                .frame(height: 42)
+                                .background(
+                                    Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.05),
+                                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                )
                             }
-                            Spacer(minLength: 0)
+                            .buttonStyle(.plain)
                         }
                     }
 
@@ -2593,11 +3098,20 @@ private struct StartFlyout: View {
         .padding(25)
         .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
         .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
+        .clipShape(RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous)
                 .strokeBorder(surfaceStyle == .classic98 ? Color.white : Color.white.opacity(0.76), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
         }
         .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
+    }
+}
+
+private extension Date {
+    var nextMinuteBoundary: Date {
+        let calendar = Calendar.current
+        let startOfMinute = calendar.dateInterval(of: .minute, for: self)?.start ?? self
+        return calendar.date(byAdding: .minute, value: 1, to: startOfMinute) ?? self.addingTimeInterval(60)
     }
 }
 
@@ -2647,4 +3161,31 @@ private extension Calendar {
 private extension Color {
     static let roseAccent = Color(red: 0.82, green: 0.34, blue: 0.43)
     static let roseMist = Color(red: 0.98, green: 0.92, blue: 0.93)
+
+    var storedRGBA: [Double] {
+        guard let color = NSColor(self).usingColorSpace(.deviceRGB) else {
+            return [0.91, 0.69, 0.87, 1]
+        }
+        return [
+            Double(color.redComponent),
+            Double(color.greenComponent),
+            Double(color.blueComponent),
+            Double(color.alphaComponent)
+        ]
+    }
+
+    static func fromStoredRGBA(_ values: [Double]) -> Color? {
+        guard values.count == 4,
+              values.allSatisfy({ (0...1).contains($0) })
+        else {
+            return nil
+        }
+        return Color(
+            .sRGB,
+            red: values[0],
+            green: values[1],
+            blue: values[2],
+            opacity: values[3]
+        )
+    }
 }

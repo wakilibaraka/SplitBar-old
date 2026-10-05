@@ -174,6 +174,10 @@ public final class AppRuntimeController {
     private var flyoutGlobalMonitor: Any?
     private var flyoutLocalMonitor: Any?
     private var detailedSystemMonitorWindow: NSWindow?
+    private var isStreamingCadenceRefreshing = false
+    private var currentMetricsInterval: TimeInterval = 15.0
+    private var currentAIUsageInterval: TimeInterval = 60.0
+    private var currentPlaybackInterval: TimeInterval = 10.0
     private var taskbarConceptWindow: NSWindow?
     private let taskbarConceptState = TaskbarConceptState()
     private var isLegacyEdgeDockEnabled = false
@@ -485,37 +489,16 @@ public final class AppRuntimeController {
     }
 
     private func setupLiveStreaming() {
-        systemMonitorService.startMonitoring(interval: 1.0) { [weak self] metrics in
-            guard let self = self else { return }
-            self.latestSystemMetrics = metrics
+        currentMetricsInterval = 15.0
+        currentAIUsageInterval = 300.0
+        currentPlaybackInterval = 10.0
+        startSystemMetricsStreaming(interval: currentMetricsInterval)
+        startPlaybackStreaming(interval: currentPlaybackInterval)
+        aiUsageService.startLiveMonitoring(interval: currentAIUsageInterval) { [weak self] _ in
+            guard let self else { return }
             self.updateDockContent()
-            // Detaylı monitör yalnızca ekranda görünürken canlı güncellenir
-            if self.detailedSystemMonitorWindow?.isVisible == true {
-                self.refreshDetailedSystemMonitor()
-            }
-            if self.state.flyout.isVisible, let activeID = self.state.flyout.activeItemID,
-               let item = self.state.dockItems.first(where: { $0.id == activeID }),
-               case .widget(let widgetID) = item.kind, widgetID == "system_monitor" {
-                self.syncFlyout(activeItemID: activeID)
-            }
-        }
-
-        nowPlayingService.startMonitoring(interval: 1.0) { [weak self] _ in
-            guard let self = self else { return }
-            self.updateDockContent()
-            if self.state.flyout.isVisible, let activeID = self.state.flyout.activeItemID,
-               let item = self.state.dockItems.first(where: { $0.id == activeID }),
-               case .widget(let widgetID) = item.kind, widgetID == "now_playing" {
-                self.syncFlyout(activeItemID: activeID)
-            }
-        }
-
-        aiUsageService.startLiveMonitoring(interval: 3.0) { [weak self] _ in
-            guard let self = self else { return }
-            self.updateDockContent()
-            if self.state.flyout.isVisible, let activeID = self.state.flyout.activeItemID,
-               let item = self.state.dockItems.first(where: { $0.id == activeID }),
-               case .widget(let widgetID) = item.kind, widgetID == "ai_usage" {
+            if self.activeFlyoutWidgetID == "ai_usage",
+               let activeID = self.state.flyout.activeItemID {
                 self.syncFlyout(activeItemID: activeID)
             }
         }
@@ -797,6 +780,80 @@ public final class AppRuntimeController {
         case .close:
             closeFlyoutMonitors()
             flyoutController.hide()
+        }
+        refreshLiveStreamingCadence()
+    }
+
+    private func refreshLiveStreamingCadence() {
+        guard !isStreamingCadenceRefreshing else { return }
+        isStreamingCadenceRefreshing = true
+        defer { isStreamingCadenceRefreshing = false }
+
+        let metricsAreVisible = detailedSystemMonitorWindow?.isVisible == true
+            || activeFlyoutWidgetID == "system_monitor"
+        let aiUsageIsVisible = activeFlyoutWidgetID == "ai_usage"
+        let playbackIsVisible = activeFlyoutWidgetID == "now_playing" || nowPlayingService.currentState.isPlaying
+
+        let metricsInterval = metricsAreVisible ? 1.0 : 15.0
+        if metricsInterval != currentMetricsInterval {
+            currentMetricsInterval = metricsInterval
+            startSystemMetricsStreaming(interval: metricsInterval)
+        }
+
+        let aiInterval = aiUsageIsVisible ? 3.0 : 300.0
+        if aiInterval != currentAIUsageInterval {
+            currentAIUsageInterval = aiInterval
+            aiUsageService.startLiveMonitoring(interval: aiInterval) { [weak self] _ in
+                guard let self else { return }
+                self.updateDockContent()
+                if self.activeFlyoutWidgetID == "ai_usage",
+                   let activeID = self.state.flyout.activeItemID {
+                    self.syncFlyout(activeItemID: activeID)
+                }
+            }
+        }
+
+        let playbackInterval = playbackIsVisible ? 2.0 : 10.0
+        if playbackInterval != currentPlaybackInterval {
+            currentPlaybackInterval = playbackInterval
+            startPlaybackStreaming(interval: playbackInterval)
+        }
+    }
+
+    private var activeFlyoutWidgetID: String? {
+        guard state.flyout.isVisible,
+              let activeID = state.flyout.activeItemID,
+              let item = state.dockItems.first(where: { $0.id == activeID }),
+              case .widget(let widgetID) = item.kind
+        else {
+            return nil
+        }
+        return widgetID
+    }
+
+    private func startSystemMetricsStreaming(interval: TimeInterval) {
+        systemMonitorService.startMonitoring(interval: interval) { [weak self] metrics in
+            guard let self else { return }
+            self.latestSystemMetrics = metrics
+            self.updateDockContent()
+            if self.detailedSystemMonitorWindow?.isVisible == true {
+                self.refreshDetailedSystemMonitor()
+            }
+            if self.activeFlyoutWidgetID == "system_monitor",
+               let activeID = self.state.flyout.activeItemID {
+                self.syncFlyout(activeItemID: activeID)
+            }
+        }
+    }
+
+    private func startPlaybackStreaming(interval: TimeInterval) {
+        nowPlayingService.startMonitoring(interval: interval) { [weak self] _ in
+            guard let self else { return }
+            self.updateDockContent()
+            if self.activeFlyoutWidgetID == "now_playing",
+               let activeID = self.state.flyout.activeItemID {
+                self.syncFlyout(activeItemID: activeID)
+            }
         }
     }
 
@@ -1257,6 +1314,7 @@ public final class AppRuntimeController {
             refreshDetailedSystemMonitor()
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            refreshLiveStreamingCadence()
             return
         }
 
@@ -1273,6 +1331,7 @@ public final class AppRuntimeController {
         refreshDetailedSystemMonitor()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        refreshLiveStreamingCadence()
     }
 
     public func refreshDetailedSystemMonitor() {

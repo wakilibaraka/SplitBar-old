@@ -26,13 +26,23 @@ explicit user controls.
   legacy edge dock hidden by default as a temporary fallback.
 - [x] Route pinned-app launches through the existing `AppLaunchService`.
 - [x] Centralize taskbar design interactions in the app-owned
-  `TaskbarConceptState`; persist Quick Settings visibility and widget size.
+  `TaskbarConceptState`; persist Quick Settings visibility, widget order/sizes,
+  launcher pins, clock style, and wallpaper presets/custom gradient.
 - [x] Add bottom-edge geometry to the existing edge dock model and panel helpers.
 - [x] Make app launching asynchronous so the UI does not wait on a blocking
   semaphore while macOS launches an application.
 - [x] Remove the retired standalone `Prototypes/TaskbarDesign` package after the
   unified target is verified.
-- [ ] Commit and publish this integration branch after final validation.
+- [x] Commit and publish the unified integration branch.
+- [x] Replace the launcher's Recommended and Most-used sections with a Folders
+  block (Desktop, Documents, Movies, Music, Pictures, Downloads) that resolves
+  real iCloud-aware user directories and opens them in Finder.
+- [x] Make the Personalisation panel a symmetric block grid with no dead space;
+  Surface style and Taskbar height now use the same card and header treatment as
+  every other section.
+- [x] Stop background polling at presentation cadence while nothing is on screen,
+  move AppleScript playback queries off the main actor, cache app icons, and
+  debounce slider persistence. See "Resource budget and forward compatibility".
 
 ## Architecture inventory and disposition
 
@@ -58,7 +68,8 @@ There must be one owner for each piece of behavior:
    visibility, and active legacy flyout transitions.
 3. `AppPreferences` and configuration persistence own durable app settings.
 4. `TaskbarConceptState` owns the integrated taskbar prototype's panel selection,
-   appearance controls, quick-setting selection, sliders, and widget-size choice.
+   appearance controls, quick-setting selection, sliders, widget board layout,
+   launcher pins, clock style, and wallpaper choices.
 5. Views render state and send actions/bindings to their owning model. Avoid
    shadow copies of app-wide settings in child `@State`.
 
@@ -130,8 +141,11 @@ tested.
 
 ### Phase 4 — Dock/taskbar panel foundation
 
-- Convert the approved bottom taskbar into a screen-edge `NSPanel` presentation
-  using the existing panel manager and screen geometry code.
+- [x] Make the launcher pin list the single catalog-backed source for both
+  launcher tiles and taskbar app icons; keep launches on `AppLaunchService`.
+- [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
+  existing panel manager and screen geometry code. Keep the macOS Dock visible
+  during this first panel milestone; it must be independently reversible.
 - Establish panel focus policy: taskbar must not steal focus from frontmost apps;
   launcher/search surfaces may take focus only where needed.
 - Validate display bounds, safe/visible frame, menu bar, auto-hide, Spaces, and
@@ -141,6 +155,12 @@ tested.
 
 **Gate:** taskbar positions correctly on all supported edges and survives Space
 switches without focus theft.
+
+The taskbar is still hosted in the preview window. The shared pin wiring is the
+first functional slice toward a dock; the next implementation should move only
+the taskbar surface into a non-activating bottom-edge panel, retain the preview
+as a fallback, and validate multi-display and Space behavior before changing
+the app's default presentation.
 
 ### Phase 5 — Native app launch and running state
 
@@ -177,7 +197,8 @@ mock mode remains available for UI work.
 - Search and launcher results must be asynchronous, cancellable, and
   keyboard-accessible.
 - Keep the 32–48 pt taskbar range, scalable icon sizes, compact launcher, and
-  persisted visual presets.
+  persisted visual presets, including gradient, dark, and customizable
+  wallpapers.
 - Keep the prototype's Windows, macOS, Aero, and past-Windows styling as
   selectable user appearance—not as different implementations of system
   behavior.
@@ -213,6 +234,69 @@ failure/termination paths.
 
 **Gate:** release checklist passes on supported macOS versions and a clean user
 profile.
+
+## Resource budget and forward compatibility
+
+### Polling and cost rules
+
+Background sampling must never run at presentation cadence while nothing is on
+screen. The rules the code now follows:
+
+- `SystemMonitorService` samples at 1 Hz only while the detailed monitor window
+  or the system-monitor flyout is visible; otherwise it drops to a 15 s baseline
+  so figures are never wholly absent.
+- `NowPlayingService` polls at 2 s while something is playing or its flyout is
+  open, and 10 s otherwise. It also skips the query entirely when neither Music
+  nor Spotify is running.
+- `AIUsageService` runs at 3 s only while its flyout is open, and 300 s otherwise,
+  matching its own internal usage-scan interval. Each refresh shells out to `ps`
+  and inspects four agent sessions, so it must not run at presentation cadence
+  while closed.
+- `AppRuntimeController.refreshLiveStreamingCadence()` is the single place that
+  decides which cadence applies. Flyout open/switch/close and opening the
+  detailed monitor all route through it; do not add a second interval decision
+  elsewhere.
+- AppleScript playback queries and transport commands run on a background queue
+  with a single in-flight guard. Never call `NSAppleScript.executeAndReturnError`
+  from the main actor on a repeating timer.
+
+Measured on a debug build over a 120 s idle window: idle CPU fell from 10.2 s to
+4.2 s (~59% less) and resident memory stayed flat. The largest remaining idle
+cost is the 0.6 s clipboard change-count poll, which is inherent to clipboard
+history.
+
+### View-level cost rules
+
+- App icons resolve once through `AppIconStore`, off the main thread, and are
+  cached. Do not call `NSWorkspace.icon(forFile:)` from a view body.
+- The taskbar clock ticks at 1 Hz only when seconds are shown; otherwise it uses
+  a minute-aligned 60 s schedule.
+- Slider and colour-picker changes debounce their `UserDefaults` write by 0.35 s
+  rather than writing on every drag tick.
+- `surfaceWash` must always be applied with the same rounded shape as
+  `panelBackground`, or the wash squares off the panel's corners.
+
+### macOS 28 status
+
+macOS 28 compatibility is **not verified**. This machine runs macOS 27.0.1 with
+Xcode 27, and the newest installed SDK is `MacOSX27.0.sdk`; there is no SDK 28 to
+build or test against. What has been established instead:
+
+- The deployment target stays at macOS 15 in both `Package.swift` and
+  `Info.plist`. A low floor is the cheapest forward-compatibility guarantee, so
+  do not raise it just to reach newer APIs.
+- The code uses public API only. No SkyLight/SLS, no
+  `NSVisualEffectView`/`NSGlassEffectView`, and no Objective-C runtime poking for
+  window-server behavior.
+- One exception remains and must be re-verified on every SDK bump:
+  `lockScreenImmediately()` in `Support/SystemSessionActions.swift` dlopens
+  `login.framework` from `/System/Library/PrivateFrameworks` and dlsyms
+  `SACLockScreenImmediate`. It is feature-detected and fails soft with typed
+  errors, so a future macOS that removes the symbol degrades rather than
+  crashes, but it is a private-framework dependency and a notarization risk.
+- When an SDK 28 becomes available, re-run: a clean build with
+  `-warnings-as-errors`, a deprecation sweep for SDK 26-28, and a pass over
+  `Info.plist` privacy keys.
 
 ## Code review notes and advice
 
