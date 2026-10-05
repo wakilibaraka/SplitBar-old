@@ -1060,53 +1060,8 @@ private struct Taskbar: View {
 
                 Spacer(minLength: 0)
 
-                HStack(spacing: 8) {
-                    if trashPlacement == .beforeTray {
-                        taskbarDivider
-                        trashCluster
-                    }
-                    Button {
-                        toggle(.controls)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "wifi")
-                            Image(systemName: "speaker.wave.2.fill")
-                            Image(systemName: "battery.75percent")
-                        }
-                        .font(.system(size: height * 0.27, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.78))
-                        .frame(height: height - 8)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Open quick controls, volume, Bluetooth and battery")
-
-                    clockSchedule { date in
-                        Button {
-                            toggle(.calendar)
-                        } label: {
-                            TaskbarClockDisplay(
-                                date: date,
-                                style: clockDisplayStyle,
-                                dateStyle: dateStyle,
-                                uses24HourTime: uses24HourTime,
-                                showsSeconds: showsSeconds,
-                                tint: tint,
-                                height: height
-                            )
-                            .frame(minWidth: 88, minHeight: height - 8, alignment: .trailing)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help("Open calendar")
-                    }
-
-                    if trashPlacement == .farRight {
-                        taskbarDivider
-                        trashCluster
-                    }
-                }
-                .padding(.trailing, 12)
+                trailingTrayCluster
+                    .layoutPriority(1)
             }
             .padding(.horizontal, usesDockPresentation ? 18 : 8)
             .frame(maxWidth: .infinity)
@@ -1219,6 +1174,56 @@ private struct Taskbar: View {
             DownloadsTile(tileSide: tileSide, glyphSize: glyphSize)
             TrashTile(tileSide: tileSide, glyphSize: glyphSize, darkMode: isDarkMode)
         }
+    }
+
+    private var trailingTrayCluster: some View {
+        HStack(spacing: 8) {
+            if trashPlacement == .beforeTray {
+                taskbarDivider
+                trashCluster
+            }
+            Button {
+                toggle(.controls)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "wifi")
+                    Image(systemName: "speaker.wave.2.fill")
+                    Image(systemName: "battery.75percent")
+                }
+                .font(.system(size: height * 0.27, weight: .medium))
+                .foregroundStyle(.primary.opacity(0.78))
+                .frame(height: height - 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Open quick controls, volume, Bluetooth and battery")
+
+            clockSchedule { date in
+                Button {
+                    toggle(.calendar)
+                } label: {
+                    TaskbarClockDisplay(
+                        date: date,
+                        style: clockDisplayStyle,
+                        dateStyle: dateStyle,
+                        uses24HourTime: uses24HourTime,
+                        showsSeconds: showsSeconds,
+                        tint: tint,
+                        height: height
+                    )
+                    .frame(minWidth: 88, minHeight: height - 8, alignment: .trailing)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Open calendar")
+            }
+
+            if trashPlacement == .farRight {
+                taskbarDivider
+                trashCluster
+            }
+        }
+        .padding(.trailing, 12)
     }
 
     private func toggle(_ panel: OpenPanel) {
