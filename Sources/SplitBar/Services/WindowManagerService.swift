@@ -21,6 +21,53 @@ public final class WindowManagerService: @unchecked Sendable {
     }
 
     @discardableResult
+    public func raiseWindow(_ info: AppWindowInfo) -> Bool {
+        guard AXIsProcessTrusted() else { return false }
+        let appElement = AXUIElementCreateApplication(info.ownerPID)
+        var windowsValue: AnyObject?
+        guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsValue) == .success,
+              let windows = windowsValue as? [AXUIElement]
+        else {
+            return false
+        }
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 1080.0
+        for window in windows {
+            var positionValue: AnyObject?
+            var sizeValue: AnyObject?
+            guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionValue) == .success,
+                  AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeValue) == .success,
+                  let positionRef = positionValue, let sizeRef = sizeValue
+            else {
+                continue
+            }
+            var position = CGPoint.zero
+            var size = CGSize.zero
+            guard AXValueGetValue(unsafeDowncast(positionRef, to: AXValue.self), .cgPoint, &position),
+                  AXValueGetValue(unsafeDowncast(sizeRef, to: AXValue.self), .cgSize, &size)
+            else {
+                continue
+            }
+            let axFrame = CGRect(
+                x: position.x,
+                y: primaryHeight - position.y - size.height,
+                width: size.width,
+                height: size.height
+            )
+            guard abs(axFrame.minX - info.bounds.minX) < 3,
+                  abs(axFrame.minY - info.bounds.minY) < 3,
+                  abs(axFrame.width - info.bounds.width) < 3,
+                  abs(axFrame.height - info.bounds.height) < 3
+            else {
+                continue
+            }
+            if AXUIElementPerformAction(window, kAXRaiseAction as CFString) == .success {
+                return true
+            }
+        }
+        return false
+    }
+
+    @discardableResult
     public func minimizeWindows(bundleIdentifier: String) -> Bool {
         guard AXIsProcessTrusted() else { return false }
         guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleIdentifier }) else {

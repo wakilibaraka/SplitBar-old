@@ -463,7 +463,9 @@ public final class AppRuntimeController {
             windows: Array(windows.prefix(6)),
             surfaceStyle: taskbarConceptState.surfaceStyle,
             onSelectWindow: { [weak self] info in
-                service.focusWindow(info: info, bundleIdentifier: bundleID)
+                if self?.windowManagerService.raiseWindow(info) != true {
+                    service.focusWindow(info: info, bundleIdentifier: bundleID)
+                }
                 self?.taskbarConceptState.previewBundleID = nil
             },
             onClose: { [weak self] in
