@@ -62,6 +62,7 @@ public final class DockController {
                 return
             }
             writeDockDefaults(autohide: true, autohideDelay: 1000)
+            restartDock()
         } else {
             restore()
         }

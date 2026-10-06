@@ -273,6 +273,11 @@ tested.
   terminate plus SIGTERM/SIGINT traps plus launch-time crash recovery,
   SPLITBAR_SKIP_DOCK dev bypass. Verified the default path never touches the
   real Dock (no state file, defaults unchanged).
+- [x] Controlled Dock hide/restore review performed live: baseline
+  (autohide on, right, no delay) persisted, delay 1000 applied with Dock
+  restart, then full restore deleted the state file and returned all three
+  values to baseline. Fixed two findings on the way: the hide path never
+  restarted the Dock, and unretained signal sources swallowed SIGTERM.
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.
