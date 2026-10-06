@@ -264,6 +264,10 @@ tested.
   off): SSID resolves only when Location grants it, paired-device list with
   tap-to-connect via public IOBluetooth, honest empty states. No public API
   exists for per-device batteries — documented, not faked.
+- [x] Display brightness is live: built-in path on public IOKit, external DDC
+  path isolated behind a protocol with runtime framework probing and graceful
+  fallback, default off with a hardware-unverified warning. Attribution in
+  NOTICE.
 - [x] Dock persist/restore infrastructure with default-OFF opt-in: original
   orientation/autohide persist to disk before any mutation, restore on
   terminate plus SIGTERM/SIGINT traps plus launch-time crash recovery,

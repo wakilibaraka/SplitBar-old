@@ -675,6 +675,40 @@ final class TaskbarConceptState: ObservableObject {
             systemStatusService.bluetoothDeviceMonitoringEnabled = showBluetoothDevices
         }
     }
+    @Published var displayBrightness = 0.82
+    @Published var displayBrightnessUnavailable = false
+    @Published var ddcBrightnessEnabled = false {
+        didSet { UserDefaults.standard.set(ddcBrightnessEnabled, forKey: "display.ddcEnabled") }
+    }
+
+    fileprivate func activeBrightnessService() -> (any DisplayBrightnessControlling)? {
+        if let builtIn = DisplayBrightness.builtIn() {
+            return builtIn
+        }
+        if ddcBrightnessEnabled {
+            return DisplayBrightness.externalDDC()
+        }
+        return nil
+    }
+
+    fileprivate func refreshDisplayBrightness() {
+        guard let service = activeBrightnessService() else {
+            displayBrightnessUnavailable = true
+            return
+        }
+        displayBrightnessUnavailable = false
+        if let level = service.currentLevel() {
+            displayBrightness = min(1, max(0, level))
+        }
+    }
+
+    fileprivate func setDisplayBrightness(_ level: Double) {
+        guard let service = activeBrightnessService() else { return }
+        if service.setLevel(level) {
+            displayBrightness = min(1, max(0, level))
+            displayBrightnessUnavailable = false
+        }
+    }
     @Published var previewBundleID: String?
     @Published var systemMetrics: SystemMetrics?
     @Published var weather = WeatherState.defaultSample()
@@ -733,7 +767,6 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var bluetoothEnabled = true
     @Published fileprivate var vpnEnabled = false
     @Published fileprivate var appVolume: Double = 0.52
-    @Published fileprivate var brightness: Double = 0.82
 
     init() {
         let defaults = UserDefaults.standard
@@ -813,6 +846,7 @@ final class TaskbarConceptState: ObservableObject {
         showWifiName = defaults.bool(forKey: "status.showWifiName")
         showBluetoothDevices = defaults.bool(forKey: "status.showBluetoothDevices")
         systemStatusService.bluetoothDeviceMonitoringEnabled = showBluetoothDevices
+        ddcBrightnessEnabled = defaults.bool(forKey: "display.ddcEnabled")
         hiddenQuickSettingTitles = Set(
             (defaults.string(forKey: "quickSettings.hiddenTiles") ?? "")
                 .split(separator: "|")
@@ -1040,6 +1074,7 @@ struct TaskbarFlyoutContentView: View {
                 contextMenuStyle: $model.contextMenuStyle,
                 showWifiName: $model.showWifiName,
                 showBluetoothDevices: $model.showBluetoothDevices,
+                ddcBrightnessEnabled: $model.ddcBrightnessEnabled,
                 taskbarIconSize: $model.taskbarIconSize,
                 trashPlacement: $model.trashPlacement,
                 panelWidths: $model.panelWidths,
@@ -1351,6 +1386,7 @@ public struct TaskbarConceptView: View {
                         contextMenuStyle: $model.contextMenuStyle,
                         showWifiName: $model.showWifiName,
                         showBluetoothDevices: $model.showBluetoothDevices,
+                        ddcBrightnessEnabled: $model.ddcBrightnessEnabled,
                         taskbarIconSize: $model.taskbarIconSize,
                         trashPlacement: $model.trashPlacement,
                         panelWidths: $model.panelWidths,
@@ -3417,11 +3453,28 @@ private struct ControlsFlyout: View {
                     )
                 )
                 controlSlider("App audio", symbol: "waveform", value: $model.appVolume)
-                controlSlider("Brightness", symbol: "sun.max.fill", value: $model.brightness)
+                if model.displayBrightnessUnavailable {
+                    Text("No controllable display found.")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    controlSlider(
+                        "Brightness",
+                        symbol: "sun.max.fill",
+                        value: Binding(
+                            get: { model.displayBrightness },
+                            set: { model.setDisplayBrightness($0) }
+                        )
+                    )
+                }
             }
             .padding(.horizontal, 14)
             .padding(.top, 9)
             .padding(.bottom, 14)
+            .task {
+                model.refreshDisplayBrightness()
+            }
         }
         .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
         .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
@@ -3973,6 +4026,7 @@ private struct SettingsFlyout: View {
     @Binding var contextMenuStyle: ContextMenuStyle
     @Binding var showWifiName: Bool
     @Binding var showBluetoothDevices: Bool
+    @Binding var ddcBrightnessEnabled: Bool
     @Binding var taskbarIconSize: TaskbarIconSize
     @Binding var trashPlacement: TrashPlacement
     @Binding var panelWidths: [PanelKind: CGFloat]
@@ -4201,6 +4255,18 @@ private struct SettingsFlyout: View {
                     Text("Bluetooth devices")
                         .font(.system(size: 11, weight: .medium))
                     Text("Lists paired devices with tap-to-connect. Prompts for Bluetooth on first read; per-device batteries have no public API.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+            .padding(.top, 2)
+            Toggle(isOn: $ddcBrightnessEnabled) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("External display brightness (DDC)")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Uses a private display API, isolated and probed at runtime. External writes are hardware-unverified; built-in display uses public API.")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

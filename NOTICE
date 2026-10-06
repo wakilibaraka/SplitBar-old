@@ -30,3 +30,9 @@ CoreAudio, and IOBluetooth APIs) is an original, clean-room implementation
 inspired by the design of Status Trio by lingyired
 (https://github.com/lingyired/status-trio), which is licensed under the Apache
 License, Version 2.0. No Status Trio source code is included in this project.
+
+The external-display brightness path follows the IOAVService I2C interface
+shape used by Status Trio's DDCPrivateAPI module, which itself carries the
+MIT-licensed AppleSiliconDDC notice (Copyright (c) 2021 Istvan T.). The
+implementation here is original; only the interface shape and the MIT
+attribution pattern were studied. No third-party source code is included.
