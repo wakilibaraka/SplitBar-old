@@ -28,11 +28,17 @@ public final class DockController {
         FileManager.default.fileExists(atPath: stateFileURL.path)
     }
 
+    private var signalSources: [DispatchSourceSignal] = []
+
     public func setupSignalHandlers(restore: @escaping @Sendable () -> Void) {
         for sig in [SIGTERM, SIGINT] {
             let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
-            source.setEventHandler(handler: restore)
+            source.setEventHandler {
+                restore()
+                NSApp.terminate(nil)
+            }
             source.resume()
+            signalSources.append(source)
             signal(sig, SIG_IGN)
         }
     }
