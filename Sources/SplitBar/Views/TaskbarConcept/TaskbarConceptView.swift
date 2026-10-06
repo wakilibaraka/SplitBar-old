@@ -2,12 +2,22 @@ import AppKit
 import Combine
 import SwiftUI
 
-private enum OpenPanel: Equatable {
+enum OpenPanel: Equatable {
     case widgets
     case calendar
     case controls
     case start
     case settings
+
+    var panelKind: PanelKind {
+        switch self {
+        case .widgets: .widgets
+        case .calendar: .calendar
+        case .controls: .controls
+        case .start: .start
+        case .settings: .settings
+        }
+    }
 }
 
 private enum SurfaceStyle: String, CaseIterable, Identifiable {
@@ -361,7 +371,7 @@ private enum TrashPlacement: String, CaseIterable, Identifiable {
     }
 }
 
-private enum PanelKind: String, CaseIterable, Identifiable {
+enum PanelKind: String, CaseIterable, Identifiable {
     case start
     case widgets
     case calendar
@@ -520,7 +530,7 @@ private enum LauncherDefaults {
 
 @MainActor
 final class TaskbarConceptState: ObservableObject {
-    @Published fileprivate var openPanel: OpenPanel?
+    @Published var openPanel: OpenPanel?
     @Published fileprivate var surfaceStyle = SurfaceStyle.glass
     @Published fileprivate var usesDockPresentation = false
     @Published fileprivate var isDarkMode = false
@@ -741,7 +751,7 @@ final class TaskbarConceptState: ObservableObject {
         widgetSizes[widget] ?? widget.defaultSize
     }
 
-    fileprivate func panelWidth(for kind: PanelKind) -> CGFloat {
+    func panelWidth(for kind: PanelKind) -> CGFloat {
         panelWidths[kind] ?? kind.defaultWidth
     }
 
@@ -795,6 +805,70 @@ final class TaskbarConceptState: ObservableObject {
     }
 }
 
+struct TaskbarFlyoutContentView: View {
+    let panel: OpenPanel
+    @ObservedObject var model: TaskbarConceptState
+    let onLaunchApplication: (String) -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        flyoutContent
+            .environment(\.surfaceStyle, model.surfaceStyle)
+            .environment(\.surfaceTransparency, model.interfaceTransparency)
+    }
+
+    @ViewBuilder
+    private var flyoutContent: some View {
+        switch panel {
+        case .widgets:
+            WidgetsPanel(onClose: onClose, accent: model.clockTint, model: model)
+        case .calendar:
+            ClockFlyout(
+                displayedMonth: $model.displayedMonth,
+                selectedDate: $model.selectedDate,
+                showsClockSettings: $model.showsClockSettings,
+                uses24HourTime: $model.uses24HourTime,
+                showsSeconds: $model.showsSeconds,
+                dateStyle: $model.dateStyle,
+                clockDisplayStyle: $model.clockDisplayStyle,
+                clockTint: $model.clockTint,
+                accent: model.clockTint
+            )
+        case .controls:
+            ControlsFlyout(accent: model.clockTint, model: model)
+        case .start:
+            StartFlyout(
+                onClose: onClose,
+                accent: model.clockTint,
+                model: model,
+                onLaunchApplication: onLaunchApplication
+            )
+        case .settings:
+            SettingsFlyout(
+                surfaceStyle: $model.surfaceStyle,
+                usesDockPresentation: $model.usesDockPresentation,
+                isDarkMode: $model.isDarkMode,
+                wallpaperPreset: $model.wallpaperPreset,
+                pastelTint: $model.pastelTint,
+                gradientEndTint: $model.gradientEndTint,
+                gradientAngle: $model.gradientAngle,
+                interfaceTransparency: $model.interfaceTransparency,
+                usesTaskbarGradient: $model.usesTaskbarGradient,
+                taskbarGradientStart: $model.taskbarGradientStart,
+                taskbarGradientEnd: $model.taskbarGradientEnd,
+                taskbarHeight: $model.taskbarHeight,
+                showsTaskbarPanel: $model.showsTaskbarPanel,
+                taskbarIconSize: $model.taskbarIconSize,
+                trashPlacement: $model.trashPlacement,
+                panelWidths: $model.panelWidths,
+                accent: model.clockTint,
+                onClose: onClose,
+                onResetPersonalisation: { model.resetPersonalisation() }
+            )
+        }
+    }
+}
+
 struct TaskbarPanelContentView: View {
     @ObservedObject var model: TaskbarConceptState
     let onLaunchApplication: (String) -> Void
@@ -839,6 +913,7 @@ public struct TaskbarConceptView: View {
         nonmutating set { model.openPanel = newValue }
     }
     private var surfaceStyle: SurfaceStyle { model.surfaceStyle }
+    private var showsTaskbarPanel: Bool { model.showsTaskbarPanel }
     private var usesDockPresentation: Bool { model.usesDockPresentation }
     private var isDarkMode: Bool { model.isDarkMode }
     private var wallpaperPreset: WallpaperPreset { model.wallpaperPreset }
@@ -902,7 +977,7 @@ public struct TaskbarConceptView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                if openPanel == .widgets {
+                if openPanel == .widgets, !showsTaskbarPanel {
                     WidgetsPanel(onClose: { openPanel = nil }, accent: clockTint, model: model)
                         .frame(
                             width: panelFrameWidth(.widgets, available: geometry.size.width - 36),
@@ -916,7 +991,7 @@ public struct TaskbarConceptView: View {
                         .zIndex(2)
                 }
 
-                if openPanel == .calendar {
+                if openPanel == .calendar, !showsTaskbarPanel {
                     ClockFlyout(
                         displayedMonth: $model.displayedMonth,
                         selectedDate: $model.selectedDate,
@@ -937,7 +1012,7 @@ public struct TaskbarConceptView: View {
                     .zIndex(2)
                 }
 
-                if openPanel == .controls {
+                if openPanel == .controls, !showsTaskbarPanel {
                     ControlsFlyout(accent: clockTint, model: model)
                         .frame(width: panelFrameWidth(.controls, available: geometry.size.width - 36), height: max(300, geometry.size.height - taskbarHeight - 28))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
@@ -948,7 +1023,7 @@ public struct TaskbarConceptView: View {
                         .zIndex(2)
                 }
 
-                if openPanel == .start {
+                if openPanel == .start, !showsTaskbarPanel {
                     StartFlyout(
                         onClose: { openPanel = nil },
                         accent: clockTint,
@@ -963,7 +1038,7 @@ public struct TaskbarConceptView: View {
                         .zIndex(2)
                 }
 
-                if openPanel == .settings {
+                if openPanel == .settings, !showsTaskbarPanel {
                     SettingsFlyout(
                         surfaceStyle: $model.surfaceStyle,
                         usesDockPresentation: $model.usesDockPresentation,

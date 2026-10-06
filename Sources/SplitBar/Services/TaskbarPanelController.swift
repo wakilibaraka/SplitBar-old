@@ -20,6 +20,10 @@ public final class TaskbarPanelController {
         panel?.isVisible == true
     }
 
+    public var currentFrame: CGRect? {
+        panel?.frame
+    }
+
     public func show(content: AnyView, height: CGFloat) {
         if panel == nil {
             createPanel()

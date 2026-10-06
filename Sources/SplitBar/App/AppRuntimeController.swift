@@ -182,6 +182,10 @@ public final class AppRuntimeController {
     private var taskbarConceptWindow: NSWindow?
     private let taskbarConceptState = TaskbarConceptState()
     private let taskbarPanelController = TaskbarPanelController()
+    private let taskbarFlyoutController = FlyoutPanelController()
+    private var taskbarFlyoutKindShown: OpenPanel?
+    private var taskbarFlyoutLocalMonitor: Any?
+    private var taskbarFlyoutGlobalMonitor: Any?
     private var taskbarPanelSubscriptions = Set<AnyCancellable>()
     private var isLegacyEdgeDockEnabled = false
     private var settingsWindow: NSWindow?
@@ -369,12 +373,19 @@ public final class AppRuntimeController {
                 } else {
                     self.taskbarPanelController.hide()
                 }
+                self.syncTaskbarFlyout(self.taskbarConceptState.openPanel)
             }
             .store(in: &taskbarPanelSubscriptions)
         taskbarConceptState.$taskbarHeight
             .removeDuplicates()
             .sink { [weak self] height in
                 self?.taskbarPanelController.updateHeight(height)
+            }
+            .store(in: &taskbarPanelSubscriptions)
+        taskbarConceptState.$openPanel
+            .removeDuplicates()
+            .sink { [weak self] panel in
+                self?.syncTaskbarFlyout(panel)
             }
             .store(in: &taskbarPanelSubscriptions)
         if taskbarConceptState.showsTaskbarPanel {
@@ -391,6 +402,107 @@ public final class AppRuntimeController {
 
     public func toggleTaskbarPanel() {
         taskbarConceptState.showsTaskbarPanel.toggle()
+    }
+
+    private func syncTaskbarFlyout(_ panel: OpenPanel?) {
+        guard taskbarConceptState.showsTaskbarPanel else {
+            closeTaskbarFlyout()
+            return
+        }
+        guard let panel else {
+            closeTaskbarFlyout()
+            return
+        }
+        guard let frame = taskbarFlyoutFrame(for: panel) else {
+            closeTaskbarFlyout()
+            return
+        }
+        let content = TaskbarFlyoutContentView(
+            panel: panel,
+            model: taskbarConceptState,
+            onLaunchApplication: { [weak self] bundleIdentifier in
+                self?.launchPinnedApplication(bundleIdentifier: bundleIdentifier)
+            },
+            onClose: { [weak self] in
+                self?.taskbarConceptState.openPanel = nil
+            }
+        )
+        if taskbarFlyoutKindShown == panel, taskbarFlyoutController.panel.isVisible {
+            taskbarFlyoutController.replace(content: AnyView(content), frame: frame)
+        } else {
+            taskbarFlyoutController.show(content: AnyView(content), frame: frame)
+            taskbarFlyoutKindShown = panel
+        }
+        setupTaskbarFlyoutDismissal()
+    }
+
+    private func taskbarFlyoutFrame(for panel: OpenPanel) -> CGRect? {
+        guard let screen = screenService.primaryScreen() else { return nil }
+        let kind = panel.panelKind
+        let width = min(taskbarConceptState.panelWidth(for: kind), screen.visibleFrame.width - 32)
+        let stripHeight = taskbarPanelController.currentFrame?.height ?? taskbarConceptState.taskbarHeight
+        let height = min(720, screen.visibleFrame.height - stripHeight - 48)
+        let stripFrame = taskbarPanelController.currentFrame ?? edgeActivationFrame(
+            screen: screen,
+            edge: .bottom,
+            thickness: stripHeight
+        )
+        var frame = flyoutPanelFrame(
+            anchorFrame: stripFrame,
+            screen: screen,
+            edge: .bottom,
+            flyoutSize: CGSize(width: width, height: max(300, height)),
+            gap: 12
+        )
+        switch panel {
+        case .widgets:
+            frame.origin.x = screen.visibleFrame.minX + 14
+        case .calendar, .controls:
+            frame.origin.x = screen.visibleFrame.maxX - width - 14
+        case .start, .settings:
+            break
+        }
+        return frame
+    }
+
+    private func setupTaskbarFlyoutDismissal() {
+        if taskbarFlyoutLocalMonitor == nil {
+            taskbarFlyoutLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+                guard let self else { return event }
+                if event.keyCode == 53, self.taskbarFlyoutController.panel.isVisible {
+                    self.taskbarConceptState.openPanel = nil
+                    return nil
+                }
+                return event
+            }
+        }
+        if taskbarFlyoutGlobalMonitor == nil {
+            taskbarFlyoutGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self else { return }
+                    let location = NSEvent.mouseLocation
+                    let inFlyout = self.taskbarFlyoutController.panel.isVisible
+                        && self.taskbarFlyoutController.panel.frame.contains(location)
+                    let stripFrame = self.taskbarPanelController.currentFrame ?? .zero
+                    if !inFlyout, !stripFrame.contains(location) {
+                        self.taskbarConceptState.openPanel = nil
+                    }
+                }
+            }
+        }
+    }
+
+    private func closeTaskbarFlyout() {
+        taskbarFlyoutKindShown = nil
+        taskbarFlyoutController.hide()
+        if let monitor = taskbarFlyoutLocalMonitor {
+            NSEvent.removeMonitor(monitor)
+            taskbarFlyoutLocalMonitor = nil
+        }
+        if let monitor = taskbarFlyoutGlobalMonitor {
+            NSEvent.removeMonitor(monitor)
+            taskbarFlyoutGlobalMonitor = nil
+        }
     }
 
     public func openTaskbarConceptWindow() {

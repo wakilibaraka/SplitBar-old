@@ -213,6 +213,10 @@ tested.
   and the preview window stays the default. Flyouts still render in the
   preview window during this milestone; per-flyout panels above the bar are the
   next slice.
+- [x] Render all five flyouts as key-capable panels above the strip when panel
+  mode is on (reusing the state-preserving flyout host, per-flyout widths,
+  ESC and click-outside dismissal); the preview window renders them only when
+  panel mode is off.
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.
