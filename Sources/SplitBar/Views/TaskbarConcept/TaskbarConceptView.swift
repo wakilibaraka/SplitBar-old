@@ -475,6 +475,35 @@ enum TaskbarSection: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+enum TaskbarStripMetrics {
+    static func tileStride(barHeight: CGFloat) -> CGFloat { max(28, barHeight - 4) + 4 }
+
+    static func layout(
+        screenWidth: CGFloat,
+        mode: TaskbarMode,
+        barHeight: CGFloat,
+        gap: CGFloat,
+        appCount: Int,
+        bottomMargin: CGFloat = 0
+    ) -> TaskbarStrip.IslandLayout {
+        let stride = tileStride(barHeight: barHeight)
+        return TaskbarStrip.layoutIslands(
+            screenWidth: screenWidth,
+            mode: mode,
+            tileStride: stride,
+            appCount: appCount,
+            weatherWidth: 196,
+            trayWidth: stride * 2,
+            clockWidth: 96,
+            clusterWidth: stride * 3,
+            gap: gap,
+            margin: 12,
+            barHeight: barHeight,
+            bottomMargin: bottomMargin
+        )
+    }
+}
+
 struct TaskbarDivider: Identifiable, Equatable, Codable, Sendable {
     var id: UUID
     var anchorBundleID: String?
@@ -1058,7 +1087,7 @@ final class TaskbarConceptState: ObservableObject {
             )
         }
     }
-    @Published fileprivate var pinnedAppBundleIDs = LauncherDefaults.pinnedBundleIDs {
+    @Published var pinnedAppBundleIDs = LauncherDefaults.pinnedBundleIDs {
         didSet { UserDefaults.standard.set(pinnedAppBundleIDs, forKey: "launcher.pinnedApps") }
     }
     @Published fileprivate var showOnlyFourPinned = false {
@@ -1553,7 +1582,8 @@ struct TaskbarPanelContentView: View {
             height: $model.taskbarHeight,
             onLaunchApplication: onLaunchApplication,
             onTaskbarIconClick: onTaskbarIconClick,
-            onTaskbarTileAction: onTaskbarTileAction
+            onTaskbarTileAction: onTaskbarTileAction,
+            rendersSplitRow: false
         )
         .environment(\.surfaceTransparency, model.interfaceTransparency)
         .preferredColorScheme(model.isDarkMode ? .dark : .light)
@@ -2271,6 +2301,7 @@ private struct Taskbar: View {
     let onLaunchApplication: (String) -> Void
     let onTaskbarIconClick: (String) -> Void
     let onTaskbarTileAction: (TaskbarTileAction) -> Void
+    var rendersSplitRow: Bool = true
 
     private var mode: TaskbarMode { model.taskbarMode }
     private var glyphSize: CGFloat { height * model.taskbarIconSize.glyphFraction }
@@ -2304,13 +2335,15 @@ private struct Taskbar: View {
 
     var body: some View {
         Group {
-            if mode.isSplit {
+            if mode.isSplit, rendersSplitRow {
                 TaskbarSplitRow(
                     model: model,
                     onLaunchApplication: onLaunchApplication,
                     onTaskbarIconClick: onTaskbarIconClick,
                     onTaskbarTileAction: onTaskbarTileAction
                 )
+            } else if mode.isSplit {
+                Color.clear
             } else {
                 barShell
             }
@@ -2479,25 +2512,16 @@ private struct TaskbarSplitRow: View {
     let onTaskbarIconClick: (String) -> Void
     let onTaskbarTileAction: (TaskbarTileAction) -> Void
 
-    private var tileStride: CGFloat { max(28, model.taskbarHeight - 4) + 4 }
-
     var body: some View {
         GeometryReader { geometry in
             let appCount = model.pinnedAppBundleIDs.count
                 + model.runningAppOrder.filter({ !model.pinnedAppBundleIDs.contains($0) }).count
-            let layout = TaskbarStrip.layoutIslands(
+            let layout = TaskbarStripMetrics.layout(
                 screenWidth: geometry.size.width,
                 mode: model.taskbarMode,
-                tileStride: tileStride,
-                appCount: appCount,
-                weatherWidth: 196,
-                trayWidth: tileStride * 2,
-                clockWidth: 96,
-                clusterWidth: tileStride * 3,
-                gap: model.islandGap,
-                margin: 12,
                 barHeight: model.taskbarHeight,
-                bottomMargin: 0
+                gap: model.islandGap,
+                appCount: appCount
             )
             ZStack(alignment: .topLeading) {
                 ForEach(Array(layout.islands.enumerated()), id: \.offset) { _, island in

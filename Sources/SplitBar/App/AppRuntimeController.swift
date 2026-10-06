@@ -393,6 +393,30 @@ public final class AppRuntimeController {
                 self?.taskbarPanelController.updateHeight(height)
             }
             .store(in: &taskbarPanelSubscriptions)
+        taskbarConceptState.$taskbarMode
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                self?.taskbarPanelController.refresh()
+            }
+            .store(in: &taskbarPanelSubscriptions)
+        taskbarConceptState.$islandGap
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                self?.taskbarPanelController.refresh()
+            }
+            .store(in: &taskbarPanelSubscriptions)
+        taskbarConceptState.$pinnedAppBundleIDs
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                self?.taskbarPanelController.refresh()
+            }
+            .store(in: &taskbarPanelSubscriptions)
+        taskbarConceptState.$runningAppOrder
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                self?.taskbarPanelController.refresh()
+            }
+            .store(in: &taskbarPanelSubscriptions)
         taskbarConceptState.$openPanel
             .removeDuplicates()
             .sink { [weak self] panel in
@@ -411,6 +435,18 @@ public final class AppRuntimeController {
     }
 
     private func showTaskbarPanel() {
+        taskbarPanelController.show(provider: { [weak self] in
+            guard let self else {
+                return TaskbarPanelRequest(
+                    strip: AnyView(EmptyView()),
+                    islandContent: { _, _ in AnyView(EmptyView()) }
+                )
+            }
+            return self.taskbarPanelRequest()
+        })
+    }
+
+    private func taskbarPanelRequest() -> TaskbarPanelRequest {
         let content = TaskbarPanelContentView(
             model: taskbarConceptState,
             onLaunchApplication: { [weak self] bundleIdentifier in
@@ -423,7 +459,49 @@ public final class AppRuntimeController {
                 self?.handleTaskbarTileAction(action)
             }
         )
-        taskbarPanelController.show(content: AnyView(content), height: taskbarConceptState.taskbarHeight)
+        let mode = taskbarConceptState.taskbarMode
+        let screenWidth = screenService.primaryScreen()?.visibleFrame.width ?? 1440
+        let appCount = taskbarConceptState.pinnedAppBundleIDs.count
+            + taskbarConceptState.runningAppOrder
+                .filter({ !taskbarConceptState.pinnedAppBundleIDs.contains($0) }).count
+        let islands = mode.isSplit
+            ? TaskbarStripMetrics.layout(
+                screenWidth: screenWidth,
+                mode: mode,
+                barHeight: taskbarConceptState.taskbarHeight,
+                gap: taskbarConceptState.islandGap,
+                appCount: appCount
+            )
+            : nil
+        let radius = taskbarConceptState.shellRadius(for: .taskbar)
+        return TaskbarPanelRequest(
+            strip: AnyView(content),
+            islands: islands,
+            islandContent: { [weak self] _, sections in
+                guard let self else { return AnyView(EmptyView()) }
+                return AnyView(
+                    TaskbarIslandContent(
+                        sections: sections,
+                        model: self.taskbarConceptState,
+                        onLaunchApplication: { [weak self] in self?.launchPinnedApplication(bundleIdentifier: $0) },
+                        onTaskbarIconClick: { [weak self] in self?.handleTaskbarIconClick(bundleIdentifier: $0) },
+                        onTaskbarTileAction: { [weak self] in self?.handleTaskbarTileAction($0) },
+                        maxAppTiles: islands?.visibleAppTiles,
+                        showOverflowChevron: islands?.showsOverflow ?? false
+                    )
+                    .padding(.horizontal, 10)
+                    .background {
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.38), lineWidth: 1)
+                            }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                )
+            }
+        )
     }
 
     public func toggleTaskbarPanel() {
