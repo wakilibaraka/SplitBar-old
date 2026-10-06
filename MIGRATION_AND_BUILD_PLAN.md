@@ -56,6 +56,13 @@ explicit user controls.
   own width slider back up toward the previous wide layout.
 - [x] Seat the quick-controls cluster immediately left of the date as one
   indivisible trailing unit.
+- [x] Launcher identity and Windows power menu: footer shows the real account
+  name with avatar (CBIdentity, initials fallback) instead of "Your profile",
+  a gear button jumping straight to Personalisation, and a power menu with
+  Lock, Sleep, Restart, Shut Down, and Log Out — icons on the left, destructive
+  actions behind confirmation, failures surfaced in an alert. Power verbs run
+  through public pmset/System Events off the main thread; first use may trigger
+  the macOS Automation prompt.
 - [x] Replace the three separate Wi-Fi/volume/battery glyphs with one dynamic
   system-status icon: battery ring with level/charging/low states, Wi-Fi
   on/off glyph, volume dots, and a Bluetooth power dot. Live data comes from

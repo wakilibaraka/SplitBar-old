@@ -3444,6 +3444,134 @@ private struct StartFlyout: View {
 
     private var folders: [LauncherFolder] { LauncherDefaults.folders }
 
+    @State private var userIdentity = UserIdentityService.currentIdentity()
+    @State private var userAvatar: NSImage?
+    @State private var pendingPowerAction: SystemPowerAction?
+    @State private var powerErrorMessage: String?
+
+    private var launcherFooter: some View {
+        HStack {
+            HStack(spacing: 10) {
+                if let userAvatar {
+                    Image(nsImage: userAvatar)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 30, height: 30)
+                        .clipShape(Circle())
+                } else {
+                    Circle()
+                        .fill(Color.secondary.opacity(0.2))
+                        .frame(width: 30, height: 30)
+                        .overlay {
+                            Text(userIdentity.initials)
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                }
+                Text(userIdentity.displayName)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button {
+                model.openPanel = .settings
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 34, height: 34)
+                    .background(Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.07), in: RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+            .help("Open Personalisation")
+            powerMenu
+        }
+        .onAppear {
+            userAvatar = UserIdentityService.avatarImage(for: userIdentity)
+        }
+        .confirmationDialog(
+            powerConfirmationTitle,
+            isPresented: Binding(
+                get: { pendingPowerAction != nil },
+                set: { if !$0 { pendingPowerAction = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Confirm", role: .destructive) {
+                if let action = pendingPowerAction {
+                    pendingPowerAction = nil
+                    runPowerAction(action)
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                pendingPowerAction = nil
+            }
+        } message: {
+            Text("This uses macOS Automation and may ask for permission first.")
+        }
+        .alert("Couldn't complete the action", isPresented: Binding(
+            get: { powerErrorMessage != nil },
+            set: { if !$0 { powerErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(powerErrorMessage ?? "")
+        }
+    }
+
+    private var powerConfirmationTitle: String {
+        switch pendingPowerAction {
+        case .restart: "Restart this Mac now?"
+        case .shutDown: "Shut down this Mac now?"
+        case .logOut: "Log out now?"
+        case .lock, .sleep, .none: "Continue?"
+        }
+    }
+
+    private var powerMenu: some View {
+        Menu {
+            Button {
+                runPowerAction(.lock)
+            } label: {
+                Label("Lock", systemImage: "lock.fill")
+            }
+            Button {
+                runPowerAction(.sleep)
+            } label: {
+                Label("Sleep", systemImage: "moon.zzz.fill")
+            }
+            Divider()
+            Button {
+                pendingPowerAction = .restart
+            } label: {
+                Label("Restart…", systemImage: "arrow.clockwise")
+            }
+            Button {
+                pendingPowerAction = .shutDown
+            } label: {
+                Label("Shut Down…", systemImage: "power")
+            }
+            Button {
+                pendingPowerAction = .logOut
+            } label: {
+                Label("Log Out…", systemImage: "rectangle.portrait.and.arrow.right")
+            }
+        } label: {
+            Image(systemName: "power")
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 34, height: 34)
+                .background(Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.07), in: RoundedRectangle(cornerRadius: 10))
+        }
+        .menuStyle(.borderlessButton)
+        .help("Power options")
+    }
+
+    private func runPowerAction(_ action: SystemPowerAction) {
+        performSystemPowerAction(action) { result in
+            if case .failure(let error) = result {
+                powerErrorMessage = error.description
+            }
+        }
+    }
+
     private var pinnedApps: [LauncherApp] {
         model.pinnedAppBundleIDs.compactMap { bundleID in
             apps.first { $0.bundleIdentifier == bundleID }
@@ -3627,18 +3755,7 @@ private struct StartFlyout: View {
                 .frame(width: 250, alignment: .leading)
             }
 
-            HStack {
-                Label("Your profile", systemImage: "person.crop.circle.fill")
-                    .font(.system(size: 11, weight: .medium))
-                Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "power")
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(width: 34, height: 34)
-                        .background(Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.07), in: RoundedRectangle(cornerRadius: 10))
-                }
-                .buttonStyle(.plain)
-            }
+            launcherFooter
         }
         .padding(25)
         .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))

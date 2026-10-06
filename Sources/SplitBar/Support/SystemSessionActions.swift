@@ -7,6 +7,7 @@ public enum SystemSessionActionError: Error, CustomStringConvertible {
     case lockFailed(status: Int32)
     case processLaunchFailed(executable: String, underlying: Error)
     case processExitedWithFailure(executable: String, arguments: [String], status: Int32)
+    case automationFailed(action: String, detail: String)
 
     public var description: String {
         switch self {
@@ -20,6 +21,8 @@ public enum SystemSessionActionError: Error, CustomStringConvertible {
             return "Failed to launch \(executable): \(underlying.localizedDescription)"
         case .processExitedWithFailure(let executable, let arguments, let status):
             return "\(executable) \(arguments.joined(separator: " ")) exited with status \(status)"
+        case .automationFailed(let action, let detail):
+            return "\(action) failed: \(detail)"
         }
     }
 }
@@ -66,5 +69,72 @@ public func sleepDisplays() throws {
             arguments: arguments,
             status: process.terminationStatus
         )
+    }
+}
+
+public enum SystemPowerAction: String, CaseIterable {
+    case lock
+    case sleep
+    case restart
+    case shutDown
+    case logOut
+}
+
+public func performSystemPowerAction(
+    _ action: SystemPowerAction,
+    completion: @escaping (Result<Void, SystemSessionActionError>) -> Void
+) {
+    DispatchQueue.global(qos: .userInitiated).async {
+        let result: Result<Void, SystemSessionActionError>
+        switch action {
+        case .lock:
+            result = lockMacDisplay()
+        case .sleep, .restart, .shutDown, .logOut:
+            result = runSystemEventsCommand(action.systemEventsVerb, action: action.rawValue)
+        }
+        DispatchQueue.main.async {
+            completion(result)
+        }
+    }
+}
+
+private func lockMacDisplay() -> Result<Void, SystemSessionActionError> {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+    process.arguments = ["displaysleepnow"]
+    do {
+        try process.run()
+    } catch {
+        return .failure(.processLaunchFailed(executable: "/usr/bin/pmset", underlying: error))
+    }
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        return .failure(.processExitedWithFailure(executable: "/usr/bin/pmset", arguments: ["displaysleepnow"], status: process.terminationStatus))
+    }
+    return .success(())
+}
+
+private func runSystemEventsCommand(_ verb: String, action: String) -> Result<Void, SystemSessionActionError> {
+    guard let script = NSAppleScript(source: "tell application \"System Events\" to \(verb)") else {
+        return .failure(.automationFailed(action: action, detail: "could not compile AppleScript"))
+    }
+    var errorDict: NSDictionary?
+    script.executeAndReturnError(&errorDict)
+    if let errorDict {
+        let message = errorDict[NSAppleScript.errorMessage] as? String ?? String(describing: errorDict)
+        return .failure(.automationFailed(action: action, detail: message))
+    }
+    return .success(())
+}
+
+private extension SystemPowerAction {
+    var systemEventsVerb: String {
+        switch self {
+        case .lock: "keystroke \"q\" using {command down, control down}"
+        case .sleep: "sleep"
+        case .restart: "restart"
+        case .shutDown: "shut down"
+        case .logOut: "log out"
+        }
     }
 }
