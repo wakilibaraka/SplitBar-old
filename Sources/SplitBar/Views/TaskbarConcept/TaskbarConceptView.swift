@@ -875,7 +875,6 @@ private enum LauncherDefaults {
 final class TaskbarConceptState: ObservableObject {
     @Published var openPanel: OpenPanel?
     @Published var surfaceStyle = SurfaceStyle.glass
-    @Published fileprivate var usesDockPresentation = false
     @Published fileprivate var isDarkMode = false
     @Published fileprivate var wallpaperPreset = WallpaperPreset.pastelBloom {
         didSet { UserDefaults.standard.set(wallpaperPreset.rawValue, forKey: "wallpaper.preset") }
@@ -1385,7 +1384,12 @@ final class TaskbarConceptState: ObservableObject {
 
     fileprivate func resetPersonalisation() {
         surfaceStyle = .glass
-        usesDockPresentation = false
+        taskbarMode = .windows
+        islandGap = 10
+        centeredBarWidth = 720
+        userDividers = []
+        trashAnchors = [:]
+        clusterOrder = ["downloads", "trash", "status"]
         isDarkMode = false
         wallpaperPreset = .pastelBloom
         pastelTint = Color(red: 0.91, green: 0.69, blue: 0.87)
@@ -1447,6 +1451,9 @@ struct TaskbarFlyoutContentView: View {
                 taskbarMode: $model.taskbarMode,
                 islandGap: $model.islandGap,
                 userDividers: $model.userDividers,
+                trashAnchors: $model.trashAnchors,
+                clusterOrder: $model.clusterOrder,
+                centeredBarWidth: $model.centeredBarWidth,
                 pinnedAppBundleIDs: model.pinnedAppBundleIDs,
                 isDarkMode: $model.isDarkMode,
                 wallpaperPreset: $model.wallpaperPreset,
@@ -1615,7 +1622,6 @@ public struct TaskbarConceptView: View {
     }
     private var surfaceStyle: SurfaceStyle { model.surfaceStyle }
     private var showsTaskbarPanel: Bool { model.showsTaskbarPanel }
-    private var usesDockPresentation: Bool { model.usesDockPresentation }
     private var isDarkMode: Bool { model.isDarkMode }
     private var wallpaperPreset: WallpaperPreset { model.wallpaperPreset }
     private var pastelTint: Color { model.pastelTint }
@@ -1746,6 +1752,9 @@ public struct TaskbarConceptView: View {
                         taskbarMode: $model.taskbarMode,
                         islandGap: $model.islandGap,
                         userDividers: $model.userDividers,
+                        trashAnchors: $model.trashAnchors,
+                        clusterOrder: $model.clusterOrder,
+                        centeredBarWidth: $model.centeredBarWidth,
                         pinnedAppBundleIDs: model.pinnedAppBundleIDs,
                         isDarkMode: $model.isDarkMode,
                         wallpaperPreset: $model.wallpaperPreset,
@@ -4693,6 +4702,9 @@ private struct SettingsFlyout: View {
     @Binding var taskbarMode: TaskbarMode
     @Binding var islandGap: CGFloat
     @Binding var userDividers: [TaskbarDivider]
+    @Binding var trashAnchors: [String: String]
+    @Binding var clusterOrder: [String]
+    @Binding var centeredBarWidth: CGFloat
     let pinnedAppBundleIDs: [String]
     @Binding var isDarkMode: Bool
     @Binding var wallpaperPreset: WallpaperPreset
@@ -4855,9 +4867,28 @@ private struct SettingsFlyout: View {
         .buttonStyle(.plain)
     }
 
+    private func clusterItemTitle(_ key: String) -> String {
+        switch key {
+        case "downloads": "Downloads"
+        case "trash": "Trash"
+        default: "System status"
+        }
+    }
+
+    private func moveClusterItem(_ key: String, offset: Int) {
+        guard let index = clusterOrder.firstIndex(of: key) else { return }
+        let target = index + offset
+        guard clusterOrder.indices.contains(target) else { return }
+        clusterOrder.swapAt(index, target)
+    }
+
+    private var effectiveTrashPlacement: TrashPlacement {
+        trashAnchors[taskbarMode.rawValue].flatMap(TrashPlacement.init(rawValue:)) ?? trashPlacement
+    }
+
     private func trashPlacementButton(_ placement: TrashPlacement) -> some View {
         Button {
-            trashPlacement = placement
+            trashAnchors[taskbarMode.rawValue] = placement.rawValue
         } label: {
             Text(placement.title)
                 .font(.system(size: 9, weight: .semibold))
@@ -4866,7 +4897,7 @@ private struct SettingsFlyout: View {
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity)
                 .background(
-                    trashPlacement == placement ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                    effectiveTrashPlacement == placement ? accent.opacity(0.12) : Color.primary.opacity(0.035),
                     in: RoundedRectangle(cornerRadius: 9)
                 )
         }
@@ -5316,13 +5347,86 @@ private struct SettingsFlyout: View {
                         iconSizePresetButton(size)
                     }
                 }
-                Text("Trash position")
+                Text("Trash position in \(taskbarMode.title)")
                     .font(.system(size: 10, weight: .medium))
                     .padding(.top, 2)
                 HStack(spacing: 8) {
                     ForEach(TrashPlacement.allCases) { placement in
                         trashPlacementButton(placement)
                     }
+                }
+                HStack(spacing: 8) {
+                    Button {
+                        trashPlacement = effectiveTrashPlacement
+                        for mode in TaskbarMode.allCases {
+                            trashAnchors[mode.rawValue] = effectiveTrashPlacement.rawValue
+                        }
+                    } label: {
+                        Label("Use in every mode", systemImage: "arrow.left.arrow.right")
+                            .font(.system(size: 9, weight: .medium))
+                    }
+                    .buttonStyle(.plain)
+                    if trashAnchors[taskbarMode.rawValue] != nil {
+                        Button {
+                            trashAnchors[taskbarMode.rawValue] = nil
+                        } label: {
+                            Label("Reset \(taskbarMode.title)", systemImage: "arrow.uturn.backward")
+                                .font(.system(size: 9, weight: .medium))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .foregroundStyle(accent)
+            }
+
+            settingsSection("Cluster order") {
+                Text("Downloads, Trash, and system status travel together as one cluster.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                VStack(spacing: 6) {
+                    ForEach(Array(clusterOrder.enumerated()), id: \.element) { index, key in
+                        HStack(spacing: 8) {
+                            Text(clusterItemTitle(key))
+                                .font(.system(size: 11, weight: .medium))
+                            Spacer(minLength: 0)
+                            Button {
+                                moveClusterItem(key, offset: -1)
+                            } label: {
+                                Image(systemName: "chevron.left")
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(index == 0)
+                            Button {
+                                moveClusterItem(key, offset: 1)
+                            } label: {
+                                Image(systemName: "chevron.right")
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(index == clusterOrder.count - 1)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+
+            if taskbarMode == .centered || taskbarMode == .macOS {
+                settingsSection("Bar width") {
+                    HStack {
+                        Text("Centered width")
+                            .font(.system(size: 11, weight: .medium))
+                        Spacer()
+                        Text("\(Int(centeredBarWidth)) pt")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                    Slider(value: $centeredBarWidth, in: 360...1600, step: 20)
+                    Text("Narrower bars leave more desktop visible while keeping every section reachable.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
