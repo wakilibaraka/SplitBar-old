@@ -765,8 +765,12 @@ public final class AppRuntimeController {
     }
 
     private func refreshRunningState() {
-        let running = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
-        taskbarConceptState.runningBundleIDs = Set(running.compactMap(\.bundleIdentifier))
+        let running = NSWorkspace.shared.runningApplications
+            .filter { $0.activationPolicy == .regular }
+            .sorted { $0.processIdentifier < $1.processIdentifier }
+        let orderedIDs = running.compactMap(\.bundleIdentifier)
+        taskbarConceptState.runningBundleIDs = Set(orderedIDs)
+        taskbarConceptState.runningAppOrder = orderedIDs
         taskbarConceptState.frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
     }
 

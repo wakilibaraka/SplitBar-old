@@ -643,6 +643,7 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var topProcesses: [TopProcess] = []
     @Published var totalProcessCount: Int = 0
     @Published var runningBundleIDs: Set<String> = []
+    @Published var runningAppOrder: [String] = []
     @Published var frontmostBundleID: String?
     @Published var runningIndicatorStyle = RunningIndicatorStyle.dot {
         didSet { UserDefaults.standard.set(runningIndicatorStyle.rawValue, forKey: "taskbar.indicatorStyle") }
@@ -1143,6 +1144,7 @@ struct TaskbarPanelContentView: View {
             showsSeconds: model.showsSeconds,
             clockDisplayStyle: model.clockDisplayStyle,
             pinnedBundleIDs: model.pinnedAppBundleIDs,
+            runningAppOrder: model.runningAppOrder,
             iconSize: model.taskbarIconSize,
             trashPlacement: model.trashPlacement,
             systemStatus: model.systemStatus,
@@ -1358,7 +1360,8 @@ public struct TaskbarConceptView: View {
                     uses24HourTime: uses24HourTime,
                     showsSeconds: showsSeconds,
                     clockDisplayStyle: model.clockDisplayStyle,
-                    pinnedBundleIDs: model.pinnedAppBundleIDs,
+            pinnedBundleIDs: model.pinnedAppBundleIDs,
+            runningAppOrder: model.runningAppOrder,
                     iconSize: model.taskbarIconSize,
                     trashPlacement: model.trashPlacement,
                     systemStatus: model.systemStatus,
@@ -1474,6 +1477,7 @@ private struct Taskbar: View {
     let showsSeconds: Bool
     let clockDisplayStyle: ClockDisplayStyle
     let pinnedBundleIDs: [String]
+    let runningAppOrder: [String]
     let iconSize: TaskbarIconSize
     let trashPlacement: TrashPlacement
     let systemStatus: SystemStatusSnapshot
@@ -1612,6 +1616,9 @@ private struct Taskbar: View {
                 ForEach(pinnedBundleIDs, id: \.self) { bundleIdentifier in
                     taskbarAppTile(bundleIdentifier)
                 }
+                ForEach(runningAppOrder.filter({ !pinnedBundleIDs.contains($0) }), id: \.self) { bundleIdentifier in
+                    taskbarAppTile(bundleIdentifier)
+                }
 
                 if trashPlacement == .withApps {
                     if showsTaskbarDividers {
@@ -1684,6 +1691,7 @@ private struct Taskbar: View {
 
     private func taskbarAppTile(_ bundleIdentifier: String) -> some View {
         let app = LauncherDefaults.apps.first { $0.bundleIdentifier == bundleIdentifier }
+        let title = displayName(for: bundleIdentifier)
         let isRunning = runningBundleIDs.contains(bundleIdentifier)
         let isFrontmost = frontmostBundleID == bundleIdentifier
         return Button {
@@ -1705,7 +1713,7 @@ private struct Taskbar: View {
             }
         }
         .buttonStyle(.plain)
-        .help(app?.title ?? bundleIdentifier)
+        .help(title)
         .contextMenu {
             tileContextMenu(bundleIdentifier)
         }
@@ -1770,7 +1778,7 @@ private struct Taskbar: View {
         }
         let windows = AppWindowPreviewService().windows(
             forBundleIdentifier: bundleIdentifier,
-            appName: LauncherDefaults.apps.first { $0.bundleIdentifier == bundleIdentifier }?.title ?? bundleIdentifier
+            appName: displayName(for: bundleIdentifier)
         )
         if !windows.isEmpty {
             Divider()
@@ -1795,11 +1803,23 @@ private struct Taskbar: View {
         Button(isPinned ? "Unpin from taskbar" : "Pin to taskbar") {
             onTaskbarTileAction(.togglePin(bundleID: bundleIdentifier))
         }
+        .disabled(!isPinned && pinnedBundleIDs.count >= 8)
         if isRunning {
             Button("Quit") {
                 onTaskbarTileAction(.quitApp(bundleID: bundleIdentifier))
             }
         }
+    }
+
+    private func displayName(for bundleIdentifier: String) -> String {
+        if let known = LauncherDefaults.apps.first(where: { $0.bundleIdentifier == bundleIdentifier }) {
+            return known.title
+        }
+        if let running = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleIdentifier }),
+           let name = running.localizedName, !name.isEmpty {
+            return name
+        }
+        return bundleIdentifier
     }
 
     private func recentDocuments(for bundleIdentifier: String) -> [URL] {

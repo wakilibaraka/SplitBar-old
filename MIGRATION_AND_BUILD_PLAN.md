@@ -95,6 +95,10 @@ explicit user controls.
   clicking launches, activates, or hides, with AX true-minimize behind a
   permission-gated mode. Indicator style/size/colour and minimize mode persist;
   their settings controls land with the settings redesign.
+- [x] Taskbar shows running non-pinned apps in PID (launch) order after the
+  pins, with the same tiles, indicators, click cycle, hover previews, and
+  menus; quitting removes them. Titles resolve via running apps; Pin grays out
+  at the 8-pin cap.
   name with avatar (CBIdentity, initials fallback) instead of "Your profile",
   a gear button jumping straight to Personalisation, and a power menu with
   Lock, Sleep, Restart, Shut Down, and Log Out — icons on the left, destructive
