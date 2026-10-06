@@ -397,6 +397,18 @@ enum TaskbarMode: String, CaseIterable, Identifiable {
         case .split3, .split4: false
         }
     }
+
+    var isSplit: Bool { !isSingleIsland }
+
+    var detail: String {
+        switch self {
+        case .windows: "Full-width bar with weather, centred apps, tray and clock"
+        case .macOS: "Floating dock-style bar"
+        case .centered: "One narrower centred bar"
+        case .split3: "Weather, apps, then tray and clock"
+        case .split4: "Weather, apps, tray, then clock"
+        }
+    }
 }
 
 enum CornerStyle: String, CaseIterable, Identifiable {
@@ -915,6 +927,28 @@ final class TaskbarConceptState: ObservableObject {
             return saved
         }
         return trashPlacement
+    }
+
+    private var tileHoverTask: Task<Void, Never>?
+
+    func handleTaskbarTileHover(_ bundleIdentifier: String, hovering: Bool) {
+        tileHoverTask?.cancel()
+        tileHoverTask = nil
+        guard showWindowPreviews else { return }
+        if hovering, runningBundleIDs.contains(bundleIdentifier) {
+            tileHoverTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(400))
+                guard !Task.isCancelled, let self else { return }
+                self.previewBundleID = bundleIdentifier
+            }
+        } else if !hovering, previewBundleID == bundleIdentifier {
+            previewBundleID = nil
+        }
+    }
+
+    func cancelTaskbarTileHover() {
+        tileHoverTask?.cancel()
+        tileHoverTask = nil
     }
     @Published fileprivate var systemStatus = SystemStatusSnapshot.placeholder()
     private let systemStatusService = SystemStatusService()
@@ -1515,34 +1549,8 @@ struct TaskbarPanelContentView: View {
 
     var body: some View {
         Taskbar(
-            openPanel: $model.openPanel,
+            model: model,
             height: $model.taskbarHeight,
-            usesDockPresentation: model.usesDockPresentation,
-            surfaceStyle: model.surfaceStyle,
-            isDarkMode: model.isDarkMode,
-            usesTaskbarGradient: model.usesTaskbarGradient,
-            taskbarGradientStart: model.taskbarGradientStart,
-            taskbarGradientEnd: model.taskbarGradientEnd,
-            tint: model.clockTint,
-            dateStyle: model.dateStyle,
-            uses24HourTime: model.uses24HourTime,
-            showsSeconds: model.showsSeconds,
-            clockDisplayStyle: model.clockDisplayStyle,
-            pinnedBundleIDs: model.pinnedAppBundleIDs,
-            runningAppOrder: model.runningAppOrder,
-            iconSize: model.taskbarIconSize,
-            trashPlacement: model.trashPlacement,
-            systemStatus: model.systemStatus,
-            weather: model.weather,
-            runningBundleIDs: model.runningBundleIDs,
-            frontmostBundleID: model.frontmostBundleID,
-            indicatorStyle: model.runningIndicatorStyle,
-            indicatorSize: model.runningIndicatorSize,
-            indicatorColor: model.runningIndicatorColor,
-            menuStyle: model.contextMenuStyle,
-            clusterOrder: model.clusterOrder,
-            previewsEnabled: model.showWindowPreviews,
-            previewBundleID: $model.previewBundleID,
             onLaunchApplication: onLaunchApplication,
             onTaskbarIconClick: onTaskbarIconClick,
             onTaskbarTileAction: onTaskbarTileAction
@@ -1743,34 +1751,8 @@ public struct TaskbarConceptView: View {
                 }
 
                 Taskbar(
-                    openPanel: $model.openPanel,
+                    model: model,
                     height: $model.taskbarHeight,
-                    usesDockPresentation: usesDockPresentation,
-                    surfaceStyle: surfaceStyle,
-                    isDarkMode: isDarkMode,
-                    usesTaskbarGradient: usesTaskbarGradient,
-                    taskbarGradientStart: taskbarGradientStart,
-                    taskbarGradientEnd: taskbarGradientEnd,
-                    tint: clockTint,
-                    dateStyle: dateStyle,
-                    uses24HourTime: uses24HourTime,
-                    showsSeconds: showsSeconds,
-                    clockDisplayStyle: model.clockDisplayStyle,
-            pinnedBundleIDs: model.pinnedAppBundleIDs,
-            runningAppOrder: model.runningAppOrder,
-                    iconSize: model.taskbarIconSize,
-                    trashPlacement: model.trashPlacement,
-                    systemStatus: model.systemStatus,
-            weather: model.weather,
-                    runningBundleIDs: model.runningBundleIDs,
-                    frontmostBundleID: model.frontmostBundleID,
-                    indicatorStyle: model.runningIndicatorStyle,
-                    indicatorSize: model.runningIndicatorSize,
-                    indicatorColor: model.runningIndicatorColor,
-                    menuStyle: model.contextMenuStyle,
-                    clusterOrder: model.clusterOrder,
-                    previewsEnabled: model.showWindowPreviews,
-                    previewBundleID: $model.previewBundleID,
                     onLaunchApplication: onLaunchApplication,
                     onTaskbarIconClick: onTaskbarIconClick,
                     onTaskbarTileAction: onTaskbarTileAction
@@ -1936,28 +1918,6 @@ private struct TaskbarClockSection: View {
     }
 }
 
-private struct TaskbarQuickSection: View {
-    @ObservedObject var model: TaskbarConceptState
-
-    var body: some View {
-        Button {
-            model.openPanel = model.openPanel == .controls ? nil : .controls
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "wifi")
-                Image(systemName: "speaker.wave.2.fill")
-                Image(systemName: "battery.75percent")
-            }
-            .font(.system(size: model.taskbarHeight * 0.27, weight: .medium))
-            .foregroundStyle(.primary.opacity(0.78))
-            .frame(height: model.taskbarHeight - 8)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help("Open quick controls, volume, Bluetooth and battery")
-    }
-}
-
 struct TaskbarIslandContent: View {
     let sections: [TaskbarSection]
     @ObservedObject var model: TaskbarConceptState
@@ -1966,7 +1926,6 @@ struct TaskbarIslandContent: View {
     let onTaskbarTileAction: (TaskbarTileAction) -> Void
     var maxAppTiles: Int? = nil
     var showOverflowChevron: Bool = false
-    @State private var hoverTask: Task<Void, Never>?
 
     private var tiles: TaskbarTiles {
         TaskbarTiles(
@@ -1987,31 +1946,17 @@ struct TaskbarIslandContent: View {
             onTaskbarIconClick: onTaskbarIconClick,
             onTaskbarTileAction: onTaskbarTileAction,
             onToggleControls: { model.openPanel = model.openPanel == .controls ? nil : .controls },
-            onHoverChanged: { id, hovering in hoverChanged(id, hovering) }
+            onHoverChanged: model.handleTaskbarTileHover
         )
-    }
-
-    private func hoverChanged(_ bundleIdentifier: String, _ hovering: Bool) {
-        hoverTask?.cancel()
-        hoverTask = nil
-        guard model.showWindowPreviews else { return }
-        if hovering, model.runningBundleIDs.contains(bundleIdentifier) {
-            hoverTask = Task {
-                try? await Task.sleep(for: .milliseconds(400))
-                guard !Task.isCancelled else { return }
-                model.previewBundleID = bundleIdentifier
-            }
-        } else if !hovering, model.previewBundleID == bundleIdentifier {
-            model.previewBundleID = nil
-        }
     }
 
     private var stripItems: [StripItem] {
         let running = model.runningAppOrder.filter({ !model.pinnedAppBundleIDs.contains($0) })
+        let dividers = model.taskbarMode == .macOS ? [] : model.userDividers
         return TaskbarStrip.compose(
             pins: model.pinnedAppBundleIDs,
             runningOrder: running,
-            dividers: model.userDividers
+            dividers: dividers
         )
     }
 
@@ -2101,15 +2046,13 @@ struct TaskbarIslandContent: View {
         }
     }
 
+    @ViewBuilder
     private func trayGroup(includeClock: Bool) -> some View {
-        HStack(spacing: 4) {
-            if model.trashPlacement(for: model.taskbarMode) == .beforeTray {
-                tiles.trashCluster
-            }
-            TaskbarQuickSection(model: model)
-            if includeClock {
-                clockGroup
-            }
+        if model.trashPlacement(for: model.taskbarMode) == .beforeTray {
+            tiles.trashCluster
+        }
+        if includeClock {
+            clockGroup
         }
     }
 
@@ -2322,243 +2265,64 @@ private struct TaskbarTiles {
 }
 
 private struct Taskbar: View {
-    @Binding var openPanel: OpenPanel?
+    @ObservedObject var model: TaskbarConceptState
     @Binding var height: CGFloat
     @State private var dragStartHeight: CGFloat?
-    let usesDockPresentation: Bool
-    let surfaceStyle: SurfaceStyle
-    let isDarkMode: Bool
-    let usesTaskbarGradient: Bool
-    let taskbarGradientStart: Color
-    let taskbarGradientEnd: Color
-    @Environment(\.surfaceTransparency) private var transparency
-    let tint: Color
-    let dateStyle: ClockDateStyle
-    let uses24HourTime: Bool
-    let showsSeconds: Bool
-    let clockDisplayStyle: ClockDisplayStyle
-    let pinnedBundleIDs: [String]
-    let runningAppOrder: [String]
-    let iconSize: TaskbarIconSize
-    let trashPlacement: TrashPlacement
-    let systemStatus: SystemStatusSnapshot
-    let weather: WeatherState
-    let runningBundleIDs: Set<String>
-    let frontmostBundleID: String?
-    let indicatorStyle: RunningIndicatorStyle
-    let indicatorSize: RunningIndicatorSize
-    let indicatorColor: Color
-    let menuStyle: ContextMenuStyle
-    let clusterOrder: [String]
-    let previewsEnabled: Bool
-    @Binding var previewBundleID: String?
-    @State private var previewHoverTask: Task<Void, Never>?
     let onLaunchApplication: (String) -> Void
     let onTaskbarIconClick: (String) -> Void
     let onTaskbarTileAction: (TaskbarTileAction) -> Void
 
-    private var glyphSize: CGFloat { height * iconSize.glyphFraction }
+    private var mode: TaskbarMode { model.taskbarMode }
+    private var glyphSize: CGFloat { height * model.taskbarIconSize.glyphFraction }
     private var tileSide: CGFloat { max(28, height - 4) }
+    private var isFloating: Bool { mode == .macOS }
+    private var isConstrained: Bool { isFloating || mode == .centered }
+    private var showsDividers: Bool { !isFloating }
 
     private var tiles: TaskbarTiles {
         TaskbarTiles(
-            pinnedBundleIDs: pinnedBundleIDs,
-            runningBundleIDs: runningBundleIDs,
-            frontmostBundleID: frontmostBundleID,
-            indicatorStyle: indicatorStyle,
-            indicatorSize: indicatorSize,
-            indicatorColor: indicatorColor,
-            menuStyle: menuStyle,
-            isDarkMode: isDarkMode,
-            systemStatus: systemStatus,
+            pinnedBundleIDs: model.pinnedAppBundleIDs,
+            runningBundleIDs: model.runningBundleIDs,
+            frontmostBundleID: model.frontmostBundleID,
+            indicatorStyle: model.runningIndicatorStyle,
+            indicatorSize: model.runningIndicatorSize,
+            indicatorColor: model.runningIndicatorColor,
+            menuStyle: model.contextMenuStyle,
+            isDarkMode: model.isDarkMode,
+            systemStatus: model.systemStatus,
             tileSide: tileSide,
             glyphSize: glyphSize,
-            previewsEnabled: previewsEnabled,
-            previewBundleID: $previewBundleID,
-            clusterOrder: clusterOrder,
+            previewsEnabled: model.showWindowPreviews,
+            previewBundleID: $model.previewBundleID,
+            clusterOrder: model.clusterOrder,
             onTaskbarIconClick: onTaskbarIconClick,
             onTaskbarTileAction: onTaskbarTileAction,
             onToggleControls: { toggle(.controls) },
-            onHoverChanged: onHoverChanged
+            onHoverChanged: model.handleTaskbarTileHover
         )
     }
 
-    private func onHoverChanged(_ bundleIdentifier: String, _ hovering: Bool) {
-        previewHoverTask?.cancel()
-        previewHoverTask = nil
-        guard previewsEnabled else { return }
-        if hovering, runningBundleIDs.contains(bundleIdentifier) {
-            previewHoverTask = Task {
-                try? await Task.sleep(for: .milliseconds(400))
-                guard !Task.isCancelled else { return }
-                previewBundleID = bundleIdentifier
-            }
-        } else if !hovering, previewBundleID == bundleIdentifier {
-            previewBundleID = nil
-        }
-    }
-
-    private func clockSchedule<Content: View>(@ViewBuilder content: @escaping (Date) -> Content) -> some View {
-        if showsSeconds {
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                content(context.date)
-            }
-        } else {
-            TimelineView(.periodic(from: .now.nextMinuteBoundary, by: 60)) { context in
-                content(context.date)
-            }
-        }
-    }
-
     var body: some View {
-        ZStack {
-            Group {
-                if usesDockPresentation {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.42), lineWidth: 1)
-                        }
-                        .padding(.horizontal, 150)
-                        .padding(.vertical, 3)
-                } else if usesTaskbarGradient {
-                    Rectangle()
-                        .fill(LinearGradient(colors: [taskbarGradientStart, taskbarGradientEnd], startPoint: .leading, endPoint: .trailing))
-                } else if surfaceStyle == .aero {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.44, green: 0.74, blue: 0.96).opacity(isDarkMode ? 0.22 : 0.45),
-                                    Color.white.opacity(isDarkMode ? 0.03 : 0.16),
-                                    Color(red: 0.18, green: 0.43, blue: 0.71).opacity(isDarkMode ? 0.18 : 0.30)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        }
-                } else {
-                    let base = surfaceStyle.taskbarFill(darkMode: isDarkMode)
-                    Rectangle()
-                        .fill(
-                            surfaceStyle == .windowsXP
-                                ? AnyShapeStyle(LinearGradient(colors: [Color(red: 0.15, green: 0.44, blue: 0.88), Color(red: 0.04, green: 0.22, blue: 0.61)], startPoint: .top, endPoint: .bottom))
-                                : AnyShapeStyle(base)
-                        )
-                        .overlay(alignment: .top) {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.42))
-                                .frame(height: 1)
-                        }
-                }
+        Group {
+            if mode.isSplit {
+                TaskbarSplitRow(
+                    model: model,
+                    onLaunchApplication: onLaunchApplication,
+                    onTaskbarIconClick: onTaskbarIconClick,
+                    onTaskbarTileAction: onTaskbarTileAction
+                )
+            } else {
+                barShell
             }
-            .opacity(1 - transparency * 0.62)
-
-            HStack(spacing: 0) {
-                Button {
-                    toggle(.widgets)
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: weather.symbolName)
-                            .symbolRenderingMode(.multicolor)
-                            .font(.system(size: glyphSize))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(weather.formattedTemperature)
-                                .font(.system(size: 13, weight: .semibold))
-                            Text(weather.conditionText)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                    .frame(width: 170, height: height - 4, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("Open widgets")
-                .padding(.leading, 18)
-
-                if showsTaskbarDividers {
-                    taskbarDivider
-                        .padding(.vertical, 6)
-                        .padding(.leading, 10)
-                }
-
-                Spacer(minLength: 0)
-
-                trailingTrayCluster
-                    .layoutPriority(1)
-            }
-            .padding(.horizontal, usesDockPresentation ? 18 : 8)
-            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
         .frame(height: height)
-        .environment(\.surfaceTransparency, transparency)
-        .overlay(alignment: .center) {
-            HStack(spacing: 4) {
-                Button {
-                    toggle(.start)
-                } label: {
-                    MacOSAppIcon(
-                        bundleIdentifier: "com.apple.launchpad",
-                        fallbackSymbol: "square.grid.3x3.fill",
-                        fallbackColor: isDarkMode ? Color(red: 0.54, green: 0.76, blue: 1) : .blue,
-                        size: glyphSize
-                    )
-                    .frame(width: tileSide, height: tileSide)
-                    .taskbarTile()
-                }
-                .help("Open Start")
-
-                ForEach(pinnedBundleIDs, id: \.self) { bundleIdentifier in
-                    taskbarAppTile(bundleIdentifier)
-                }
-                ForEach(runningAppOrder.filter({ !pinnedBundleIDs.contains($0) }), id: \.self) { bundleIdentifier in
-                    taskbarAppTile(bundleIdentifier)
-                }
-
-                if trashPlacement == .withApps {
-                    if showsTaskbarDividers {
-                        taskbarDivider
-                            .padding(.vertical, 6)
-                    }
-                    trashCluster
-                }
-            }
-            .buttonStyle(.plain)
+        .environment(\.surfaceTransparency, model.interfaceTransparency)
+        .overlay(alignment: .top) {
+            resizeHandle
         }
         .overlay(alignment: .top) {
-            Color.clear
-                .frame(maxWidth: .infinity)
-                .frame(height: 12)
-                .overlay(alignment: .top) {
-                    Capsule()
-                        .fill(Color.primary.opacity(0.16))
-                        .frame(width: 42, height: 3)
-                        .padding(.top, 3)
-                }
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 1)
-                        .onChanged { value in
-                            if dragStartHeight == nil {
-                                dragStartHeight = height
-                            }
-                            if let dragStartHeight {
-                                height = min(48, max(32, dragStartHeight - value.translation.height))
-                            }
-                        }
-                        .onEnded { _ in
-                            dragStartHeight = nil
-                        }
-                )
-                .help("Drag to resize the taskbar")
-        }
-        .overlay(alignment: .top) {
-            if usesDockPresentation == false && surfaceStyle == .classic98 {
+            if !isFloating, model.surfaceStyle == .classic98 {
                 Rectangle()
                     .fill(Color.white.opacity(0.9))
                     .frame(height: 1)
@@ -2568,7 +2332,7 @@ private struct Taskbar: View {
         .contentShape(Rectangle())
         .contextMenu {
             Button {
-                openPanel = .settings
+                model.openPanel = .settings
             } label: {
                 Label("Customise taskbar", systemImage: "slider.horizontal.3")
             }
@@ -2583,230 +2347,200 @@ private struct Taskbar: View {
         }
     }
 
-    private var taskbarDivider: some View {
-        TaskbarDividerView()
-    }
-
-    private func taskbarAppTile(_ bundleIdentifier: String) -> some View {
-        let app = LauncherDefaults.apps.first { $0.bundleIdentifier == bundleIdentifier }
-        let title = taskbarDisplayName(for: bundleIdentifier)
-        let isRunning = runningBundleIDs.contains(bundleIdentifier)
-        let isFrontmost = frontmostBundleID == bundleIdentifier
-        return Button {
-            onTaskbarIconClick(bundleIdentifier)
-        } label: {
-            MacOSAppIcon(
-                bundleIdentifier: bundleIdentifier,
-                fallbackSymbol: app?.symbol ?? "app.fill",
-                fallbackColor: app?.color ?? .secondary,
-                size: glyphSize
-            )
-            .frame(width: tileSide, height: tileSide)
-            .taskbarTile(highlighted: isRunning && indicatorStyle == .highlight, highlightColor: indicatorColor)
-            .overlay(alignment: .bottom) {
-                if isRunning, indicatorStyle != .highlight {
-                    runningIndicator(isFrontmost: isFrontmost)
-                        .padding(.bottom, 4)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .help(title)
-        .contextMenu {
-            tileContextMenu(bundleIdentifier)
-        }
-        .onHover { hovering in
-            previewHoverTask?.cancel()
-            previewHoverTask = nil
-            guard previewsEnabled else { return }
-            if hovering, runningBundleIDs.contains(bundleIdentifier) {
-                previewHoverTask = Task {
-                    try? await Task.sleep(for: .milliseconds(400))
-                    guard !Task.isCancelled else { return }
-                    previewBundleID = bundleIdentifier
-                }
-            } else if !hovering, previewBundleID == bundleIdentifier {
-                previewBundleID = nil
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func tileContextMenu(_ bundleIdentifier: String) -> some View {
-        switch menuStyle {
-        case .native:
-            nativeTileMenu(bundleIdentifier)
-        case .windows:
-            windowsTileMenu(bundleIdentifier)
-        }
-    }
-
-    @ViewBuilder
-    private func nativeTileMenu(_ bundleIdentifier: String) -> some View {
-        let isRunning = runningBundleIDs.contains(bundleIdentifier)
-        Button(isRunning ? "Activate" : "Open") {
-            onTaskbarIconClick(bundleIdentifier)
-        }
-        Button("Show in Finder") {
-            onTaskbarTileAction(.revealInFinder(bundleID: bundleIdentifier))
-        }
-        if isRunning {
-            Divider()
-            Button("Hide") {
-                onTaskbarTileAction(.hideApp(bundleID: bundleIdentifier))
-            }
-            Button("Quit") {
-                onTaskbarTileAction(.quitApp(bundleID: bundleIdentifier))
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func windowsTileMenu(_ bundleIdentifier: String) -> some View {
-        let isRunning = runningBundleIDs.contains(bundleIdentifier)
-        let isPinned = pinnedBundleIDs.contains(bundleIdentifier)
-        Button("Open") {
-            onTaskbarIconClick(bundleIdentifier)
-        }
-        Button("Open new window") {
-            onTaskbarTileAction(.newWindow(bundleID: bundleIdentifier))
-        }
-        Button("Open file location") {
-            onTaskbarTileAction(.revealInFinder(bundleID: bundleIdentifier))
-        }
-        let windows = AppWindowPreviewService().windows(
-            forBundleIdentifier: bundleIdentifier,
-            appName: taskbarDisplayName(for: bundleIdentifier)
-        )
-        if !windows.isEmpty {
-            Divider()
-            ForEach(windows.prefix(5)) { window in
-                Button(window.title) {
-                    AppWindowPreviewService().focusWindow(info: window, bundleIdentifier: bundleIdentifier)
-                }
-            }
-        }
-        let recents = recentDocuments(for: bundleIdentifier)
-        if !recents.isEmpty {
-            Divider()
-            Menu("Recent") {
-                ForEach(recents, id: \.self) { url in
-                    Button(url.deletingPathExtension().lastPathComponent) {
-                        onTaskbarTileAction(.openRecent(url))
+    private var barShell: some View {
+        GeometryReader { geometry in
+            ZStack {
+                barBackground
+                HStack(spacing: 0) {
+                    TaskbarWeatherSection(model: model)
+                        .padding(.leading, 18)
+                    if showsDividers, !model.userDividers.isEmpty {
+                        TaskbarDividerView()
+                            .padding(.vertical, 6)
+                            .padding(.leading, 10)
                     }
+                    Spacer(minLength: 0)
+                    trailingTrayCluster
+                        .layoutPriority(1)
                 }
+                .padding(.horizontal, isFloating ? 18 : 8)
+                .frame(maxWidth: .infinity)
             }
-        }
-        Divider()
-        Button(isPinned ? "Unpin from taskbar" : "Pin to taskbar") {
-            onTaskbarTileAction(.togglePin(bundleID: bundleIdentifier))
-        }
-        .disabled(!isPinned && pinnedBundleIDs.count >= 8)
-        if isRunning {
-            Button("Quit") {
-                onTaskbarTileAction(.quitApp(bundleID: bundleIdentifier))
-            }
-        }
-    }
-
-    private func recentDocuments(for bundleIdentifier: String) -> [URL] {
-        let recents = NSDocumentController.shared.recentDocumentURLs
-        var matches: [URL] = []
-        for url in recents.prefix(20) {
-            guard let appURL = NSWorkspace.shared.urlForApplication(toOpen: url),
-                  Bundle(url: appURL)?.bundleIdentifier == bundleIdentifier
-            else {
-                continue
-            }
-            matches.append(url)
-            if matches.count >= 5 {
-                break
-            }
-        }
-        return matches
-    }
-
-    private func runningIndicator(isFrontmost: Bool) -> some View {
-        Group {
-            switch indicatorStyle {
-            case .dot:
-                Circle()
-                    .fill(indicatorColor.opacity(isFrontmost ? 1 : 0.55))
-                    .frame(width: indicatorSize.dotDiameter, height: indicatorSize.dotDiameter)
-            case .dash:
-                Capsule()
-                    .fill(indicatorColor.opacity(isFrontmost ? 1 : 0.55))
-                    .frame(width: indicatorSize.dashWidth, height: indicatorSize.dashHeight)
-            case .highlight:
-                EmptyView()
+            .frame(maxWidth: .infinity)
+            .frame(width: isConstrained ? min(geometry.size.width, model.centeredBarWidth) : nil)
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .center) {
+                TaskbarIslandContent(
+                    sections: [.apps],
+                    model: model,
+                    onLaunchApplication: onLaunchApplication,
+                    onTaskbarIconClick: onTaskbarIconClick,
+                    onTaskbarTileAction: onTaskbarTileAction
+                )
             }
         }
     }
 
-    private var showsTaskbarDividers: Bool {
-        !usesDockPresentation
-    }
-
-    private var trashCluster: some View {
-        HStack(spacing: 4) {
-            DownloadsTile(tileSide: tileSide, glyphSize: glyphSize)
-            TrashTile(tileSide: tileSide, glyphSize: glyphSize, darkMode: isDarkMode)
-            Button {
-                toggle(.controls)
-            } label: {
-                SystemStatusIcon(snapshot: systemStatus, glyphSize: glyphSize)
-                    .frame(width: tileSide, height: tileSide)
-                    .taskbarTile()
-            }
-            .buttonStyle(.plain)
-            .help("Open quick controls, volume, Bluetooth and battery")
+    @ViewBuilder
+    private var barBackground: some View {
+        let radius = model.shellRadius(for: .taskbar)
+        if isFloating {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.42), lineWidth: 1)
+                }
+                .padding(.vertical, 3)
+        } else if model.usesTaskbarGradient {
+            Rectangle()
+                .fill(LinearGradient(colors: [model.taskbarGradientStart, model.taskbarGradientEnd], startPoint: .leading, endPoint: .trailing))
+        } else if model.surfaceStyle == .aero {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.44, green: 0.74, blue: 0.96).opacity(model.isDarkMode ? 0.22 : 0.45),
+                            Color.white.opacity(model.isDarkMode ? 0.03 : 0.16),
+                            Color(red: 0.18, green: 0.43, blue: 0.71).opacity(model.isDarkMode ? 0.18 : 0.30)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+        } else {
+            Rectangle()
+                .fill(
+                    model.surfaceStyle == .windowsXP
+                        ? AnyShapeStyle(LinearGradient(colors: [Color(red: 0.15, green: 0.44, blue: 0.88), Color(red: 0.04, green: 0.22, blue: 0.61)], startPoint: .top, endPoint: .bottom))
+                        : AnyShapeStyle(model.surfaceStyle.taskbarFill(darkMode: model.isDarkMode))
+                )
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.42))
+                        .frame(height: 1)
+                }
         }
     }
 
     private var trailingTrayCluster: some View {
-        HStack(spacing: trashPlacement == .beforeClock ? 4 : 8) {
-            if trashPlacement == .beforeTray {
-                if showsTaskbarDividers {
-                    taskbarDivider
-                }
-                trashCluster
+        HStack(spacing: model.trashPlacement(for: mode) == .beforeClock ? 4 : 8) {
+            if model.trashPlacement(for: mode) == .beforeTray {
+                tiles.trashCluster
             }
-            if trashPlacement == .beforeClock {
-                trashCluster
+            if model.trashPlacement(for: mode) == .beforeClock {
+                tiles.trashCluster
             }
-
-            clockSchedule { date in
-                Button {
-                    toggle(.calendar)
-                } label: {
-                    TaskbarClockDisplay(
-                        date: date,
-                        style: clockDisplayStyle,
-                        dateStyle: dateStyle,
-                        uses24HourTime: uses24HourTime,
-                        showsSeconds: showsSeconds,
-                        tint: tint,
-                        height: height
-                    )
-                    .frame(minWidth: 88, minHeight: height - 8, alignment: .trailing)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("Open calendar")
-            }
-
-            if trashPlacement == .farRight {
-                if showsTaskbarDividers {
-                    taskbarDivider
-                }
-                trashCluster
+            TaskbarClockSection(model: model)
+            if model.trashPlacement(for: mode) == .farRight {
+                tiles.trashCluster
             }
         }
         .padding(.trailing, 12)
     }
 
+    private var resizeHandle: some View {
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: 12)
+            .overlay(alignment: .top) {
+                Capsule()
+                    .fill(Color.primary.opacity(0.16))
+                    .frame(width: 42, height: 3)
+                    .padding(.top, 3)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        if dragStartHeight == nil {
+                            dragStartHeight = height
+                        }
+                        if let dragStartHeight {
+                            height = min(48, max(32, dragStartHeight - value.translation.height))
+                        }
+                    }
+                    .onEnded { _ in
+                        dragStartHeight = nil
+                    }
+            )
+            .help("Drag to resize the taskbar")
+    }
+
     private func toggle(_ panel: OpenPanel) {
-        openPanel = openPanel == panel ? nil : panel
+        model.openPanel = model.openPanel == panel ? nil : panel
+    }
+}
+
+private struct TaskbarSplitRow: View {
+    @ObservedObject var model: TaskbarConceptState
+    let onLaunchApplication: (String) -> Void
+    let onTaskbarIconClick: (String) -> Void
+    let onTaskbarTileAction: (TaskbarTileAction) -> Void
+
+    private var tileStride: CGFloat { max(28, model.taskbarHeight - 4) + 4 }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let appCount = model.pinnedAppBundleIDs.count
+                + model.runningAppOrder.filter({ !model.pinnedAppBundleIDs.contains($0) }).count
+            let layout = TaskbarStrip.layoutIslands(
+                screenWidth: geometry.size.width,
+                mode: model.taskbarMode,
+                tileStride: tileStride,
+                appCount: appCount,
+                weatherWidth: 196,
+                trayWidth: tileStride * 2,
+                clockWidth: 96,
+                clusterWidth: tileStride * 3,
+                gap: model.islandGap,
+                margin: 12,
+                barHeight: model.taskbarHeight,
+                bottomMargin: 0
+            )
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(layout.islands.enumerated()), id: \.offset) { _, island in
+                    islandShell(
+                        sections: island.sections,
+                        frame: island.frame,
+                        maxAppTiles: layout.visibleAppTiles,
+                        showsOverflow: layout.showsOverflow
+                    )
+                    .offset(x: island.frame.minX, y: island.frame.minY)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+        }
+    }
+
+    private func islandShell(
+        sections: [TaskbarSection],
+        frame: CGRect,
+        maxAppTiles: Int,
+        showsOverflow: Bool
+    ) -> some View {
+        let radius = model.shellRadius(for: .taskbar)
+        return TaskbarIslandContent(
+            sections: sections,
+            model: model,
+            onLaunchApplication: onLaunchApplication,
+            onTaskbarIconClick: onTaskbarIconClick,
+            onTaskbarTileAction: onTaskbarTileAction,
+            maxAppTiles: maxAppTiles,
+            showOverflowChevron: showsOverflow
+        )
+        .padding(.horizontal, 10)
+        .frame(width: frame.width, height: frame.height)
+        .background {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.38), lineWidth: 1)
+                }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
     }
 }
 
