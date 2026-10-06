@@ -716,7 +716,6 @@ final class TaskbarConceptState: ObservableObject {
     ]
     @Published fileprivate var bluetoothEnabled = true
     @Published fileprivate var vpnEnabled = false
-    @Published fileprivate var volume: Double = 0.68
     @Published fileprivate var appVolume: Double = 0.52
     @Published fileprivate var brightness: Double = 0.82
 
@@ -914,6 +913,13 @@ final class TaskbarConceptState: ObservableObject {
 
     func togglePinned(_ bundleID: String) {
         setPinned(bundleID, isPinned: !pinnedAppBundleIDs.contains(bundleID))
+    }
+
+    fileprivate func setOutputVolume(_ level: Double) {
+        SystemStatusService.setOutputVolume(level)
+        var snapshot = systemStatus
+        snapshot.volumeLevel = min(1, max(0, level))
+        systemStatus = snapshot
     }
 
     fileprivate func resetPersonalisation() {
@@ -3305,7 +3311,14 @@ private struct ControlsFlyout: View {
             .scrollIndicators(.hidden)
 
             WidgetCard(title: "Volume mixer", symbol: "speaker.wave.2.fill", tint: .blue) {
-                controlSlider("System", symbol: "speaker.wave.2.fill", value: $model.volume)
+                controlSlider(
+                    "System",
+                    symbol: "speaker.wave.2.fill",
+                    value: Binding(
+                        get: { model.systemStatus.volumeLevel },
+                        set: { model.setOutputVolume($0) }
+                    )
+                )
                 controlSlider("App audio", symbol: "waveform", value: $model.appVolume)
                 controlSlider("Brightness", symbol: "sun.max.fill", value: $model.brightness)
             }

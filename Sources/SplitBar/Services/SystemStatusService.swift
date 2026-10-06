@@ -203,4 +203,38 @@ public final class SystemStatusService {
         let mute = muted(element: 1) ?? muted(element: 0) ?? false
         return (Double(min(1, max(0, level))), mute)
     }
+
+    @discardableResult
+    nonisolated static func setOutputVolume(_ level: Double) -> Bool {
+        var deviceID = AudioDeviceID(0)
+        var deviceSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var defaultAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &defaultAddress, 0, nil, &deviceSize, &deviceID
+        ) == noErr, deviceID != 0 else {
+            return false
+        }
+        for element: UInt32 in [1, 0] {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyVolumeScalar,
+                mScope: kAudioDevicePropertyScopeOutput,
+                mElement: element
+            )
+            var value = Float32(min(1, max(0, level)))
+            guard AudioObjectHasProperty(deviceID, &address) else { continue }
+            let status = AudioObjectSetPropertyData(
+                deviceID, &address, 0, nil,
+                UInt32(MemoryLayout<Float32>.size), &value
+            )
+            if status == noErr {
+                return true
+            }
+        }
+        return false
+    }
 }
