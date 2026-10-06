@@ -225,6 +225,26 @@ the taskbar surface into a non-activating bottom-edge panel, retain the preview
 as a fallback, and validate multi-display and Space behavior before changing
 the app's default presentation.
 
+#### Dock-like floating behavior (committed)
+
+App windows must float above and around the bar; the bar must never overlay
+fullscreen content. Reference studied: deskbar hides its bar per display with a
+fullscreen scan. Clean-room plan:
+
+- Drop `.fullScreenAuxiliary` from the taskbar panel so fullscreen Spaces hide
+  it by default, and add a `FullscreenMonitor` service that scans
+  `CGWindowList` per display on `activeSpaceDidChange` plus frontmost-app
+  change as belt-and-braces (covers non-Space fullscreen overlays). Hide only
+  the affected display's panel when multi-display lands.
+- Move the strip from `.floating` to `.statusBar` level (matches the reference
+  and always-on-top expectations) only together with the hiding above; never
+  raise the level while the bar can still overlay fullscreen content.
+- macOS offers no public edge-reservation API (no AppBar equivalent), so a
+  third-party bar cannot push windows up the way the real Dock does. Floating
+  plus hide-on-fullscreen is the design, not a bug; a later "dodge windows
+  touching the strip" mode needs `CGWindowList` polling and stays optional and
+  off by default for the same resource reasons as all other polling.
+
 ### Phase 5 — Native app launch and running state
 
 - Keep app catalog and launch logic in services; the UI sends identifiers/actions
@@ -232,6 +252,28 @@ the app's default presentation.
 - Add running-app indicators using public `NSWorkspace` APIs.
 - Define launch, activate, open-window, and quit semantics separately.
 - Add clear behavior for uninstalled apps and inaccessible locations.
+
+#### Click semantics and context menus (committed)
+
+Windows behavior to replicate: clicking a running app's icon activates it, and
+clicking the frontmost app's icon minimizes it; right-click opens the app menu.
+Reference studied: deskbar does per-window buttons with AX raise/minimize/close
+plus Dock-style menus. Clean-room plan, no permission for the base layer:
+
+- Track running state (`NSRunningApplication`) and frontmost state (also
+  `NSWorkspace`, no permission) in the model; show running indicators on tiles.
+- Click cycle, all public API: not running → launch; running but not frontmost
+  → `activate()`; running and frontmost → `hide()` (hide, not minimize, needs
+  no permission). True genie-minimize and per-window raise go behind
+  Accessibility, requested lazily with a rationale the first time a gated
+  action is used; public `AXUIElement` APIs only with a frame-matching
+  fallback — the reference's private `_AXUIElementGetWindow` dlsym is
+  explicitly not adopted.
+- Right-click `NSMenu` per tile: Open/Activate, window list from
+  `CGWindowListCopyWindowInfo` titles (no permission), Show in Finder, Hide,
+  Quit (`terminate()`, public), Pin/Unpin. Per-window focus items appear only
+  when Accessibility is granted; jump-list recent documents stay a later
+  slice.
 
 **Gate:** pin, unpin, reorder, launch, activate, and running indicators work
 without blocking the main thread.
@@ -323,6 +365,11 @@ failure/termination paths.
 
 ### Phase 9 — Release quality
 
+- Sign with a persistent local certificate before requesting Accessibility or
+  Screen Recording: macOS keys TCC grants to the code identity, so every
+  ad-hoc rebuild would re-prompt otherwise (lesson confirmed from the deskbar
+  history). Assert bundle identifier and designated requirement at package
+  time.
 - Add unit tests for reducers, config migrations, panel geometry, and preference
   validation.
 - Add UI tests or recorded manual checks for launch, close, resizing, themes,
@@ -458,4 +505,9 @@ build or test against. What has been established instead:
   BoringNotch, DockDoor, and AltTab are GPL-3.0 (study only, reimplement
   clean); rajeshgoli/deskbar carries no license grant (study only);
   OpenSwitchr is MIT (adaptable with attribution); Status Trio is Apache-2.0
-  (design-adaptable with attribution, recorded in NOTICE).
+  (design-adaptable with attribution, recorded in NOTICE); malvarezcastillo/
+  deskbar is a byte-identical fork of the unlicensed rajeshgoli/deskbar
+  (verified via commit history: all commits authored upstream), so the same
+  study-only verdict applies — windowing patterns reimplemented cleanly, never
+  pasted, including its private `_AXUIElementGetWindow` dlsym which is
+  explicitly excluded.
