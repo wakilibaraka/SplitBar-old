@@ -5,7 +5,25 @@ import OSLog
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     public private(set) var runtimeController: AppRuntimeController?
 
+    private func claimSingleInstance() -> Bool {
+        let myPID = ProcessInfo.processInfo.processIdentifier
+        let executableName = (ProcessInfo.processInfo.arguments.first as NSString?)?.lastPathComponent ?? "SplitBar"
+        let others = NSWorkspace.shared.runningApplications.filter { app in
+            app.processIdentifier != myPID
+                && (app.bundleIdentifier == "com.baraka.splitbar"
+                    || app.executableURL?.lastPathComponent == executableName)
+        }
+        guard others.isEmpty else {
+            others.first?.activate(options: .activateAllWindows)
+            Logger.lifecycle.info("Another SplitBar instance is already running; this launch yields to it")
+            NSApp.terminate(nil)
+            return false
+        }
+        return true
+    }
+
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        guard claimSingleInstance() else { return }
         Logger.lifecycle.info("SplitBar application did finish launching")
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,

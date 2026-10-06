@@ -69,7 +69,11 @@ explicit user controls.
 - [x] Shrink the status icon to a regular app-sized tile in the trash cluster
   (battery ring plus Wi-Fi glyph at the shared icon preset) and wire the Quick
   Settings readout rows to the same live snapshot: battery level/charging
-  state, Wi-Fi on/off with signal bars, and Bluetooth power. The fake Wi-Fi
+  state, Wi-Fi on/off with signal bars, and Bluetooth power.
+- [x] Enforce a single running instance at launch (later launches activate the
+  existing one and exit) so overlapping windows from divergent in-memory state
+  can never composite on screen. Developers relaunching test builds must quit
+  the running copy first. The fake Wi-Fi
   toggle and fake Bluetooth device percentages are gone; those rows are
   display-only until their action slices land. The quick-setting tile grid
   stays mock until one capability at a time is wired with confirmation.
