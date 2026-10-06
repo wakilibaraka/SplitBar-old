@@ -80,6 +80,9 @@ explicit user controls.
   with per-window focus falling back to app activation.
 - [x] Launcher Processes card replaces the static All-programs placeholder:
   live top-5 CPU table sampled every 5 s only while the launcher is open.
+- [x] First-party Recents in the launcher: recent app launches (all vandalism-free,
+  recorded on every launch through the single funnel) and recent folder opens,
+  persisted and shown above All apps; no system snooping, no permission.
 - [x] Widgets board gains Date, System rings, and Network widgets with live
   data (clock, CPU/memory/disk/battery rings + uptime + process count,
   up/down rates + session peaks); metrics forwarded from the runtime monitor,

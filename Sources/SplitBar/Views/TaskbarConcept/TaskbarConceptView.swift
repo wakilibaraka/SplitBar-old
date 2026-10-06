@@ -708,6 +708,12 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var showOnlyFourPinned = false {
         didSet { UserDefaults.standard.set(showOnlyFourPinned, forKey: "launcher.showOnlyFour") }
     }
+    @Published fileprivate var recentAppIDs: [String] = [] {
+        didSet { UserDefaults.standard.set(recentAppIDs, forKey: "launcher.recentApps") }
+    }
+    @Published fileprivate var recentFolderTitles: [String] = [] {
+        didSet { UserDefaults.standard.set(recentFolderTitles, forKey: "launcher.recentFolders") }
+    }
     @Published fileprivate var hiddenQuickSettingTitles: Set<String> = [] {
         didSet { UserDefaults.standard.set(hiddenQuickSettingTitles.sorted().joined(separator: "|"), forKey: "quickSettings.hiddenTiles") }
     }
@@ -774,6 +780,8 @@ final class TaskbarConceptState: ObservableObject {
         }
         pinnedAppBundleIDs = restoredPins
         showOnlyFourPinned = defaults.bool(forKey: "launcher.showOnlyFour")
+        recentAppIDs = (defaults.stringArray(forKey: "launcher.recentApps") ?? []).filter { !$0.isEmpty }
+        recentFolderTitles = (defaults.stringArray(forKey: "launcher.recentFolders") ?? []).filter { !$0.isEmpty }
         if let savedIndicatorStyle = defaults.string(forKey: "taskbar.indicatorStyle").flatMap(RunningIndicatorStyle.init(rawValue:)) {
             runningIndicatorStyle = savedIndicatorStyle
         }
@@ -913,6 +921,18 @@ final class TaskbarConceptState: ObservableObject {
 
     func togglePinned(_ bundleID: String) {
         setPinned(bundleID, isPinned: !pinnedAppBundleIDs.contains(bundleID))
+    }
+
+    func recordLaunch(_ bundleID: String) {
+        var updated = recentAppIDs.filter { $0 != bundleID }
+        updated.insert(bundleID, at: 0)
+        recentAppIDs = Array(updated.prefix(8))
+    }
+
+    fileprivate func recordFolderOpen(_ title: String) {
+        var updated = recentFolderTitles.filter { $0 != title }
+        updated.insert(title, at: 0)
+        recentFolderTitles = Array(updated.prefix(4))
     }
 
     fileprivate func setOutputVolume(_ level: Double) {
@@ -4400,6 +4420,65 @@ private struct StartFlyout: View {
         catalogApps = scanned
     }
 
+    private var recentSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Recent")
+                .font(.system(size: 14, weight: .semibold))
+            if !model.recentAppIDs.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(model.recentAppIDs, id: \.self) { bundleID in
+                            recentAppCell(bundleID)
+                        }
+                    }
+                }
+            }
+            if !model.recentFolderTitles.isEmpty {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
+                    ForEach(model.recentFolderTitles.filter({ title in folders.contains(where: { $0.title == title }) }), id: \.self) { title in
+                        if let folder = folders.first(where: { $0.title == title }) {
+                            folderCell(folder)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private func recentAppTitle(_ bundleID: String) -> String {
+        if let known = apps.first(where: { $0.bundleIdentifier == bundleID }) {
+            return known.title
+        }
+        if let scanned = catalogApps.first(where: { $0.bundleIdentifier == bundleID }) {
+            return scanned.displayName
+        }
+        return bundleID
+    }
+
+    private func recentAppCell(_ bundleID: String) -> some View {
+        Button {
+            onLaunchApplication(bundleID)
+        } label: {
+            VStack(spacing: 6) {
+                MacOSAppIcon(
+                    bundleIdentifier: bundleID,
+                    fallbackSymbol: "app.fill",
+                    fallbackColor: .secondary,
+                    size: 30
+                )
+                .frame(width: 46, height: 46)
+                .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 13))
+                Text(recentAppTitle(bundleID))
+                    .font(.system(size: 9, weight: .medium))
+                    .lineLimit(1)
+            }
+            .frame(width: 60)
+        }
+        .buttonStyle(.plain)
+        .help(recentAppTitle(bundleID))
+    }
+
     private var allAppsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -4492,10 +4571,11 @@ private struct StartFlyout: View {
         .disabled(!isPinned && model.pinnedAppBundleIDs.count >= 8)
         .opacity(!isPinned && model.pinnedAppBundleIDs.count >= 8 ? 0.45 : 1)
     }
-
-    private func folderCell(_ folder: LauncherFolder) -> some View {        Button {
+    private func folderCell(_ folder: LauncherFolder) -> some View {
+        Button {
             if let url = folder.url {
                 NSWorkspace.shared.open(url)
+                model.recordFolderOpen(folder.title)
             }
         } label: {
             HStack(spacing: 8) {
@@ -4520,7 +4600,8 @@ private struct StartFlyout: View {
         .buttonStyle(.plain)
     }
 
-    private func catalogAppCell(_ app: ApplicationDescriptor) -> some View {        Button {
+        private func catalogAppCell(_ app: ApplicationDescriptor) -> some View {
+        Button {
             onLaunchApplication(app.bundleIdentifier)
         } label: {
             VStack(spacing: 8) {
@@ -4730,6 +4811,10 @@ private struct StartFlyout: View {
                         .toggleStyle(.switch)
                         .font(.system(size: 10, weight: .medium))
                         .padding(.top, 2)
+
+                    if !model.recentAppIDs.isEmpty || !model.recentFolderTitles.isEmpty {
+                        recentSection
+                    }
 
                     if !isEditingPins && !model.showOnlyFourPinned {
                         allAppsSection

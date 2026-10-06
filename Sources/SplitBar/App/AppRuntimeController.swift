@@ -622,6 +622,7 @@ public final class AppRuntimeController {
     }
 
     private func launchPinnedApplication(bundleIdentifier: String) {
+        taskbarConceptState.recordLaunch(bundleIdentifier)
         guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
             Logger.lifecycle.error("Pinned application is not installed bundle=\(bundleIdentifier, privacy: .public)")
             let alert = NSAlert()
