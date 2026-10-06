@@ -542,20 +542,6 @@ private struct LauncherApp: Identifiable {
     var id: String { bundleIdentifier }
 }
 
-private enum AllAppsGrouping: String, CaseIterable, Identifiable {
-    case alphabetical
-    case category
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .alphabetical: "A-Z"
-        case .category: "Category"
-        }
-    }
-}
-
 private struct LauncherFolder: Identifiable {
     let title: String
     let symbol: String
@@ -686,9 +672,6 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var showOnlyFourPinned = false {
         didSet { UserDefaults.standard.set(showOnlyFourPinned, forKey: "launcher.showOnlyFour") }
     }
-    @Published fileprivate var allAppsGrouping = AllAppsGrouping.alphabetical {
-        didSet { UserDefaults.standard.set(allAppsGrouping.rawValue, forKey: "launcher.allAppsGrouping") }
-    }
     @Published fileprivate var hiddenQuickSettingTitles: Set<String> = [] {
         didSet { UserDefaults.standard.set(hiddenQuickSettingTitles.sorted().joined(separator: "|"), forKey: "quickSettings.hiddenTiles") }
     }
@@ -757,9 +740,6 @@ final class TaskbarConceptState: ObservableObject {
         }
         pinnedAppBundleIDs = restoredPins
         showOnlyFourPinned = defaults.bool(forKey: "launcher.showOnlyFour")
-        if let savedGrouping = defaults.string(forKey: "launcher.allAppsGrouping").flatMap(AllAppsGrouping.init(rawValue:)) {
-            allAppsGrouping = savedGrouping
-        }
         if let savedIndicatorStyle = defaults.string(forKey: "taskbar.indicatorStyle").flatMap(RunningIndicatorStyle.init(rawValue:)) {
             runningIndicatorStyle = savedIndicatorStyle
         }
@@ -1135,7 +1115,7 @@ public struct TaskbarConceptView: View {
                         model: model,
                         onLaunchApplication: onLaunchApplication
                     )
-                        .frame(width: panelFrameWidth(.start, available: geometry.size.width - 48), height: min(820, geometry.size.height - taskbarHeight - 36))
+                        .frame(width: panelFrameWidth(.start, available: geometry.size.width - 48), height: min(700, geometry.size.height - taskbarHeight - 36))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .padding(.bottom, taskbarHeight + 12)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -3977,24 +3957,6 @@ private struct StartFlyout: View {
         return catalogApps.filter { $0.displayName.localizedCaseInsensitiveContains(query) }
     }
 
-    private var catalogLetterGroups: [(String, [ApplicationDescriptor])] {
-        let grouped = Dictionary(grouping: filteredCatalogApps) { app in
-            String(app.displayName.prefix(1)).uppercased()
-        }
-        return grouped.keys.sorted().compactMap { key in
-            guard let apps = grouped[key] else { return nil }
-            return (key, apps)
-        }
-    }
-
-    private var catalogCategoryGroups: [(String, [ApplicationDescriptor])] {
-        let grouped = Dictionary(grouping: filteredCatalogApps) { $0.category }
-        return grouped.keys.sorted().compactMap { key in
-            guard let apps = grouped[key] else { return nil }
-            return (key, apps)
-        }
-    }
-
     private func loadCatalog() async {
         guard catalogApps.isEmpty else { return }
         let scanned = await Task.detached(priority: .userInitiated) {
@@ -4009,13 +3971,9 @@ private struct StartFlyout: View {
                 Text("All apps")
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
-                Picker("", selection: $model.allAppsGrouping) {
-                    ForEach(AllAppsGrouping.allCases) { grouping in
-                        Text(grouping.title).tag(grouping)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 150)
+                Text("\(filteredCatalogApps.count) apps")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
             }
             if catalogApps.isEmpty {
                 ProgressView()
@@ -4028,34 +3986,16 @@ private struct StartFlyout: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
             } else {
-                ForEach(allAppsGroups, id: \.0) { group in
-                    allAppsGroupSection(title: group.0, apps: group.1)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 14) {
+                    ForEach(filteredCatalogApps) { app in
+                        catalogAppCell(app)
+                    }
                 }
             }
         }
         .padding(.top, 4)
         .task {
             await loadCatalog()
-        }
-    }
-
-    private var allAppsGroups: [(String, [ApplicationDescriptor])] {
-        switch model.allAppsGrouping {
-        case .alphabetical: catalogLetterGroups
-        case .category: catalogCategoryGroups
-        }
-    }
-
-    private func allAppsGroupSection(title: String, apps: [ApplicationDescriptor]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.secondary)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 14) {
-                ForEach(apps) { app in
-                    catalogAppCell(app)
-                }
-            }
         }
     }
 
@@ -4325,7 +4265,8 @@ private struct StartFlyout: View {
             .frame(height: 48)
             .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.06), in: Capsule())
 
-            HStack(alignment: .top, spacing: 24) {
+            ScrollView {
+                HStack(alignment: .top, spacing: 24) {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
                         Text("Pinned")
@@ -4398,7 +4339,9 @@ private struct StartFlyout: View {
                     Spacer(minLength: 0)
                 }
                 .frame(width: 250, alignment: .leading)
+                }
             }
+            .scrollIndicators(.hidden)
 
             launcherFooter
         }
