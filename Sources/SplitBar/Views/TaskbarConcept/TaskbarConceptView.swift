@@ -20,7 +20,7 @@ enum OpenPanel: Equatable {
     }
 }
 
-private enum SurfaceStyle: String, CaseIterable, Identifiable {
+enum SurfaceStyle: String, CaseIterable, Identifiable {
     case glass
     case clay
     case neumorphic
@@ -609,7 +609,7 @@ private enum LauncherDefaults {
 @MainActor
 final class TaskbarConceptState: ObservableObject {
     @Published var openPanel: OpenPanel?
-    @Published fileprivate var surfaceStyle = SurfaceStyle.glass
+    @Published var surfaceStyle = SurfaceStyle.glass
     @Published fileprivate var usesDockPresentation = false
     @Published fileprivate var isDarkMode = false
     @Published fileprivate var wallpaperPreset = WallpaperPreset.pastelBloom {
@@ -659,6 +659,10 @@ final class TaskbarConceptState: ObservableObject {
     @Published var contextMenuStyle = ContextMenuStyle.native {
         didSet { UserDefaults.standard.set(contextMenuStyle.rawValue, forKey: "taskbar.menuStyle") }
     }
+    @Published var showWindowPreviews = false {
+        didSet { UserDefaults.standard.set(showWindowPreviews, forKey: "taskbar.windowPreviews") }
+    }
+    @Published var previewBundleID: String?
     @Published var systemMetrics: SystemMetrics?
     @Published var networkPeakIn: Double = 0
     @Published var networkPeakOut: Double = 0
@@ -782,6 +786,7 @@ final class TaskbarConceptState: ObservableObject {
         if let savedMenuStyle = defaults.string(forKey: "taskbar.menuStyle").flatMap(ContextMenuStyle.init(rawValue:)) {
             contextMenuStyle = savedMenuStyle
         }
+        showWindowPreviews = defaults.bool(forKey: "taskbar.windowPreviews")
         hiddenQuickSettingTitles = Set(
             (defaults.string(forKey: "quickSettings.hiddenTiles") ?? "")
                 .split(separator: "|")
@@ -977,6 +982,7 @@ struct TaskbarFlyoutContentView: View {
                 taskbarGradientEnd: $model.taskbarGradientEnd,
                 taskbarHeight: $model.taskbarHeight,
                 showsTaskbarPanel: $model.showsTaskbarPanel,
+                showWindowPreviews: $model.showWindowPreviews,
                 taskbarIconSize: $model.taskbarIconSize,
                 trashPlacement: $model.trashPlacement,
                 panelWidths: $model.panelWidths,
@@ -985,6 +991,95 @@ struct TaskbarFlyoutContentView: View {
                 onResetPersonalisation: { model.resetPersonalisation() }
             )
         }
+    }
+}
+
+struct WindowPreviewContent: View {
+    let bundleID: String
+    let appTitle: String
+    let windows: [AppWindowInfo]
+    let surfaceStyle: SurfaceStyle
+    let onSelectWindow: (AppWindowInfo) -> Void
+    let onClose: () -> Void
+    @State private var thumbnails: [CGWindowID: NSImage] = [:]
+    @State private var didAttemptCapture = false
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.surfaceTransparency) private var transparency
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(appTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text("\(windows.count) \(windows.count == 1 ? "window" : "windows")")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(windows.prefix(6)) { window in
+                previewRow(window)
+            }
+            if didAttemptCapture, thumbnails.isEmpty {
+                Text("Grant Screen Recording for live thumbnails.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
+        .clipShape(RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.76), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
+        .task {
+            await captureThumbnails()
+        }
+    }
+
+    private func previewRow(_ window: AppWindowInfo) -> some View {
+        Button {
+            onSelectWindow(window)
+        } label: {
+            HStack(spacing: 10) {
+                if let image = thumbnails[window.id] {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 120, height: 72)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    MacOSAppIcon(
+                        bundleIdentifier: bundleID,
+                        fallbackSymbol: "app.fill",
+                        fallbackColor: .secondary,
+                        size: 34
+                    )
+                    .frame(width: 120, height: 72)
+                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                }
+                Text(window.title)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .padding(8)
+            .background(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.05), in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func captureThumbnails() async {
+        let service = AppWindowPreviewService()
+        for window in windows.prefix(6) {
+            if let image = await service.captureThumbnail(forWindowID: window.id) {
+                thumbnails[window.id] = image
+            }
+        }
+        didAttemptCapture = true
     }
 }
 
@@ -1019,6 +1114,8 @@ struct TaskbarPanelContentView: View {
             indicatorSize: model.runningIndicatorSize,
             indicatorColor: model.runningIndicatorColor,
             menuStyle: model.contextMenuStyle,
+            previewsEnabled: model.showWindowPreviews,
+            previewBundleID: $model.previewBundleID,
             onLaunchApplication: onLaunchApplication,
             onTaskbarIconClick: onTaskbarIconClick,
             onTaskbarTileAction: onTaskbarTileAction
@@ -1186,6 +1283,7 @@ public struct TaskbarConceptView: View {
                         taskbarGradientEnd: $model.taskbarGradientEnd,
                         taskbarHeight: $model.taskbarHeight,
                         showsTaskbarPanel: $model.showsTaskbarPanel,
+                        showWindowPreviews: $model.showWindowPreviews,
                         taskbarIconSize: $model.taskbarIconSize,
                         trashPlacement: $model.trashPlacement,
                         panelWidths: $model.panelWidths,
@@ -1225,6 +1323,8 @@ public struct TaskbarConceptView: View {
                     indicatorSize: model.runningIndicatorSize,
                     indicatorColor: model.runningIndicatorColor,
                     menuStyle: model.contextMenuStyle,
+                    previewsEnabled: model.showWindowPreviews,
+                    previewBundleID: $model.previewBundleID,
                     onLaunchApplication: onLaunchApplication,
                     onTaskbarIconClick: onTaskbarIconClick,
                     onTaskbarTileAction: onTaskbarTileAction
@@ -1337,6 +1437,9 @@ private struct Taskbar: View {
     let indicatorSize: RunningIndicatorSize
     let indicatorColor: Color
     let menuStyle: ContextMenuStyle
+    let previewsEnabled: Bool
+    @Binding var previewBundleID: String?
+    @State private var previewHoverTask: Task<Void, Never>?
     let onLaunchApplication: (String) -> Void
     let onTaskbarIconClick: (String) -> Void
     let onTaskbarTileAction: (TaskbarTileAction) -> Void
@@ -1558,6 +1661,20 @@ private struct Taskbar: View {
         .help(app?.title ?? bundleIdentifier)
         .contextMenu {
             tileContextMenu(bundleIdentifier)
+        }
+        .onHover { hovering in
+            previewHoverTask?.cancel()
+            previewHoverTask = nil
+            guard previewsEnabled else { return }
+            if hovering, runningBundleIDs.contains(bundleIdentifier) {
+                previewHoverTask = Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    guard !Task.isCancelled else { return }
+                    previewBundleID = bundleIdentifier
+                }
+            } else if !hovering, previewBundleID == bundleIdentifier {
+                previewBundleID = nil
+            }
         }
     }
 
@@ -3706,6 +3823,7 @@ private struct SettingsFlyout: View {
     @Binding var taskbarGradientEnd: Color
     @Binding var taskbarHeight: CGFloat
     @Binding var showsTaskbarPanel: Bool
+    @Binding var showWindowPreviews: Bool
     @Binding var taskbarIconSize: TaskbarIconSize
     @Binding var trashPlacement: TrashPlacement
     @Binding var panelWidths: [PanelKind: CGFloat]
@@ -3899,6 +4017,17 @@ private struct SettingsFlyout: View {
                     Text("Screen-edge panel")
                         .font(.system(size: 11, weight: .medium))
                     Text("Show the taskbar in a bottom-edge panel. Experimental; flyouts still open in the preview window.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+            Toggle(isOn: $showWindowPreviews) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Window previews")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Live thumbnails on icon hover. Needs Screen Recording; icon fallback otherwise.")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

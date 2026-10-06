@@ -183,6 +183,7 @@ public final class AppRuntimeController {
     private let taskbarConceptState = TaskbarConceptState()
     private let taskbarPanelController = TaskbarPanelController()
     private let taskbarFlyoutController = FlyoutPanelController()
+    private let windowPreviewController = FlyoutPanelController()
     private var taskbarFlyoutKindShown: OpenPanel?
     private var taskbarFlyoutLocalMonitor: Any?
     private var taskbarFlyoutGlobalMonitor: Any?
@@ -367,6 +368,7 @@ public final class AppRuntimeController {
     private func setupTaskbarPanel() {
         taskbarPanelController.onFullscreenBegan = { [weak self] in
             self?.taskbarConceptState.openPanel = nil
+            self?.taskbarConceptState.previewBundleID = nil
         }
         taskbarConceptState.$showsTaskbarPanel
             .removeDuplicates()
@@ -376,6 +378,7 @@ public final class AppRuntimeController {
                     self.showTaskbarPanel()
                 } else {
                     self.taskbarPanelController.hide()
+                    self.taskbarConceptState.previewBundleID = nil
                 }
                 self.syncTaskbarFlyout(self.taskbarConceptState.openPanel)
             }
@@ -390,6 +393,12 @@ public final class AppRuntimeController {
             .removeDuplicates()
             .sink { [weak self] panel in
                 self?.syncTaskbarFlyout(panel)
+            }
+            .store(in: &taskbarPanelSubscriptions)
+        taskbarConceptState.$previewBundleID
+            .removeDuplicates()
+            .sink { [weak self] bundleID in
+                self?.syncWindowPreview(bundleID)
             }
             .store(in: &taskbarPanelSubscriptions)
         if taskbarConceptState.showsTaskbarPanel {
@@ -417,7 +426,57 @@ public final class AppRuntimeController {
         taskbarConceptState.showsTaskbarPanel.toggle()
     }
 
+    private func syncWindowPreview(_ bundleID: String?) {
+        guard taskbarConceptState.showsTaskbarPanel,
+              taskbarConceptState.showWindowPreviews,
+              let bundleID
+        else {
+            windowPreviewController.hide()
+            return
+        }
+        let appTitle = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleID })?.localizedName ?? bundleID
+        let service = AppWindowPreviewService()
+        let windows = service.windows(forBundleIdentifier: bundleID, appName: appTitle)
+        guard !windows.isEmpty,
+              let screen = screenService.primaryScreen(),
+              let stripFrame = taskbarPanelController.currentFrame
+        else {
+            windowPreviewController.hide()
+            return
+        }
+        let width: CGFloat = 400
+        let height = min(480, CGFloat(110 + windows.prefix(6).count * 92))
+        let frame = flyoutPanelFrame(
+            anchorFrame: stripFrame,
+            screen: screen,
+            edge: .bottom,
+            flyoutSize: CGSize(width: min(width, screen.visibleFrame.width - 32), height: height),
+            gap: 12
+        )
+        let content = WindowPreviewContent(
+            bundleID: bundleID,
+            appTitle: appTitle,
+            windows: Array(windows.prefix(6)),
+            surfaceStyle: taskbarConceptState.surfaceStyle,
+            onSelectWindow: { [weak self] info in
+                service.focusWindow(info: info, bundleIdentifier: bundleID)
+                self?.taskbarConceptState.previewBundleID = nil
+            },
+            onClose: { [weak self] in
+                self?.taskbarConceptState.previewBundleID = nil
+            }
+        )
+        if windowPreviewController.panel.isVisible {
+            windowPreviewController.replace(content: AnyView(content), frame: frame)
+        } else {
+            windowPreviewController.show(content: AnyView(content), frame: frame)
+        }
+    }
+
     private func syncTaskbarFlyout(_ panel: OpenPanel?) {
+        if panel != nil {
+            taskbarConceptState.previewBundleID = nil
+        }
         guard taskbarConceptState.showsTaskbarPanel else {
             closeTaskbarFlyout()
             return

@@ -237,6 +237,11 @@ tested.
   hides it per display on Space/app switches via `CGWindowList` scan (also
   dismissing open flyouts), and the controller is keyed per display with only
   the primary enabled — multi-display placement can switch the set on.
+- [x] Window previews behind an opt-in toggle (default off): hovering a running
+  app tile shows that app's windows above the strip with SCScreenshotManager
+  thumbnails, icon fallback plus a Screen Recording hint when capture is
+  unavailable, and click-to-activate. Preview dismisses on hover exit, flyout
+  open, mode off, and fullscreen.
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.
