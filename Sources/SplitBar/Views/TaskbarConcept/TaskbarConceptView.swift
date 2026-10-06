@@ -316,25 +316,25 @@ private enum ClockDisplayStyle: String, CaseIterable, Identifiable {
 }
 
 private enum TaskbarIconSize: String, CaseIterable, Identifiable {
-    case small
     case medium
     case large
+    case extraLarge
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .small: "Small"
         case .medium: "Medium"
         case .large: "Large"
+        case .extraLarge: "Extra large"
         }
     }
 
     var glyphFraction: CGFloat {
         switch self {
-        case .small: 0.42
         case .medium: 0.54
         case .large: 0.64
+        case .extraLarge: 0.76
         }
     }
 }
@@ -342,6 +342,7 @@ private enum TaskbarIconSize: String, CaseIterable, Identifiable {
 private enum TrashPlacement: String, CaseIterable, Identifiable {
     case withApps
     case beforeTray
+    case beforeClock
     case farRight
 
     var id: String { rawValue }
@@ -350,6 +351,7 @@ private enum TrashPlacement: String, CaseIterable, Identifiable {
         switch self {
         case .withApps: "With apps"
         case .beforeTray: "Before tray"
+        case .beforeClock: "Before clock"
         case .farRight: "Far right"
         }
     }
@@ -521,6 +523,9 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var taskbarGradientStart = Color(red: 0.78, green: 0.48, blue: 0.86)
     @Published fileprivate var taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)
     @Published fileprivate var taskbarHeight: CGFloat = 46
+    @Published fileprivate var showsTaskbarPanel = false {
+        didSet { UserDefaults.standard.set(showsTaskbarPanel, forKey: "taskbar.panelShown") }
+    }
     @Published fileprivate var taskbarIconSize = TaskbarIconSize.medium {
         didSet { UserDefaults.standard.set(taskbarIconSize.rawValue, forKey: "taskbar.iconSize") }
     }
@@ -614,6 +619,7 @@ final class TaskbarConceptState: ObservableObject {
         if let savedTrashPlacement = defaults.string(forKey: "taskbar.trashPlacement").flatMap(TrashPlacement.init(rawValue:)) {
             trashPlacement = savedTrashPlacement
         }
+        showsTaskbarPanel = defaults.bool(forKey: "taskbar.panelShown")
         let savedWidths = defaults.dictionary(forKey: "panels.widths") as? [String: Double] ?? [:]
         panelWidths = Dictionary(uniqueKeysWithValues: savedWidths.compactMap { key, value in
             guard let kind = PanelKind(rawValue: key) else { return nil }
@@ -686,6 +692,24 @@ final class TaskbarConceptState: ObservableObject {
         } else {
             pinnedAppBundleIDs.removeAll { $0 == bundleID }
         }
+    }
+
+    fileprivate func resetPersonalisation() {
+        surfaceStyle = .glass
+        usesDockPresentation = false
+        isDarkMode = false
+        wallpaperPreset = .pastelBloom
+        pastelTint = Color(red: 0.91, green: 0.69, blue: 0.87)
+        gradientEndTint = Color(red: 0.47, green: 0.70, blue: 0.86)
+        gradientAngle = 35.0
+        interfaceTransparency = 0.68
+        usesTaskbarGradient = false
+        taskbarGradientStart = Color(red: 0.78, green: 0.48, blue: 0.86)
+        taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)
+        taskbarHeight = 46
+        taskbarIconSize = .medium
+        trashPlacement = .withApps
+        panelWidths = [:]
     }
 }
 
@@ -845,7 +869,8 @@ public struct TaskbarConceptView: View {
                         trashPlacement: $model.trashPlacement,
                         panelWidths: $model.panelWidths,
                         accent: clockTint,
-                        onClose: { openPanel = nil }
+                        onClose: { openPanel = nil },
+                        onResetPersonalisation: { model.resetPersonalisation() }
                     )
                     .frame(width: panelFrameWidth(.settings, available: geometry.size.width - 40), height: min(680, geometry.size.height - taskbarHeight - 34))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -1195,6 +1220,9 @@ private struct Taskbar: View {
         HStack(spacing: 8) {
             if trashPlacement == .beforeTray {
                 taskbarDivider
+                trashCluster
+            }
+            if trashPlacement == .beforeClock {
                 trashCluster
             }
 
@@ -2979,6 +3007,8 @@ private struct SettingsFlyout: View {
     @Binding var panelWidths: [PanelKind: CGFloat]
     let accent: Color
     let onClose: () -> Void
+    let onResetPersonalisation: () -> Void
+    @State private var isConfirmingReset = false
     @Environment(\.surfaceStyle) private var currentStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
@@ -3225,6 +3255,28 @@ private struct SettingsFlyout: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button {
+                    isConfirmingReset = true
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 32, height: 32)
+                        .background(sectionFill, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Reset Personalisation to defaults")
+                .confirmationDialog(
+                    "Reset Personalisation?",
+                    isPresented: $isConfirmingReset,
+                    titleVisibility: .visible
+                ) {
+                    Button("Reset everything", role: .destructive) {
+                        onResetPersonalisation()
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Widths, icons, trash position, wallpaper, and taskbar appearance return to defaults. Pins and widgets are untouched.")
+                }
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .semibold))

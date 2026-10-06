@@ -43,10 +43,13 @@ explicit user controls.
 - [x] Stop background polling at presentation cadence while nothing is on screen,
   move AppleScript playback queries off the main actor, cache app icons, and
   debounce slider persistence. See "Resource budget and forward compatibility".
-- [x] Render taskbar app icons as full-height tiles with Small/Medium/Large size
-  presets; the weather glyph uses the same sizing. Trash is a three-position
-  setting (with apps by default, before the tray, or far right) with a
-  Downloads tile pinned to its left, full/empty state, and Open/Empty actions.
+- [x] Render taskbar app icons as full-height tiles with Medium/Large/Extra
+  large size presets (Medium default); the weather glyph uses the same sizing.
+  Trash is a four-position setting (with apps by default, before the tray,
+  before the clock, or far right) with a Downloads tile pinned to its left,
+  full/empty state, and Open/Empty actions. Personalisation has a Reset button
+  with confirmation that restores widths, icons, trash position, wallpaper,
+  and taskbar appearance without touching pins or widgets.
 - [x] Narrow the five flyouts to Windows 11-style default widths, each with its
   own width slider back up toward the previous wide layout.
 - [x] Seat the quick-controls cluster immediately left of the date as one
