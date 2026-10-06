@@ -8,8 +8,10 @@ public struct OpenMeteoResponse: Decodable {
         public let time: String?
     }
     public struct Daily: Decodable {
+        public let time: [String]?
         public let temperature_2m_max: [Double]
         public let temperature_2m_min: [Double]
+        public let weathercode: [Int]?
     }
     public struct Hourly: Decodable {
         public let time: [String]
@@ -25,10 +27,19 @@ public struct OpenMeteoResponse: Decodable {
 @MainActor
 public final class WeatherService {
     public private(set) var currentState: WeatherState
+    public var onUpdate: ((WeatherState) -> Void)?
     private var refreshTimer: Timer?
+    private let cacheURL: URL?
 
-    public init(initialState: WeatherState) {
-        self.currentState = initialState
+    public init(initialState: WeatherState, cacheURL: URL? = nil) {
+        self.cacheURL = cacheURL
+        if let cacheURL,
+           let data = try? Data(contentsOf: cacheURL),
+           let cached = try? JSONDecoder().decode(WeatherState.self, from: data) {
+            self.currentState = cached
+        } else {
+            self.currentState = initialState
+        }
         Task { [weak self] in
             await self?.refresh()
         }
@@ -77,7 +88,7 @@ public final class WeatherService {
         }
 
         // 2. Live Weather Query
-        let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(latitude)&longitude=\(longitude)&current_weather=true&daily=temperature_2m_max,temperature_2m_min&hourly=temperature_2m,weathercode&timezone=auto"
+        let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(latitude)&longitude=\(longitude)&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode&forecast_days=14&hourly=temperature_2m,weathercode&timezone=auto"
 
         guard let url = URL(string: urlString) else {
             return
@@ -133,12 +144,51 @@ public final class WeatherService {
                 highCelsius: high,
                 lowCelsius: low,
                 hourly: hourlyList.isEmpty ? self.currentState.hourly : hourlyList,
+                daily: Self.buildDailyForecasts(from: decoded.daily),
+                isLive: true,
                 lastUpdated: Date()
             )
+            if let cacheURL {
+                try? JSONEncoder().encode(self.currentState).write(to: cacheURL, options: .atomic)
+            }
+            onUpdate?(self.currentState)
         } catch {
             // Geçici ağ hatasında önbellekteki durum korunur
             Logger.general.warning("Weather refresh failed error=\(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    private static func buildDailyForecasts(from daily: OpenMeteoResponse.Daily?) -> [DailyForecast] {
+        guard let daily else { return [] }
+        let count = min(
+            daily.temperature_2m_max.count,
+            daily.temperature_2m_min.count,
+            14
+        )
+        var forecasts: [DailyForecast] = []
+        for index in 0..<count {
+            let code: Int
+            if let codes = daily.weathercode, codes.indices.contains(index) {
+                code = codes[index]
+            } else {
+                code = 2
+            }
+            let date: String
+            if let dates = daily.time, dates.indices.contains(index) {
+                date = dates[index]
+            } else {
+                date = "day-\(index)"
+            }
+            forecasts.append(
+                DailyForecast(
+                    date: date,
+                    highCelsius: daily.temperature_2m_max[index],
+                    lowCelsius: daily.temperature_2m_min[index],
+                    symbolName: mapWeatherCode(code: code).symbol
+                )
+            )
+        }
+        return forecasts
     }
 
     public static nonisolated func mapWeatherCode(code: Int) -> (text: String, symbol: String) {

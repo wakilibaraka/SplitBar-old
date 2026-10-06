@@ -323,6 +323,7 @@ public final class AppRuntimeController {
         self.setupDefaultShortcuts()
         self.setupTaskbarPanel()
         self.setupRunningState()
+        self.setupWeatherForwarding()
         self.setupClipboardMonitoring()
         self.setupLiveStreaming()
         Logger.lifecycle.info("AppRuntimeController initialized")
@@ -804,6 +805,13 @@ public final class AppRuntimeController {
             taskbarConceptState.togglePinned(bundleID)
         case .openRecent(let url):
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func setupWeatherForwarding() {
+        taskbarConceptState.weather = weatherService.currentState
+        weatherService.onUpdate = { [weak self] state in
+            self?.taskbarConceptState.weather = state
         }
     }
 

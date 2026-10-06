@@ -245,6 +245,11 @@ tested.
 - [x] Settings redesign for taskbar behavior: one Taskbar behavior section
   owns indicator style/size/colour, click minimize mode, menu style, and the
   previews toggle in the established block-grid idiom.
+- [x] Live weather provider: Open-Meteo current plus 14-day daily codes and
+  hourly series behind the existing IP geolocation (no new permission),
+  Codable disk cache served stale across launches and failures, offline/sample
+  states in the UI, and the fabricated humidity/wind buttons removed. Verified
+  live against the local area.
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.

@@ -296,7 +296,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let clipboardMonitor = ClipboardMonitor()
         let systemMonitorService = SystemMonitorService()
         let nowPlayingService = NowPlayingService()
-        let weatherService = WeatherService(initialState: WeatherState.defaultSample())
+        let weatherService = WeatherService(
+            initialState: WeatherState.defaultSample(),
+            cacheURL: appSupport.appendingPathComponent("weather.json")
+        )
         // Gerçek cihazlar flyout açılınca okunur; sahte örnek cihazlarla başlanmaz
         let bluetoothService = BluetoothService(
             initialState: BluetoothState(isBluetoothEnabled: false, devices: [], lastUpdated: Date())

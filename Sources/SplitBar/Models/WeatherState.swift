@@ -1,6 +1,6 @@
 import Foundation
 
-public struct HourlyForecast: Equatable, Sendable, Identifiable {
+public struct HourlyForecast: Equatable, Sendable, Codable, Identifiable {
     public let id: String
     public let hour: String
     public let temperatureCelsius: Double
@@ -19,7 +19,27 @@ public struct HourlyForecast: Equatable, Sendable, Identifiable {
     }
 }
 
-public struct WeatherState: Equatable, Sendable {
+public struct DailyForecast: Equatable, Sendable, Codable, Identifiable {
+    public var id: String { date }
+    public let date: String
+    public let highCelsius: Double
+    public let lowCelsius: Double
+    public let symbolName: String
+
+    public init(
+        date: String,
+        highCelsius: Double,
+        lowCelsius: Double,
+        symbolName: String
+    ) {
+        self.date = date
+        self.highCelsius = highCelsius
+        self.lowCelsius = lowCelsius
+        self.symbolName = symbolName
+    }
+}
+
+public struct WeatherState: Equatable, Sendable, Codable {
     public let cityName: String
     public let temperatureCelsius: Double
     public let conditionText: String
@@ -27,6 +47,8 @@ public struct WeatherState: Equatable, Sendable {
     public let highCelsius: Double
     public let lowCelsius: Double
     public let hourly: [HourlyForecast]
+    public let daily: [DailyForecast]
+    public let isLive: Bool
     public let lastUpdated: Date
 
     public var formattedTemperature: String {
@@ -41,6 +63,8 @@ public struct WeatherState: Equatable, Sendable {
         highCelsius: Double,
         lowCelsius: Double,
         hourly: [HourlyForecast],
+        daily: [DailyForecast] = [],
+        isLive: Bool = false,
         lastUpdated: Date
     ) {
         self.cityName = cityName
@@ -50,6 +74,8 @@ public struct WeatherState: Equatable, Sendable {
         self.highCelsius = highCelsius
         self.lowCelsius = lowCelsius
         self.hourly = hourly
+        self.daily = daily
+        self.isLive = isLive
         self.lastUpdated = lastUpdated
     }
 

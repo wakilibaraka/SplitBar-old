@@ -664,6 +664,7 @@ final class TaskbarConceptState: ObservableObject {
     }
     @Published var previewBundleID: String?
     @Published var systemMetrics: SystemMetrics?
+    @Published var weather = WeatherState.defaultSample()
     @Published var networkPeakIn: Double = 0
     @Published var networkPeakOut: Double = 0
     private let processSampleQueue = DispatchQueue(label: "com.baraka.splitbar.topprocesses", qos: .utility)
@@ -1113,6 +1114,7 @@ struct TaskbarPanelContentView: View {
             iconSize: model.taskbarIconSize,
             trashPlacement: model.trashPlacement,
             systemStatus: model.systemStatus,
+            weather: model.weather,
             runningBundleIDs: model.runningBundleIDs,
             frontmostBundleID: model.frontmostBundleID,
             indicatorStyle: model.runningIndicatorStyle,
@@ -1327,6 +1329,7 @@ public struct TaskbarConceptView: View {
                     iconSize: model.taskbarIconSize,
                     trashPlacement: model.trashPlacement,
                     systemStatus: model.systemStatus,
+            weather: model.weather,
                     runningBundleIDs: model.runningBundleIDs,
                     frontmostBundleID: model.frontmostBundleID,
                     indicatorStyle: model.runningIndicatorStyle,
@@ -1441,6 +1444,7 @@ private struct Taskbar: View {
     let iconSize: TaskbarIconSize
     let trashPlacement: TrashPlacement
     let systemStatus: SystemStatusSnapshot
+    let weather: WeatherState
     let runningBundleIDs: Set<String>
     let frontmostBundleID: String?
     let indicatorStyle: RunningIndicatorStyle
@@ -1520,16 +1524,16 @@ private struct Taskbar: View {
                     toggle(.widgets)
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: "cloud.sun.fill")
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(Color(red: 0.94, green: 0.63, blue: 0.18), Color(red: 0.45, green: 0.69, blue: 0.89))
+                        Image(systemName: weather.symbolName)
+                            .symbolRenderingMode(.multicolor)
                             .font(.system(size: glyphSize))
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("13°")
+                            Text(weather.formattedTemperature)
                                 .font(.system(size: 13, weight: .semibold))
-                            Text("Mostly clear")
+                            Text(weather.conditionText)
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
                         }
                     }
                     .frame(width: 170, height: height - 4, alignment: .leading)
@@ -2518,7 +2522,7 @@ private struct WidgetsPanel: View {
     private func widgetContent(_ widget: DashboardWidget, size: WidgetSizePreset) -> some View {
         switch widget {
         case .weather:
-            WeatherWidget(contentHeight: size.weatherContentHeight)
+            WeatherWidget(weather: model.weather, contentHeight: size.weatherContentHeight)
         case .systemResources:
             SystemResourcesWidget(contentHeight: size.cardContentHeight)
         case .nowPlaying:
@@ -2608,125 +2612,107 @@ private struct WidgetCard<Content: View>: View {
 }
 
 private struct WeatherWidget: View {
+    let weather: WeatherState
     let contentHeight: CGFloat
-    @State private var hourlyMetric = "Sky"
 
-    private let hourlyForecast: [(String, String, String, String)] = [
-        ("Now", "cloud.sun.fill", "13°", "50%"),
-        ("19:00", "cloud.rain.fill", "12°", "70%"),
-        ("20:00", "cloud.rain.fill", "11°", "65%"),
-        ("21:00", "cloud.moon.fill", "10°", "40%"),
-        ("22:00", "moon.fill", "9°", "25%"),
-        ("23:00", "moon.fill", "8°", "20%")
-    ]
+    private static let dayParser: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
-    private let fourteenDayForecast: [(String, String, String, String)] = [
-        ("Today", "cloud.sun.rain.fill", "20°", "13°"),
-        ("Tue", "cloud.sun.fill", "21°", "14°"),
-        ("Wed", "sun.max.fill", "23°", "15°"),
-        ("Thu", "sun.max.fill", "24°", "16°"),
-        ("Fri", "cloud.sun.fill", "22°", "15°"),
-        ("Sat", "cloud.rain.fill", "19°", "12°"),
-        ("Sun", "cloud.sun.fill", "21°", "13°"),
-        ("Mon", "sun.max.fill", "25°", "16°"),
-        ("Tue", "sun.max.fill", "26°", "17°"),
-        ("Wed", "cloud.sun.fill", "23°", "15°"),
-        ("Thu", "cloud.sun.fill", "22°", "14°"),
-        ("Fri", "sun.max.fill", "24°", "16°"),
-        ("Sat", "cloud.rain.fill", "19°", "12°"),
-        ("Sun", "cloud.sun.fill", "21°", "13°")
-    ]
+    private static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter
+    }()
+
+    private func dayLabel(for date: String, isFirst: Bool) -> String {
+        if isFirst {
+            return "Today"
+        }
+        if let parsed = Self.dayParser.date(from: date) {
+            return Self.weekdayFormatter.string(from: parsed)
+        }
+        return date
+    }
 
     var body: some View {
         WidgetCard(title: "Weather", symbol: "cloud.sun.fill", tint: .blue, minContentHeight: contentHeight) {
             VStack(alignment: .leading, spacing: 11) {
                 HStack(spacing: 12) {
-                    Image(systemName: "cloud.sun.fill")
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(Color.orange, Color.blue.opacity(0.75))
+                    Image(systemName: weather.symbolName)
+                        .symbolRenderingMode(.multicolor)
                         .font(.system(size: 36))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("13°")
+                        Text(weather.formattedTemperature)
                             .font(.system(size: 26, weight: .semibold, design: .rounded))
-                        Text("Mostly clear · Durres")
+                        Text("\(weather.conditionText) · \(weather.cityName)")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 3) {
-                        Text("Feels like 12°")
+                        Text("H: \(Int(round(weather.highCelsius)))°  L: \(Int(round(weather.lowCelsius)))°")
                             .font(.system(size: 10, weight: .medium))
-                        Label("50% humidity", systemImage: "humidity.fill")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.secondary)
+                        if !weather.isLive {
+                            Text("Offline · sample")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
                 forecastSectionHeader("Hourly forecast")
 
                 HStack(spacing: 0) {
-                    ForEach(Array(hourlyForecast.enumerated()), id: \.element.0) { index, forecast in
-                        let (hour, symbol, temperature, humidity) = forecast
+                    ForEach(weather.hourly) { forecast in
                         VStack(spacing: 6) {
-                            Text(hour)
+                            Text(forecast.hour)
                                 .font(.system(size: 8, weight: .medium))
                                 .foregroundStyle(.secondary)
-                            Image(systemName: symbol)
+                            Image(systemName: forecast.symbolName)
                                 .symbolRenderingMode(.multicolor)
                                 .font(.system(size: 15))
-                            Text(temperature)
+                            Text("\(Int(round(forecast.temperatureCelsius)))°")
                                 .font(.system(size: 9, weight: .semibold))
-                            Text(hourlyMetric == "Humidity" ? humidity : hourlyMetric == "Wind" ? "\(index * 3 + 5) km/h" : " ")
-                                .font(.system(size: 7, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity)
-                    }
-                }
-
-                HStack(spacing: 6) {
-                    ForEach(["Sky", "Humidity", "Wind"], id: \.self) { metric in
-                        Button {
-                            hourlyMetric = metric
-                        } label: {
-                            Label(metric, systemImage: metricSymbol(metric))
-                                .font(.system(size: 8, weight: .semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
-                                .background(
-                                    hourlyMetric == metric ? Color.blue.opacity(0.14) : Color.primary.opacity(0.045),
-                                    in: RoundedRectangle(cornerRadius: 8)
-                                )
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
 
                 forecastSectionHeader("14-day forecast")
 
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 7) {
-                    ForEach(Array(fourteenDayForecast.enumerated()), id: \.offset) { _, forecast in
-                        let (day, symbol, high, low) = forecast
-                        VStack(spacing: 4) {
-                            Text(day)
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundStyle(.secondary)
-                            Image(systemName: symbol)
-                                .symbolRenderingMode(.multicolor)
-                                .font(.system(size: 15))
-                                .frame(height: 18)
-                            HStack(spacing: 3) {
-                                Text(high)
-                                    .font(.system(size: 8, weight: .semibold))
-                                Text(low)
+                if weather.daily.isEmpty {
+                    Text("Forecast unavailable while offline.")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
+                } else {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 7) {
+                        ForEach(Array(weather.daily.prefix(14).enumerated()), id: \.offset) { index, forecast in
+                            VStack(spacing: 4) {
+                                Text(dayLabel(for: forecast.date, isFirst: index == 0))
                                     .font(.system(size: 8, weight: .medium))
                                     .foregroundStyle(.secondary)
+                                Image(systemName: forecast.symbolName)
+                                    .symbolRenderingMode(.multicolor)
+                                    .font(.system(size: 15))
+                                    .frame(height: 18)
+                                HStack(spacing: 3) {
+                                    Text("\(Int(round(forecast.highCelsius)))°")
+                                        .font(.system(size: 8, weight: .semibold))
+                                    Text("\(Int(round(forecast.lowCelsius)))°")
+                                        .font(.system(size: 8, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                }
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 4)
-                        .background(Color.blue.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
             }
@@ -2749,17 +2735,9 @@ private struct WeatherWidget: View {
         .padding(.top, 2)
     }
 
-    private func metricSymbol(_ metric: String) -> String {
-        switch metric {
-        case "Humidity": "humidity.fill"
-        case "Wind": "wind"
-        default: "cloud.fill"
-        }
-    }
 }
 
-private struct SystemResourcesWidget: View {
-    let contentHeight: CGFloat
+private struct SystemResourcesWidget: View {    let contentHeight: CGFloat
 
     var body: some View {
         WidgetCard(
