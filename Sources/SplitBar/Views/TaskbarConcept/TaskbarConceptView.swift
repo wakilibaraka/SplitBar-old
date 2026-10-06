@@ -1260,7 +1260,7 @@ private struct Taskbar: View {
     }
 
     private var trailingTrayCluster: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: trashPlacement == .beforeClock ? 4 : 8) {
             if trashPlacement == .beforeTray {
                 if showsTaskbarDividers {
                     taskbarDivider
