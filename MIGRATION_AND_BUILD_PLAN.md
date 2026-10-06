@@ -77,6 +77,11 @@ explicit user controls.
 - [x] Widgets refinement pass: unified uppercase-micro headers on all cards
   and forecast sections; theme logic untouched (dark/XP/98/Aero keep working
   through the shared card backgrounds).
+- [x] Running state with click cycle: NSWorkspace push notifications track
+  running and frontmost apps; tiles show dot/dash/highlight indicators;
+  clicking launches, activates, or hides, with AX true-minimize behind a
+  permission-gated mode. Indicator style/size/colour and minimize mode persist;
+  their settings controls land with the settings redesign.
   name with avatar (CBIdentity, initials fallback) instead of "Your profile",
   a gear button jumping straight to Personalisation, and a power menu with
   Lock, Sleep, Restart, Shut Down, and Log Out — icons on the left, destructive

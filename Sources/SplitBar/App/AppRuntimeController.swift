@@ -321,6 +321,7 @@ public final class AppRuntimeController {
         self.syncPanels()
         self.setupDefaultShortcuts()
         self.setupTaskbarPanel()
+        self.setupRunningState()
         self.setupClipboardMonitoring()
         self.setupLiveStreaming()
         Logger.lifecycle.info("AppRuntimeController initialized")
@@ -397,9 +398,15 @@ public final class AppRuntimeController {
     }
 
     private func showTaskbarPanel() {
-        let content = TaskbarPanelContentView(model: taskbarConceptState) { [weak self] bundleIdentifier in
-            self?.launchPinnedApplication(bundleIdentifier: bundleIdentifier)
-        }
+        let content = TaskbarPanelContentView(
+            model: taskbarConceptState,
+            onLaunchApplication: { [weak self] bundleIdentifier in
+                self?.launchPinnedApplication(bundleIdentifier: bundleIdentifier)
+            },
+            onTaskbarIconClick: { [weak self] bundleIdentifier in
+                self?.handleTaskbarIconClick(bundleIdentifier: bundleIdentifier)
+            }
+        )
         taskbarPanelController.show(content: AnyView(content), height: taskbarConceptState.taskbarHeight)
     }
 
@@ -513,9 +520,15 @@ public final class AppRuntimeController {
         if let existing = taskbarConceptWindow {
             window = existing
         } else {
-            let conceptView = TaskbarConceptView(model: taskbarConceptState) { [weak self] bundleIdentifier in
-                self?.launchPinnedApplication(bundleIdentifier: bundleIdentifier)
-            }
+            let conceptView = TaskbarConceptView(
+                model: taskbarConceptState,
+                onLaunchApplication: { [weak self] bundleIdentifier in
+                    self?.launchPinnedApplication(bundleIdentifier: bundleIdentifier)
+                },
+                onTaskbarIconClick: { [weak self] bundleIdentifier in
+                    self?.handleTaskbarIconClick(bundleIdentifier: bundleIdentifier)
+                }
+            )
             let hostingView = NSHostingView(rootView: conceptView)
             hostingView.sizingOptions = []
             window = NSWindow(
@@ -660,6 +673,50 @@ public final class AppRuntimeController {
                let activeID = self.state.flyout.activeItemID {
                 self.syncFlyout(activeItemID: activeID)
             }
+        }
+    }
+
+    private func setupRunningState() {
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [
+            NSWorkspace.didLaunchApplicationNotification,
+            NSWorkspace.didTerminateApplicationNotification,
+            NSWorkspace.didActivateApplicationNotification
+        ] {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in
+                    self?.refreshRunningState()
+                }
+            }
+        }
+        refreshRunningState()
+    }
+
+    private func refreshRunningState() {
+        let running = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
+        taskbarConceptState.runningBundleIDs = Set(running.compactMap(\.bundleIdentifier))
+        taskbarConceptState.frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+    }
+
+    public func handleTaskbarIconClick(bundleIdentifier: String) {
+        let matches = NSWorkspace.shared.runningApplications.filter { $0.bundleIdentifier == bundleIdentifier }
+        guard let app = matches.first else {
+            launchPinnedApplication(bundleIdentifier: bundleIdentifier)
+            return
+        }
+        if app.isActive {
+            if taskbarConceptState.minimizeMode == .minimize {
+                if windowManagerService.isAccessibilityGranted() {
+                    if windowManagerService.minimizeWindows(bundleIdentifier: bundleIdentifier) {
+                        return
+                    }
+                } else {
+                    windowManagerService.promptAccessibilityPermission()
+                }
+            }
+            app.hide()
+        } else {
+            app.activate()
         }
     }
 

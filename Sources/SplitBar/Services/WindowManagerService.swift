@@ -21,6 +21,31 @@ public final class WindowManagerService: @unchecked Sendable {
     }
 
     @discardableResult
+    public func minimizeWindows(bundleIdentifier: String) -> Bool {
+        guard AXIsProcessTrusted() else { return false }
+        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleIdentifier }) else {
+            return false
+        }
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var windowsValue: AnyObject?
+        guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsValue) == .success,
+              let windows = windowsValue as? [AXUIElement], !windows.isEmpty
+        else {
+            return false
+        }
+        var minimizedAny = false
+        for window in windows {
+            if AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanTrue) == .success {
+                minimizedAny = true
+            }
+        }
+        if !minimizedAny {
+            Logger.panels.warning("AX minimize affected no windows bundle=\(bundleIdentifier, privacy: .public)")
+        }
+        return minimizedAny
+    }
+
+    @discardableResult
     public func tileFrontmostWindow(action: WindowTilingAction) -> Bool {
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
             Logger.panels.warning("No frontmost application found to tile")

@@ -371,13 +371,82 @@ private enum TrashPlacement: String, CaseIterable, Identifiable {
     }
 }
 
+enum RunningIndicatorStyle: String, CaseIterable, Identifiable {
+    case dot
+    case dash
+    case highlight
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .dot: "Dot"
+        case .dash: "Dash"
+        case .highlight: "Highlight"
+        }
+    }
+}
+
+enum RunningIndicatorSize: String, CaseIterable, Identifiable {
+    case small
+    case medium
+    case large
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .small: "Small"
+        case .medium: "Medium"
+        case .large: "Large"
+        }
+    }
+
+    var dotDiameter: CGFloat {
+        switch self {
+        case .small: 4
+        case .medium: 6
+        case .large: 8
+        }
+    }
+
+    var dashWidth: CGFloat {
+        switch self {
+        case .small: 14
+        case .medium: 18
+        case .large: 24
+        }
+    }
+
+    var dashHeight: CGFloat {
+        switch self {
+        case .small: 3
+        case .medium: 4
+        case .large: 5
+        }
+    }
+}
+
+enum AppMinimizeMode: String, CaseIterable, Identifiable {
+    case hide
+    case minimize
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .hide: "Hide"
+        case .minimize: "Minimize"
+        }
+    }
+}
+
 enum PanelKind: String, CaseIterable, Identifiable {
     case start
     case widgets
     case calendar
     case controls
     case settings
-
     var id: String { rawValue }
 
     var title: String {
@@ -564,6 +633,20 @@ final class TaskbarConceptState: ObservableObject {
     private let systemStatusService = SystemStatusService()
     @Published fileprivate var topProcesses: [TopProcess] = []
     @Published var totalProcessCount: Int = 0
+    @Published var runningBundleIDs: Set<String> = []
+    @Published var frontmostBundleID: String?
+    @Published var runningIndicatorStyle = RunningIndicatorStyle.dot {
+        didSet { UserDefaults.standard.set(runningIndicatorStyle.rawValue, forKey: "taskbar.indicatorStyle") }
+    }
+    @Published var runningIndicatorSize = RunningIndicatorSize.medium {
+        didSet { UserDefaults.standard.set(runningIndicatorSize.rawValue, forKey: "taskbar.indicatorSize") }
+    }
+    @Published var runningIndicatorColor = Color.blue {
+        didSet { UserDefaults.standard.set(runningIndicatorColor.storedRGBA, forKey: "taskbar.indicatorColor") }
+    }
+    @Published var minimizeMode = AppMinimizeMode.hide {
+        didSet { UserDefaults.standard.set(minimizeMode.rawValue, forKey: "taskbar.minimizeMode") }
+    }
     @Published var systemMetrics: SystemMetrics?
     @Published var networkPeakIn: Double = 0
     @Published var networkPeakOut: Double = 0
@@ -676,6 +759,19 @@ final class TaskbarConceptState: ObservableObject {
         showOnlyFourPinned = defaults.bool(forKey: "launcher.showOnlyFour")
         if let savedGrouping = defaults.string(forKey: "launcher.allAppsGrouping").flatMap(AllAppsGrouping.init(rawValue:)) {
             allAppsGrouping = savedGrouping
+        }
+        if let savedIndicatorStyle = defaults.string(forKey: "taskbar.indicatorStyle").flatMap(RunningIndicatorStyle.init(rawValue:)) {
+            runningIndicatorStyle = savedIndicatorStyle
+        }
+        if let savedIndicatorSize = defaults.string(forKey: "taskbar.indicatorSize").flatMap(RunningIndicatorSize.init(rawValue:)) {
+            runningIndicatorSize = savedIndicatorSize
+        }
+        if let values = defaults.array(forKey: "taskbar.indicatorColor") as? [Double],
+           let color = Color.fromStoredRGBA(values) {
+            runningIndicatorColor = color
+        }
+        if let savedMinimizeMode = defaults.string(forKey: "taskbar.minimizeMode").flatMap(AppMinimizeMode.init(rawValue:)) {
+            minimizeMode = savedMinimizeMode
         }
         hiddenQuickSettingTitles = Set(
             (defaults.string(forKey: "quickSettings.hiddenTiles") ?? "")
@@ -872,6 +968,7 @@ struct TaskbarFlyoutContentView: View {
 struct TaskbarPanelContentView: View {
     @ObservedObject var model: TaskbarConceptState
     let onLaunchApplication: (String) -> Void
+    let onTaskbarIconClick: (String) -> Void
 
     var body: some View {
         Taskbar(
@@ -892,7 +989,13 @@ struct TaskbarPanelContentView: View {
             iconSize: model.taskbarIconSize,
             trashPlacement: model.trashPlacement,
             systemStatus: model.systemStatus,
-            onLaunchApplication: onLaunchApplication
+            runningBundleIDs: model.runningBundleIDs,
+            frontmostBundleID: model.frontmostBundleID,
+            indicatorStyle: model.runningIndicatorStyle,
+            indicatorSize: model.runningIndicatorSize,
+            indicatorColor: model.runningIndicatorColor,
+            onLaunchApplication: onLaunchApplication,
+            onTaskbarIconClick: onTaskbarIconClick
         )
         .environment(\.surfaceTransparency, model.interfaceTransparency)
         .preferredColorScheme(model.isDarkMode ? .dark : .light)
@@ -902,10 +1005,12 @@ struct TaskbarPanelContentView: View {
 public struct TaskbarConceptView: View {
     @ObservedObject private var model: TaskbarConceptState
     private let onLaunchApplication: (String) -> Void
+    private let onTaskbarIconClick: (String) -> Void
 
-    init(model: TaskbarConceptState, onLaunchApplication: @escaping (String) -> Void) {
+    init(model: TaskbarConceptState, onLaunchApplication: @escaping (String) -> Void, onTaskbarIconClick: @escaping (String) -> Void) {
         self._model = ObservedObject(wrappedValue: model)
         self.onLaunchApplication = onLaunchApplication
+        self.onTaskbarIconClick = onTaskbarIconClick
     }
 
     private var openPanel: OpenPanel? {
@@ -1086,7 +1191,13 @@ public struct TaskbarConceptView: View {
                     iconSize: model.taskbarIconSize,
                     trashPlacement: model.trashPlacement,
                     systemStatus: model.systemStatus,
-                    onLaunchApplication: onLaunchApplication
+                    runningBundleIDs: model.runningBundleIDs,
+                    frontmostBundleID: model.frontmostBundleID,
+                    indicatorStyle: model.runningIndicatorStyle,
+                    indicatorSize: model.runningIndicatorSize,
+                    indicatorColor: model.runningIndicatorColor,
+                    onLaunchApplication: onLaunchApplication,
+                    onTaskbarIconClick: onTaskbarIconClick
                 )
                 .zIndex(3)
             }
@@ -1190,7 +1301,13 @@ private struct Taskbar: View {
     let iconSize: TaskbarIconSize
     let trashPlacement: TrashPlacement
     let systemStatus: SystemStatusSnapshot
+    let runningBundleIDs: Set<String>
+    let frontmostBundleID: String?
+    let indicatorStyle: RunningIndicatorStyle
+    let indicatorSize: RunningIndicatorSize
+    let indicatorColor: Color
     let onLaunchApplication: (String) -> Void
+    let onTaskbarIconClick: (String) -> Void
 
     private var glyphSize: CGFloat { height * iconSize.glyphFraction }
     private var tileSide: CGFloat { max(28, height - 4) }
@@ -1311,20 +1428,7 @@ private struct Taskbar: View {
                 .help("Open Start")
 
                 ForEach(pinnedBundleIDs, id: \.self) { bundleIdentifier in
-                    let app = LauncherDefaults.apps.first { $0.bundleIdentifier == bundleIdentifier }
-                    Button {
-                        onLaunchApplication(bundleIdentifier)
-                    } label: {
-                        MacOSAppIcon(
-                            bundleIdentifier: bundleIdentifier,
-                            fallbackSymbol: app?.symbol ?? "app.fill",
-                            fallbackColor: app?.color ?? .secondary,
-                            size: glyphSize
-                        )
-                        .frame(width: tileSide, height: tileSide)
-                        .taskbarTile()
-                    }
-                    .help(app?.title ?? bundleIdentifier)
+                    taskbarAppTile(bundleIdentifier)
                 }
 
                 if trashPlacement == .withApps {
@@ -1394,6 +1498,49 @@ private struct Taskbar: View {
         Rectangle()
             .fill(Color.primary.opacity(0.14))
             .frame(width: 1)
+    }
+
+    private func taskbarAppTile(_ bundleIdentifier: String) -> some View {
+        let app = LauncherDefaults.apps.first { $0.bundleIdentifier == bundleIdentifier }
+        let isRunning = runningBundleIDs.contains(bundleIdentifier)
+        let isFrontmost = frontmostBundleID == bundleIdentifier
+        return Button {
+            onTaskbarIconClick(bundleIdentifier)
+        } label: {
+            MacOSAppIcon(
+                bundleIdentifier: bundleIdentifier,
+                fallbackSymbol: app?.symbol ?? "app.fill",
+                fallbackColor: app?.color ?? .secondary,
+                size: glyphSize
+            )
+            .frame(width: tileSide, height: tileSide)
+            .taskbarTile(highlighted: isRunning && indicatorStyle == .highlight, highlightColor: indicatorColor)
+            .overlay(alignment: .bottom) {
+                if isRunning, indicatorStyle != .highlight {
+                    runningIndicator(isFrontmost: isFrontmost)
+                        .padding(.bottom, 4)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .help(app?.title ?? bundleIdentifier)
+    }
+
+    private func runningIndicator(isFrontmost: Bool) -> some View {
+        Group {
+            switch indicatorStyle {
+            case .dot:
+                Circle()
+                    .fill(indicatorColor.opacity(isFrontmost ? 1 : 0.55))
+                    .frame(width: indicatorSize.dotDiameter, height: indicatorSize.dotDiameter)
+            case .dash:
+                Capsule()
+                    .fill(indicatorColor.opacity(isFrontmost ? 1 : 0.55))
+                    .frame(width: indicatorSize.dashWidth, height: indicatorSize.dashHeight)
+            case .highlight:
+                EmptyView()
+            }
+        }
     }
 
     private var showsTaskbarDividers: Bool {
@@ -1755,6 +1902,8 @@ private struct TrashTile: View {
 }
 
 private struct TaskbarTileStyle: ViewModifier {
+    var highlighted = false
+    var highlightColor = Color.blue
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
 
@@ -1762,10 +1911,13 @@ private struct TaskbarTileStyle: ViewModifier {
         content
             .background {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10))
+                    .fill(highlighted ? highlightColor.opacity(0.22) : Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10))
                     .overlay {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.5), lineWidth: 1)
+                            .strokeBorder(
+                                highlighted ? highlightColor.opacity(0.55) : Color.white.opacity(colorScheme == .dark ? 0.14 : 0.5),
+                                lineWidth: 1
+                            )
                     }
             }
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -1780,8 +1932,8 @@ private struct TaskbarTileStyle: ViewModifier {
 }
 
 private extension View {
-    func taskbarTile() -> some View {
-        modifier(TaskbarTileStyle())
+    func taskbarTile(highlighted: Bool = false, highlightColor: Color = .blue) -> some View {
+        modifier(TaskbarTileStyle(highlighted: highlighted, highlightColor: highlightColor))
     }
 }
 
