@@ -72,6 +72,8 @@ explicit user controls.
   letter or category grouping; the columns scroll inside a capped floating
   Start panel (700 pt, Win11-like) with search pinned top and profile footer
   pinned bottom.
+- [x] Pinned drag reorder in the launcher (unpin already exists via Edit mode
+  and lands in context menus next).
 - [x] Launcher Processes card replaces the static All-programs placeholder:
   live top-5 CPU table sampled every 5 s only while the launcher is open.
 - [x] Widgets board gains Date, System rings, and Network widgets with live

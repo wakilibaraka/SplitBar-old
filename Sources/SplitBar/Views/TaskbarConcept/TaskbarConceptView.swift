@@ -862,6 +862,16 @@ final class TaskbarConceptState: ObservableObject {
         }
     }
 
+    fileprivate func movePinned(_ bundleID: String, before targetBundleID: String) {
+        guard bundleID != targetBundleID,
+              let sourceIndex = pinnedAppBundleIDs.firstIndex(of: bundleID) else { return }
+        var updated = pinnedAppBundleIDs
+        updated.remove(at: sourceIndex)
+        let targetIndex = updated.firstIndex(of: targetBundleID) ?? updated.endIndex
+        updated.insert(bundleID, at: targetIndex)
+        pinnedAppBundleIDs = updated
+    }
+
     fileprivate func resetPersonalisation() {
         surfaceStyle = .glass
         usesDockPresentation = false
@@ -4006,8 +4016,7 @@ private struct StartFlyout: View {
             } else {
                 onLaunchApplication(app.bundleIdentifier)
             }
-        } label: {
-            VStack(spacing: 8) {
+        } label: {            VStack(spacing: 8) {
                 MacOSAppIcon(
                     bundleIdentifier: app.bundleIdentifier,
                     fallbackSymbol: app.symbol,
@@ -4029,6 +4038,12 @@ private struct StartFlyout: View {
             }
         }
         .buttonStyle(.plain)
+        .draggable(app.bundleIdentifier)
+        .dropDestination(for: String.self) { droppedItems, _ in
+            guard let draggedID = droppedItems.first else { return false }
+            model.movePinned(draggedID, before: app.bundleIdentifier)
+            return true
+        }
     }
 
     private func pinEditCell(_ app: LauncherApp) -> some View {        let isPinned = model.pinnedAppBundleIDs.contains(app.bundleIdentifier)
