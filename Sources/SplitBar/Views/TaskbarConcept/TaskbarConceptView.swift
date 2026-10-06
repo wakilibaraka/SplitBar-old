@@ -1089,6 +1089,12 @@ private struct Taskbar: View {
                 .help("Open widgets")
                 .padding(.leading, 18)
 
+                if showsTaskbarDividers {
+                    taskbarDivider
+                        .padding(.vertical, 6)
+                        .padding(.leading, 10)
+                }
+
                 Spacer(minLength: 0)
 
                 trailingTrayCluster
@@ -1134,8 +1140,10 @@ private struct Taskbar: View {
                 }
 
                 if trashPlacement == .withApps {
-                    taskbarDivider
-                        .padding(.vertical, 6)
+                    if showsTaskbarDividers {
+                        taskbarDivider
+                            .padding(.vertical, 6)
+                    }
                     trashCluster
                 }
             }
@@ -1200,6 +1208,10 @@ private struct Taskbar: View {
             .frame(width: 1)
     }
 
+    private var showsTaskbarDividers: Bool {
+        !usesDockPresentation
+    }
+
     private var trashCluster: some View {
         HStack(spacing: 4) {
             DownloadsTile(tileSide: tileSide, glyphSize: glyphSize)
@@ -1219,7 +1231,9 @@ private struct Taskbar: View {
     private var trailingTrayCluster: some View {
         HStack(spacing: 8) {
             if trashPlacement == .beforeTray {
-                taskbarDivider
+                if showsTaskbarDividers {
+                    taskbarDivider
+                }
                 trashCluster
             }
             if trashPlacement == .beforeClock {
@@ -1247,7 +1261,9 @@ private struct Taskbar: View {
             }
 
             if trashPlacement == .farRight {
-                taskbarDivider
+                if showsTaskbarDividers {
+                    taskbarDivider
+                }
                 trashCluster
             }
         }
