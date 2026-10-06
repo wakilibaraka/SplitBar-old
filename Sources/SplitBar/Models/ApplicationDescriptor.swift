@@ -5,14 +5,17 @@ public struct ApplicationDescriptor: Identifiable, Equatable, Sendable {
     public let bundleIdentifier: String
     public let displayName: String
     public let applicationURL: URL
+    public let category: String
 
     public init(
         bundleIdentifier: String,
         displayName: String,
-        applicationURL: URL
+        applicationURL: URL,
+        category: String = "Other"
     ) {
         self.bundleIdentifier = bundleIdentifier
         self.displayName = displayName
         self.applicationURL = applicationURL
+        self.category = category
     }
 }

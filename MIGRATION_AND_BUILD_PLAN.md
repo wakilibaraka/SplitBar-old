@@ -63,6 +63,17 @@ explicit user controls.
   actions behind confirmation, failures surfaced in an alert. Power verbs run
   through public pmset/System Events off the main thread; first use may trigger
   the macOS Automation prompt.
+- [x] Launcher All-Apps grid: pinned row shows 4 with a persisted "Show only
+  4 pinned apps" toggle (default off = grid visible); the grid scans real
+  catalog apps once per open with A-Z/Category grouping, live search filter,
+  cached icons, and tap-to-launch. Categories come from
+  LSApplicationCategoryType; dockbar patterns reimplemented cleanly.
+  name with avatar (CBIdentity, initials fallback) instead of "Your profile",
+  a gear button jumping straight to Personalisation, and a power menu with
+  Lock, Sleep, Restart, Shut Down, and Log Out — icons on the left, destructive
+  actions behind confirmation, failures surfaced in an alert. Power verbs run
+  through public pmset/System Events off the main thread; first use may trigger
+  the macOS Automation prompt.
 - [x] Replace the three separate Wi-Fi/volume/battery glyphs with one dynamic
   system-status icon: battery ring with level/charging/low states, Wi-Fi
   on/off glyph, volume dots, and a Bluetooth power dot. Live data comes from

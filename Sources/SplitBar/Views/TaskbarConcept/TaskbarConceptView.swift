@@ -459,6 +459,20 @@ private struct LauncherApp: Identifiable {
     var id: String { bundleIdentifier }
 }
 
+private enum AllAppsGrouping: String, CaseIterable, Identifiable {
+    case alphabetical
+    case category
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .alphabetical: "A-Z"
+        case .category: "Category"
+        }
+    }
+}
+
 private struct LauncherFolder: Identifiable {
     let title: String
     let symbol: String
@@ -566,6 +580,12 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var pinnedAppBundleIDs = LauncherDefaults.pinnedBundleIDs {
         didSet { UserDefaults.standard.set(pinnedAppBundleIDs, forKey: "launcher.pinnedApps") }
     }
+    @Published fileprivate var showOnlyFourPinned = false {
+        didSet { UserDefaults.standard.set(showOnlyFourPinned, forKey: "launcher.showOnlyFour") }
+    }
+    @Published fileprivate var allAppsGrouping = AllAppsGrouping.alphabetical {
+        didSet { UserDefaults.standard.set(allAppsGrouping.rawValue, forKey: "launcher.allAppsGrouping") }
+    }
     @Published fileprivate var hiddenQuickSettingTitles: Set<String> = [] {
         didSet { UserDefaults.standard.set(hiddenQuickSettingTitles.sorted().joined(separator: "|"), forKey: "quickSettings.hiddenTiles") }
     }
@@ -633,6 +653,10 @@ final class TaskbarConceptState: ObservableObject {
             restoredPins.append(bundleID)
         }
         pinnedAppBundleIDs = restoredPins
+        showOnlyFourPinned = defaults.bool(forKey: "launcher.showOnlyFour")
+        if let savedGrouping = defaults.string(forKey: "launcher.allAppsGrouping").flatMap(AllAppsGrouping.init(rawValue:)) {
+            allAppsGrouping = savedGrouping
+        }
         hiddenQuickSettingTitles = Set(
             (defaults.string(forKey: "quickSettings.hiddenTiles") ?? "")
                 .split(separator: "|")
@@ -3444,10 +3468,125 @@ private struct StartFlyout: View {
 
     private var folders: [LauncherFolder] { LauncherDefaults.folders }
 
+    private var filteredCatalogApps: [ApplicationDescriptor] {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return catalogApps }
+        return catalogApps.filter { $0.displayName.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var catalogLetterGroups: [(String, [ApplicationDescriptor])] {
+        let grouped = Dictionary(grouping: filteredCatalogApps) { app in
+            String(app.displayName.prefix(1)).uppercased()
+        }
+        return grouped.keys.sorted().compactMap { key in
+            guard let apps = grouped[key] else { return nil }
+            return (key, apps)
+        }
+    }
+
+    private var catalogCategoryGroups: [(String, [ApplicationDescriptor])] {
+        let grouped = Dictionary(grouping: filteredCatalogApps) { $0.category }
+        return grouped.keys.sorted().compactMap { key in
+            guard let apps = grouped[key] else { return nil }
+            return (key, apps)
+        }
+    }
+
+    private func loadCatalog() async {
+        guard catalogApps.isEmpty else { return }
+        let scanned = await Task.detached(priority: .userInitiated) {
+            ApplicationCatalogService().scan(directories: ApplicationCatalogService.catalogDirectories())
+        }.value
+        catalogApps = scanned
+    }
+
+    private var allAppsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("All apps")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Picker("", selection: $model.allAppsGrouping) {
+                    ForEach(AllAppsGrouping.allCases) { grouping in
+                        Text(grouping.title).tag(grouping)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 150)
+            }
+            if catalogApps.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            } else if filteredCatalogApps.isEmpty {
+                Text("No apps match your search.")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            } else {
+                ForEach(allAppsGroups, id: \.0) { group in
+                    allAppsGroupSection(title: group.0, apps: group.1)
+                }
+            }
+        }
+        .padding(.top, 4)
+        .task {
+            await loadCatalog()
+        }
+    }
+
+    private var allAppsGroups: [(String, [ApplicationDescriptor])] {
+        switch model.allAppsGrouping {
+        case .alphabetical: catalogLetterGroups
+        case .category: catalogCategoryGroups
+        }
+    }
+
+    private func allAppsGroupSection(title: String, apps: [ApplicationDescriptor]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 14) {
+                ForEach(apps) { app in
+                    catalogAppCell(app)
+                }
+            }
+        }
+    }
+
+    private func catalogAppCell(_ app: ApplicationDescriptor) -> some View {
+        Button {
+            onLaunchApplication(app.bundleIdentifier)
+        } label: {
+            VStack(spacing: 8) {
+                MacOSAppIcon(
+                    bundleIdentifier: app.bundleIdentifier,
+                    fallbackSymbol: "app.fill",
+                    fallbackColor: .secondary,
+                    size: 34
+                )
+                .frame(width: 54, height: 54)
+                .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 15))
+                Text(app.displayName)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(height: 26)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .help(app.displayName)
+    }
+
     @State private var userIdentity = UserIdentityService.currentIdentity()
     @State private var userAvatar: NSImage?
     @State private var pendingPowerAction: SystemPowerAction?
     @State private var powerErrorMessage: String?
+    @State private var searchQuery = ""
+    @State private var catalogApps: [ApplicationDescriptor] = []
 
     private var launcherFooter: some View {
         HStack {
@@ -3583,12 +3722,21 @@ private struct StartFlyout: View {
             HStack(spacing: 11) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(accent)
-                Text("Search apps, settings and files")
+                TextField("Search apps, settings and files", text: $searchQuery)
                     .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Image(systemName: "slider.horizontal.3")
-                    .foregroundStyle(.secondary)
+                    .textFieldStyle(.plain)
+                if searchQuery.isEmpty {
+                    Image(systemName: "slider.horizontal.3")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Button {
+                        searchQuery = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 16)
             .frame(height: 48)
@@ -3609,7 +3757,7 @@ private struct StartFlyout: View {
                     }
 
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 19) {
-                        ForEach(pinnedApps) { app in
+                        ForEach(Array(pinnedApps.prefix(4))) { app in
                             Button {
                                 if isEditingPins {
                                     model.setPinned(app.bundleIdentifier, isPinned: false)
@@ -3640,6 +3788,15 @@ private struct StartFlyout: View {
                             }
                             .buttonStyle(.plain)
                         }
+                    }
+
+                    Toggle("Show only 4 pinned apps", isOn: $model.showOnlyFourPinned)
+                        .toggleStyle(.switch)
+                        .font(.system(size: 10, weight: .medium))
+                        .padding(.top, 2)
+
+                    if !isEditingPins && !model.showOnlyFourPinned {
+                        allAppsSection
                     }
 
                     if isEditingPins {
