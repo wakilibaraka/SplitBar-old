@@ -287,6 +287,17 @@ tested.
   Universal vs per-surface scope, applied to all six panel shells; tiles and
   inner cards keep their own radii. Pill caps at 26 pt on tall panels; sharp
   floors at 2 pt for beveled themes.
+- [x] Split modes as a real screen-edge surface: the taskbar hosts one island
+  panel per group (weather / apps / tray+clock), gaps stay click-through, app
+  tiles shrink with an overflow chevron, and frames relayout on mode, gap,
+  height, pinned/running changes, and screen changes. Single-island modes
+  (Windows, macOS pill, centered bar) keep the full-width strip panel. Mode
+  picker shows layout miniatures; island gap and centered width are sliders.
+- [x] Dividers fully editable: tile context menu adds/removes/moves a divider
+  after an app, the settings manager lists every divider with its anchor,
+  per-mode move/remove controls, and a divider context menu for removal.
+  Trash anchors are per-mode in settings, the Downloads/Trash/Status cluster
+  has an orderable list, and the legacy `usesDockPresentation` flag is gone.
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.
