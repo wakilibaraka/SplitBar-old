@@ -879,6 +879,9 @@ public final class AppRuntimeController {
         systemMonitorService.startMonitoring(interval: interval) { [weak self] metrics in
             guard let self else { return }
             self.latestSystemMetrics = metrics
+            self.taskbarConceptState.systemMetrics = metrics
+            self.taskbarConceptState.networkPeakIn = max(self.taskbarConceptState.networkPeakIn, Double(metrics.network.bytesInPerSecond))
+            self.taskbarConceptState.networkPeakOut = max(self.taskbarConceptState.networkPeakOut, Double(metrics.network.bytesOutPerSecond))
             self.updateDockContent()
             if self.detailedSystemMonitorWindow?.isVisible == true {
                 self.refreshDetailedSystemMonitor()

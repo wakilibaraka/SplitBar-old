@@ -230,6 +230,9 @@ private enum DashboardWidget: String, CaseIterable, Identifiable {
     case photos
     case stickyNotes
     case watchlist
+    case date
+    case systemRings
+    case network
 
     var id: String { rawValue }
 
@@ -237,6 +240,7 @@ private enum DashboardWidget: String, CaseIterable, Identifiable {
         switch self {
         case .weather: .large
         case .systemResources: .medium
+        case .date, .systemRings, .network: .small
         case .nowPlaying, .photos, .stickyNotes, .watchlist: .small
         }
     }
@@ -549,6 +553,10 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var systemStatus = SystemStatusSnapshot.placeholder()
     private let systemStatusService = SystemStatusService()
     @Published fileprivate var topProcesses: [TopProcess] = []
+    @Published var totalProcessCount: Int = 0
+    @Published var systemMetrics: SystemMetrics?
+    @Published var networkPeakIn: Double = 0
+    @Published var networkPeakOut: Double = 0
     private let processSampleQueue = DispatchQueue(label: "com.baraka.splitbar.topprocesses", qos: .utility)
     @Published fileprivate var panelWidths: [PanelKind: CGFloat] = [:] {
         didSet {
@@ -675,16 +683,17 @@ final class TaskbarConceptState: ObservableObject {
     }
 
     fileprivate func sampleTopProcessesIfNeeded() {
-        guard openPanel == .start else { return }
+        guard openPanel == .start || openPanel == .widgets else { return }
         processSampleQueue.async { [weak self] in
             let sampled = Self.sampleTopProcesses()
             DispatchQueue.main.async {
-                self?.topProcesses = sampled
+                self?.topProcesses = sampled.processes
+                self?.totalProcessCount = sampled.total
             }
         }
     }
 
-    nonisolated private static func sampleTopProcesses() -> [TopProcess] {
+    nonisolated private static func sampleTopProcesses() -> (processes: [TopProcess], total: Int) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/ps")
         process.arguments = ["-axo", "comm,pcpu,rss"]
@@ -694,8 +703,9 @@ final class TaskbarConceptState: ObservableObject {
             try process.run()
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
-            guard let output = String(data: data, encoding: .utf8) else { return [] }
+            guard let output = String(data: data, encoding: .utf8) else { return (processes: [], total: 0) }
             var rows: [TopProcess] = []
+            var totalCount = 0
             for line in output.components(separatedBy: "\n").dropFirst() {
                 let parts = line.split(separator: " ", omittingEmptySubsequences: true)
                 guard parts.count >= 3,
@@ -704,13 +714,14 @@ final class TaskbarConceptState: ObservableObject {
                 else {
                     continue
                 }
+                totalCount += 1
                 let name = parts.dropLast(2).joined(separator: " ")
                 guard !name.isEmpty else { continue }
                 rows.append(TopProcess(name: name, cpuPercent: cpu, memoryMB: rssKB / 1024))
             }
-            return Array(rows.sorted { $0.cpuPercent > $1.cpuPercent }.prefix(5))
+            return (Array(rows.sorted { $0.cpuPercent > $1.cpuPercent }.prefix(5)), totalCount)
         } catch {
-            return []
+            return (processes: [], total: 0)
         }
     }
 
@@ -1730,6 +1741,128 @@ private struct MacOSAppIcon: View {
     }
 }
 
+private struct DateWidget: View {
+    let contentHeight: CGFloat
+
+    var body: some View {
+        WidgetCard(title: "Date", symbol: "calendar", tint: .red, minContentHeight: contentHeight) {
+            VStack(spacing: 2) {
+                Text(Date.now.formatted(.dateTime.weekday(.wide)).uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.red)
+                    .tracking(1.5)
+                Text(Date.now.formatted(.dateTime.day()))
+                    .font(.system(size: 44, weight: .light, design: .rounded))
+                Text(Date.now.formatted(.dateTime.month(.wide)).uppercased())
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .tracking(1.5)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+        }
+    }
+}
+
+private struct SystemRingsWidget: View {
+    let cpuPercent: Double
+    let memoryPercent: Double
+    let diskPercent: Double
+    let batteryLevel: Int
+    let processCount: Int
+    let contentHeight: CGFloat
+
+    private var uptimeText: String {
+        let totalMinutes = Int(ProcessInfo.processInfo.systemUptime / 60)
+        if totalMinutes < 60 {
+            return "\(totalMinutes) mins"
+        }
+        return "\(totalMinutes / 60) hrs"
+    }
+
+    var body: some View {
+        WidgetCard(title: "System", symbol: "cpu", tint: .blue, minContentHeight: contentHeight) {
+            VStack(spacing: 10) {
+                HStack(spacing: 0) {
+                    ringDial(value: cpuPercent / 100, color: .blue, label: "CPU")
+                    ringDial(value: memoryPercent / 100, color: .purple, label: "MEM")
+                    ringDial(value: diskPercent / 100, color: .green, label: "DISK")
+                    ringDial(value: Double(batteryLevel) / 100, color: .orange, label: "BATT")
+                }
+                HStack {
+                    Text("Uptime \(uptimeText)")
+                    Spacer(minLength: 0)
+                    Text("Processes \(processCount)")
+                }
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func ringDial(value: Double, color: Color, label: String) -> some View {
+        VStack(spacing: 3) {
+            ZStack {
+                Circle()
+                    .stroke(Color.primary.opacity(0.12), lineWidth: 3)
+                    .frame(width: 30, height: 30)
+                Circle()
+                    .trim(from: 0, to: min(1, max(0, value)))
+                    .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .frame(width: 30, height: 30)
+                    .rotationEffect(.degrees(-90))
+                Text("\(Int((min(1, max(0, value)) * 100).rounded()))")
+                    .font(.system(size: 7, weight: .bold, design: .rounded))
+            }
+            Text(label)
+                .font(.system(size: 7, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct NetworkWidget: View {
+    let downBytesPerSecond: UInt64
+    let upBytesPerSecond: UInt64
+    let peakDownBytesPerSecond: UInt64
+    let peakUpBytesPerSecond: UInt64
+    let contentHeight: CGFloat
+
+    var body: some View {
+        WidgetCard(title: "Network", symbol: "network", tint: .teal, minContentHeight: contentHeight) {
+            VStack(spacing: 8) {
+                networkRow(label: "DOWNLOAD", current: downBytesPerSecond, peak: peakDownBytesPerSecond)
+                networkRow(label: "UPLOAD", current: upBytesPerSecond, peak: peakUpBytesPerSecond)
+            }
+        }
+    }
+
+    private func networkRow(label: String, current: UInt64, peak: UInt64) -> some View {
+        HStack(alignment: .lastTextBaseline) {
+            Text(label)
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(rateText(current))
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                Text("Peak \(rateText(peak))")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func rateText(_ bytesPerSecond: UInt64) -> String {
+        let bytes = Double(bytesPerSecond)
+        if bytes >= 1_000_000 {
+            return String(format: "%.1f MB/s", bytes / 1_000_000)
+        }
+        return String(format: "%.1f KB/s", bytes / 1_000)
+    }
+}
+
 private struct WidgetsPanel: View {
     let onClose: () -> Void
     let accent: Color
@@ -1913,6 +2046,25 @@ private struct WidgetsPanel: View {
             StickyNotesWidget(contentHeight: size.cardContentHeight)
         case .watchlist:
             WatchlistWidget(contentHeight: size.cardContentHeight)
+        case .date:
+            DateWidget(contentHeight: size.cardContentHeight)
+        case .systemRings:
+            SystemRingsWidget(
+                cpuPercent: model.systemMetrics?.cpu.usagePercent ?? 0,
+                memoryPercent: model.systemMetrics?.memory.usagePercent ?? 0,
+                diskPercent: model.systemMetrics?.disk.usagePercent ?? 0,
+                batteryLevel: model.systemStatus.batteryLevel,
+                processCount: model.totalProcessCount,
+                contentHeight: size.cardContentHeight
+            )
+        case .network:
+            NetworkWidget(
+                downBytesPerSecond: model.systemMetrics?.network.bytesInPerSecond ?? 0,
+                upBytesPerSecond: model.systemMetrics?.network.bytesOutPerSecond ?? 0,
+                peakDownBytesPerSecond: UInt64(model.networkPeakIn),
+                peakUpBytesPerSecond: UInt64(model.networkPeakOut),
+                contentHeight: size.cardContentHeight
+            )
         }
     }
 }

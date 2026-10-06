@@ -70,6 +70,10 @@ explicit user controls.
   LSApplicationCategoryType; dockbar patterns reimplemented cleanly.
 - [x] Launcher Processes card replaces the static All-programs placeholder:
   live top-5 CPU table sampled every 5 s only while the launcher is open.
+- [x] Widgets board gains Date, System rings, and Network widgets with live
+  data (clock, CPU/memory/disk/battery rings + uptime + process count,
+  up/down rates + session peaks); metrics forwarded from the runtime monitor,
+  process count piggybacked on the existing ps sample at no extra spawn.
   name with avatar (CBIdentity, initials fallback) instead of "Your profile",
   a gear button jumping straight to Personalisation, and a power menu with
   Lock, Sleep, Restart, Shut Down, and Log Out — icons on the left, destructive
