@@ -321,6 +321,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         let launchAtLoginService = LaunchAtLoginService()
         let quickNotesService = QuickNotesService(baseURL: appSupport)
+        let dockController = DockController(
+            stateFileURL: appSupport.appendingPathComponent("dock-prior-state.json")
+        )
+        dockController.restoreIfNeeded()
+        dockController.setupSignalHandlers {
+            Task { @MainActor in
+                DockController(stateFileURL: appSupport.appendingPathComponent("dock-prior-state.json")).setHidden(false)
+            }
+        }
 
         self.runtimeController = AppRuntimeController(
             initialState: initialState,
@@ -340,7 +349,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             aiUsageService: aiUsageService,
             windowManagerService: windowManagerService,
             launchAtLoginService: launchAtLoginService,
-            quickNotesService: quickNotesService
+            quickNotesService: quickNotesService,
+            dockController: dockController
         )
+    }
+
+    public func applicationWillTerminate(_ notification: Notification) {
+        let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first?.appendingPathComponent("com.baraka.splitbar")
+            ?? FileManager.default.temporaryDirectory.appendingPathComponent("com.baraka.splitbar")
+        DockController(stateFileURL: appSupport.appendingPathComponent("dock-prior-state.json")).setHidden(false)
     }
 }

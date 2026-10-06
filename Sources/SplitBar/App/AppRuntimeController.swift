@@ -164,6 +164,7 @@ public final class AppRuntimeController {
     public let windowManagerService: WindowManagerService
     public let launchAtLoginService: LaunchAtLoginService
     public let quickNotesService: QuickNotesService
+    public let dockController: DockController
     public let tooltipController: DockTooltipPanelController
     public private(set) var statusBarController: StatusBarController?
     public let magnificationConfiguration: DockMagnificationConfiguration
@@ -214,7 +215,8 @@ public final class AppRuntimeController {
         aiUsageService: AIUsageService,
         windowManagerService: WindowManagerService,
         launchAtLoginService: LaunchAtLoginService,
-        quickNotesService: QuickNotesService
+        quickNotesService: QuickNotesService,
+        dockController: DockController
     ) {
         self.state = initialState
         self.preferences = preferences
@@ -235,6 +237,7 @@ public final class AppRuntimeController {
         self.windowManagerService = windowManagerService
         self.launchAtLoginService = launchAtLoginService
         self.quickNotesService = quickNotesService
+        self.dockController = dockController
         self.tooltipController = DockTooltipPanelController()
         self.clipboardPolicy = preferences.clipboardRetention
         do {
@@ -817,6 +820,12 @@ public final class AppRuntimeController {
         taskbarConceptState.onTogglePlayback = { [weak self] in
             self?.nowPlayingService.togglePlayPause()
         }
+        taskbarConceptState.$hideMacDock
+            .removeDuplicates()
+            .sink { [weak self] hidden in
+                self?.dockController.setHidden(hidden)
+            }
+            .store(in: &taskbarPanelSubscriptions)
     }
 
     private func setupClipboardMonitoring() {

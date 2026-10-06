@@ -253,6 +253,11 @@ tested.
 - [x] Live Now Playing binding: board card renders the polled AppleScript
   state with idle card, progress bar, and working play/pause through the
   existing off-main transport; updates publish only on change.
+- [x] Dock persist/restore infrastructure with default-OFF opt-in: original
+  orientation/autohide persist to disk before any mutation, restore on
+  terminate plus SIGTERM/SIGINT traps plus launch-time crash recovery,
+  SPLITBAR_SKIP_DOCK dev bypass. Verified the default path never touches the
+  real Dock (no state file, defaults unchanged).
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.

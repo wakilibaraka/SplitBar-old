@@ -662,6 +662,9 @@ final class TaskbarConceptState: ObservableObject {
     @Published var showWindowPreviews = false {
         didSet { UserDefaults.standard.set(showWindowPreviews, forKey: "taskbar.windowPreviews") }
     }
+    @Published var hideMacDock = false {
+        didSet { UserDefaults.standard.set(hideMacDock, forKey: "dock.hidden") }
+    }
     @Published var previewBundleID: String?
     @Published var systemMetrics: SystemMetrics?
     @Published var weather = WeatherState.defaultSample()
@@ -789,6 +792,7 @@ final class TaskbarConceptState: ObservableObject {
             contextMenuStyle = savedMenuStyle
         }
         showWindowPreviews = defaults.bool(forKey: "taskbar.windowPreviews")
+        hideMacDock = defaults.bool(forKey: "dock.hidden")
         hiddenQuickSettingTitles = Set(
             (defaults.string(forKey: "quickSettings.hiddenTiles") ?? "")
                 .split(separator: "|")
@@ -984,6 +988,7 @@ struct TaskbarFlyoutContentView: View {
                 taskbarGradientEnd: $model.taskbarGradientEnd,
                 taskbarHeight: $model.taskbarHeight,
                 showsTaskbarPanel: $model.showsTaskbarPanel,
+                hideMacDock: $model.hideMacDock,
                 showWindowPreviews: $model.showWindowPreviews,
                 runningIndicatorStyle: $model.runningIndicatorStyle,
                 runningIndicatorSize: $model.runningIndicatorSize,
@@ -1291,6 +1296,7 @@ public struct TaskbarConceptView: View {
                         taskbarGradientEnd: $model.taskbarGradientEnd,
                         taskbarHeight: $model.taskbarHeight,
                         showsTaskbarPanel: $model.showsTaskbarPanel,
+                        hideMacDock: $model.hideMacDock,
                         showWindowPreviews: $model.showWindowPreviews,
                         runningIndicatorStyle: $model.runningIndicatorStyle,
                         runningIndicatorSize: $model.runningIndicatorSize,
@@ -3838,6 +3844,7 @@ private struct SettingsFlyout: View {
     @Binding var taskbarGradientEnd: Color
     @Binding var taskbarHeight: CGFloat
     @Binding var showsTaskbarPanel: Bool
+    @Binding var hideMacDock: Bool
     @Binding var showWindowPreviews: Bool
     @Binding var runningIndicatorStyle: RunningIndicatorStyle
     @Binding var runningIndicatorSize: RunningIndicatorSize
@@ -4152,6 +4159,17 @@ private struct SettingsFlyout: View {
                     Text("Screen-edge panel")
                         .font(.system(size: 11, weight: .medium))
                     Text("Show the taskbar in a bottom-edge panel with flyouts above it.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+            Toggle(isOn: $hideMacDock) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Hide macOS Dock")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Experimental and reversible. Original Dock settings restore on quit, crash recovery included.")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
