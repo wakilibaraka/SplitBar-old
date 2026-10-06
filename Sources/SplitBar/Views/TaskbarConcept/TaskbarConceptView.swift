@@ -191,13 +191,14 @@ private struct TransparencyKey: EnvironmentKey {
 }
 
 private struct AeroSheen: ViewModifier {
+    var cornerRadius: CGFloat?
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
         content.overlay {
             if surfaceStyle == .aero {
-                RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: cornerRadius ?? surfaceStyle.cornerRadius, style: .continuous)
                     .fill(
                         LinearGradient(
                             colors: [
@@ -216,8 +217,8 @@ private struct AeroSheen: ViewModifier {
 }
 
 private extension View {
-    func aeroSheen() -> some View {
-        modifier(AeroSheen())
+    func aeroSheen(cornerRadius: CGFloat? = nil) -> some View {
+        modifier(AeroSheen(cornerRadius: cornerRadius))
     }
 }
 
@@ -396,6 +397,50 @@ enum TaskbarMode: String, CaseIterable, Identifiable {
         case .split3, .split4: false
         }
     }
+}
+
+enum CornerStyle: String, CaseIterable, Identifiable {
+    case pill
+    case roundedRect
+    case sharp
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .pill: "Pill"
+        case .roundedRect: "Rounded"
+        case .sharp: "Sharp"
+        }
+    }
+
+    func shellRadius(surfaceStyle: SurfaceStyle) -> CGFloat {
+        switch self {
+        case .pill: 26
+        case .roundedRect: surfaceStyle.cornerRadius
+        case .sharp: 2
+        }
+    }
+}
+
+enum CornerScope: String, CaseIterable, Identifiable {
+    case universal
+    case perSurface
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .universal: "Universal"
+        case .perSurface: "Per surface"
+        }
+    }
+}
+
+enum CornerSurface {
+    case taskbar
+    case widgets
+    case flyouts
 }
 
 enum TaskbarSection: String, CaseIterable, Identifiable {
@@ -748,6 +793,34 @@ final class TaskbarConceptState: ObservableObject {
     @Published var clusterOrder: [String] = ["downloads", "trash", "status"] {
         didSet { UserDefaults.standard.set(clusterOrder, forKey: "taskbar.clusterOrder") }
     }
+    @Published var cornerStyle = CornerStyle.roundedRect {
+        didSet { UserDefaults.standard.set(cornerStyle.rawValue, forKey: "corners.style") }
+    }
+    @Published var cornerScope = CornerScope.universal {
+        didSet { UserDefaults.standard.set(cornerScope.rawValue, forKey: "corners.scope") }
+    }
+    @Published var cornerTaskbar = CornerStyle.roundedRect {
+        didSet { UserDefaults.standard.set(cornerTaskbar.rawValue, forKey: "corners.taskbar") }
+    }
+    @Published var cornerWidgets = CornerStyle.roundedRect {
+        didSet { UserDefaults.standard.set(cornerWidgets.rawValue, forKey: "corners.widgets") }
+    }
+    @Published var cornerFlyouts = CornerStyle.roundedRect {
+        didSet { UserDefaults.standard.set(cornerFlyouts.rawValue, forKey: "corners.flyouts") }
+    }
+
+    func cornerStyle(for surface: CornerSurface) -> CornerStyle {
+        guard cornerScope == .perSurface else { return cornerStyle }
+        switch surface {
+        case .taskbar: return cornerTaskbar
+        case .widgets: return cornerWidgets
+        case .flyouts: return cornerFlyouts
+        }
+    }
+
+    func shellRadius(for surface: CornerSurface) -> CGFloat {
+        cornerStyle(for: surface).shellRadius(surfaceStyle: surfaceStyle)
+    }
 
     func trashPlacement(for mode: TaskbarMode) -> TrashPlacement {
         if let saved = trashAnchors[mode.rawValue].flatMap(TrashPlacement.init(rawValue:)) {
@@ -936,6 +1009,21 @@ final class TaskbarConceptState: ObservableObject {
         let savedCluster = defaults.stringArray(forKey: "taskbar.clusterOrder") ?? []
         if !savedCluster.isEmpty {
             clusterOrder = savedCluster
+        }
+        if let savedCorners = defaults.string(forKey: "corners.style").flatMap(CornerStyle.init(rawValue:)) {
+            cornerStyle = savedCorners
+        }
+        if let savedScope = defaults.string(forKey: "corners.scope").flatMap(CornerScope.init(rawValue:)) {
+            cornerScope = savedScope
+        }
+        if let savedTaskbar = defaults.string(forKey: "corners.taskbar").flatMap(CornerStyle.init(rawValue:)) {
+            cornerTaskbar = savedTaskbar
+        }
+        if let savedWidgets = defaults.string(forKey: "corners.widgets").flatMap(CornerStyle.init(rawValue:)) {
+            cornerWidgets = savedWidgets
+        }
+        if let savedFlyouts = defaults.string(forKey: "corners.flyouts").flatMap(CornerStyle.init(rawValue:)) {
+            cornerFlyouts = savedFlyouts
         }
         showsTaskbarPanel = defaults.bool(forKey: "taskbar.panelShown")
         let savedWidths = defaults.dictionary(forKey: "panels.widths") as? [String: Double] ?? [:]
@@ -1168,7 +1256,8 @@ struct TaskbarFlyoutContentView: View {
                 dateStyle: $model.dateStyle,
                 clockDisplayStyle: $model.clockDisplayStyle,
                 clockTint: $model.clockTint,
-                accent: model.clockTint
+                accent: model.clockTint,
+                cornerRadius: model.shellRadius(for: .flyouts)
             )
         case .controls:
             ControlsFlyout(accent: model.clockTint, model: model)
@@ -1204,12 +1293,18 @@ struct TaskbarFlyoutContentView: View {
                 showWifiName: $model.showWifiName,
                 showBluetoothDevices: $model.showBluetoothDevices,
                 ddcBrightnessEnabled: $model.ddcBrightnessEnabled,
+                cornerStyle: $model.cornerStyle,
+                cornerScope: $model.cornerScope,
+                cornerTaskbar: $model.cornerTaskbar,
+                cornerWidgets: $model.cornerWidgets,
+                cornerFlyouts: $model.cornerFlyouts,
                 taskbarIconSize: $model.taskbarIconSize,
                 trashPlacement: $model.trashPlacement,
                 panelWidths: $model.panelWidths,
                 accent: model.clockTint,
                 onClose: onClose,
-                onResetPersonalisation: { model.resetPersonalisation() }
+                onResetPersonalisation: { model.resetPersonalisation() },
+                cornerRadius: model.shellRadius(for: .flyouts)
             )
         }
     }
@@ -1222,6 +1317,7 @@ struct WindowPreviewContent: View {
     let surfaceStyle: SurfaceStyle
     let onSelectWindow: (AppWindowInfo) -> Void
     let onClose: () -> Void
+    let cornerRadius: CGFloat
     @State private var thumbnails: [CGWindowID: NSImage] = [:]
     @State private var didAttemptCapture = false
     @Environment(\.colorScheme) private var colorScheme
@@ -1247,11 +1343,11 @@ struct WindowPreviewContent: View {
             }
         }
         .padding(14)
-        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.76), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
@@ -1454,7 +1550,8 @@ public struct TaskbarConceptView: View {
                         dateStyle: $model.dateStyle,
                         clockDisplayStyle: $model.clockDisplayStyle,
                         clockTint: $model.clockTint,
-                        accent: clockTint
+                        accent: clockTint,
+                        cornerRadius: model.shellRadius(for: .flyouts)
                     )
                     .frame(width: min(520, geometry.size.width - 36), height: max(300, geometry.size.height - taskbarHeight - 28))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
@@ -1516,12 +1613,18 @@ public struct TaskbarConceptView: View {
                         showWifiName: $model.showWifiName,
                         showBluetoothDevices: $model.showBluetoothDevices,
                         ddcBrightnessEnabled: $model.ddcBrightnessEnabled,
+                        cornerStyle: $model.cornerStyle,
+                        cornerScope: $model.cornerScope,
+                        cornerTaskbar: $model.cornerTaskbar,
+                        cornerWidgets: $model.cornerWidgets,
+                        cornerFlyouts: $model.cornerFlyouts,
                         taskbarIconSize: $model.taskbarIconSize,
                         trashPlacement: $model.trashPlacement,
                         panelWidths: $model.panelWidths,
                         accent: clockTint,
                         onClose: { openPanel = nil },
-                        onResetPersonalisation: { model.resetPersonalisation() }
+                        onResetPersonalisation: { model.resetPersonalisation() },
+                        cornerRadius: model.shellRadius(for: .flyouts)
                     )
                     .frame(width: panelFrameWidth(.settings, available: geometry.size.width - 40), height: min(680, geometry.size.height - taskbarHeight - 34))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -2589,6 +2692,7 @@ private struct NetworkWidget: View {
 }
 
 private struct WidgetsPanel: View {
+    private var shellRadius: CGFloat { model.shellRadius(for: .widgets) }
     let onClose: () -> Void
     let accent: Color
     @ObservedObject var model: TaskbarConceptState
@@ -2696,15 +2800,15 @@ private struct WidgetsPanel: View {
             }
             .scrollIndicators(.hidden)
         }
-        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: shellRadius, style: .continuous))
         .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: shellRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: shellRadius, style: .continuous)
                 .strokeBorder(surfaceStyle == .classic98 ? Color.white.opacity(0.95) : Color.white.opacity(0.72), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
         }
         .shadow(color: .black.opacity(surfaceStyle == .classic98 ? 0.12 : 0.18), radius: surfaceStyle == .glass ? 22 : 14, x: 0, y: surfaceStyle == .classic98 ? 3 : 8)
-        .aeroSheen()
+        .aeroSheen(cornerRadius: shellRadius)
     }
 
     @ViewBuilder
@@ -3456,6 +3560,7 @@ private struct QuickSetting: Identifiable {
 }
 
 private struct ControlsFlyout: View {
+    private var shellRadius: CGFloat { model.shellRadius(for: .flyouts) }
     let accent: Color
     @ObservedObject var model: TaskbarConceptState
     @Environment(\.surfaceStyle) private var surfaceStyle
@@ -3605,11 +3710,11 @@ private struct ControlsFlyout: View {
                 model.refreshDisplayBrightness()
             }
         }
-        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: shellRadius, style: .continuous))
         .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: shellRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: shellRadius, style: .continuous)
                 .strokeBorder(surfaceStyle == .classic98 ? Color.white : Color.white.opacity(0.76), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
         }
         .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
@@ -3786,6 +3891,7 @@ private struct ClockFlyout: View {
     @Binding var clockDisplayStyle: ClockDisplayStyle
     @Binding var clockTint: Color
     let accent: Color
+    let cornerRadius: CGFloat
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
@@ -3861,11 +3967,11 @@ private struct ClockFlyout: View {
             .scrollIndicators(.hidden)
             .frame(maxHeight: .infinity, alignment: .top)
         }
-        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.76), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
@@ -4156,12 +4262,18 @@ private struct SettingsFlyout: View {
     @Binding var showWifiName: Bool
     @Binding var showBluetoothDevices: Bool
     @Binding var ddcBrightnessEnabled: Bool
+    @Binding var cornerStyle: CornerStyle
+    @Binding var cornerScope: CornerScope
+    @Binding var cornerTaskbar: CornerStyle
+    @Binding var cornerWidgets: CornerStyle
+    @Binding var cornerFlyouts: CornerStyle
     @Binding var taskbarIconSize: TaskbarIconSize
     @Binding var trashPlacement: TrashPlacement
     @Binding var panelWidths: [PanelKind: CGFloat]
     let accent: Color
     let onClose: () -> Void
     let onResetPersonalisation: () -> Void
+    let cornerRadius: CGFloat
     @State private var isConfirmingReset = false
     @Environment(\.surfaceStyle) private var currentStyle
     @Environment(\.colorScheme) private var colorScheme
@@ -4191,6 +4303,35 @@ private struct SettingsFlyout: View {
             .font(.system(size: 10, weight: .medium, design: .rounded))
             .foregroundStyle(.secondary)
             .frame(minWidth: 38, alignment: .trailing)
+    }
+
+    private func cornerStyleButton(_ style: CornerStyle, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(style.title)
+                .font(.system(size: 9, weight: .semibold))
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(
+                    selected ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                    in: RoundedRectangle(cornerRadius: 9)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func cornerSurfaceRow(_ title: String, selection: Binding<CornerStyle>) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 10, weight: .medium))
+            Spacer()
+            Picker("", selection: selection) {
+                ForEach(CornerStyle.allCases) { style in
+                    Text(style.title).tag(style)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 190)
+        }
     }
 
     private func surfaceStyleRow(_ style: SurfaceStyle) -> some View {
@@ -4648,6 +4789,36 @@ private struct SettingsFlyout: View {
                 }
             }
 
+            settingsSection("Corners") {
+                HStack(spacing: 8) {
+                    ForEach(CornerStyle.allCases) { style in
+                        cornerStyleButton(style, selected: cornerStyle == style) {
+                            cornerStyle = style
+                        }
+                    }
+                }
+                HStack {
+                    Text("Apply to")
+                        .font(.system(size: 10, weight: .medium))
+                    Spacer()
+                    Picker("", selection: $cornerScope) {
+                        ForEach(CornerScope.allCases) { scope in
+                            Text(scope.title).tag(scope)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 190)
+                }
+                if cornerScope == .perSurface {
+                    cornerSurfaceRow("Taskbar", selection: $cornerTaskbar)
+                    cornerSurfaceRow("Widgets", selection: $cornerWidgets)
+                    cornerSurfaceRow("Flyouts", selection: $cornerFlyouts)
+                }
+                Text("Pill rounds shells fully (capped on tall panels); Sharp floors at 2 pt so beveled themes keep reading.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+
             settingsSection("Desktop wallpaper") {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                     ForEach(WallpaperPreset.allCases) { preset in
@@ -4689,11 +4860,11 @@ private struct SettingsFlyout: View {
         .padding(22)
         }
         .scrollIndicators(.hidden)
-        .background(panelBackground(style: currentStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: currentStyle.cornerRadius, style: .continuous))
+        .background(panelBackground(style: currentStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .background(surfaceWash(style: currentStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: currentStyle.cornerRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: currentStyle.cornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(currentStyle == .classic98 ? Color.white : Color.white.opacity(0.76), lineWidth: currentStyle == .classic98 ? 2 : 1)
         }
         .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
@@ -4701,6 +4872,7 @@ private struct SettingsFlyout: View {
 }
 
 private struct StartFlyout: View {
+    private var shellRadius: CGFloat { model.shellRadius(for: .flyouts) }
     let onClose: () -> Void
     let accent: Color
     @ObservedObject var model: TaskbarConceptState
@@ -5179,11 +5351,11 @@ private struct StartFlyout: View {
             launcherFooter
         }
         .padding(25)
-        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: shellRadius, style: .continuous))
         .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: shellRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: surfaceStyle.cornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: shellRadius, style: .continuous)
                 .strokeBorder(surfaceStyle == .classic98 ? Color.white : Color.white.opacity(0.76), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
         }
         .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)

@@ -283,6 +283,10 @@ tested.
   trash anchors, and cluster order — all pure logic covered by a new
   SplitBarTests target (6 tests green). eskele patterns adapted with
   attribution in NOTICE.
+- [x] Corner style setting (Pill/Rounded/Sharp, rounded-rect default) with
+  Universal vs per-surface scope, applied to all six panel shells; tiles and
+  inner cards keep their own radii. Pill caps at 26 pt on tall panels; sharp
+  floors at 2 pt for beveled themes.
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.

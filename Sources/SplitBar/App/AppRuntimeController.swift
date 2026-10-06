@@ -470,7 +470,8 @@ public final class AppRuntimeController {
             },
             onClose: { [weak self] in
                 self?.taskbarConceptState.previewBundleID = nil
-            }
+            },
+            cornerRadius: taskbarConceptState.shellRadius(for: .flyouts)
         )
         if windowPreviewController.panel.isVisible {
             windowPreviewController.replace(content: AnyView(content), frame: frame)
