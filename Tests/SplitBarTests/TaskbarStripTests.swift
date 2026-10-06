@@ -1,6 +1,7 @@
 import Testing
 
 @testable import SplitBar
+import CoreGraphics
 
 struct TaskbarStripTests {
     @Test func pinsBeforeRunning() {
@@ -47,5 +48,67 @@ struct TaskbarStripTests {
             let covered = Set(TaskbarSection.islands(for: mode).flatMap { $0 })
             #expect(covered == Set(TaskbarSection.allCases))
         }
+    }
+
+    private func split3Layout(appCount: Int, screenWidth: CGFloat = 1728) -> TaskbarStrip.IslandLayout {
+        TaskbarStrip.layoutIslands(
+            screenWidth: screenWidth,
+            mode: .split3,
+            tileStride: 46,
+            appCount: appCount,
+            weatherWidth: 200,
+            trayWidth: 150,
+            clockWidth: 100,
+            clusterWidth: 140,
+            gap: 10,
+            margin: 12,
+            barHeight: 46,
+            bottomMargin: 8
+        )
+    }
+
+    @Test func splitIslandsStayInsideTheScreen() {
+        let layout = split3Layout(appCount: 9)
+        #expect(layout.islands.count == 3)
+        #expect(!layout.showsOverflow)
+        #expect(layout.visibleAppTiles == 9)
+        for island in layout.islands {
+            #expect(island.frame.minX >= 0)
+            #expect(island.frame.maxX <= 1728)
+            #expect(island.frame.minY == 8)
+        }
+        let ordered = layout.islands.sorted { $0.frame.minX < $1.frame.minX }
+        #expect(ordered[0].sections == [.weather])
+        #expect(ordered[1].sections == [.apps])
+        #expect(ordered[2].sections == [.tray, .clock])
+    }
+
+    @Test func crowdedAppsShrinkWithOverflowFlag() {
+        let layout = split3Layout(appCount: 40, screenWidth: 1200)
+        #expect(layout.showsOverflow)
+        #expect(layout.visibleAppTiles < 40)
+        #expect(layout.visibleAppTiles >= 1)
+        for island in layout.islands {
+            #expect(island.frame.maxX <= 1200)
+        }
+    }
+
+    @Test func singleIslandModesProduceNoIslands() {
+        let layout = TaskbarStrip.layoutIslands(
+            screenWidth: 1728,
+            mode: .windows,
+            tileStride: 46,
+            appCount: 9,
+            weatherWidth: 200,
+            trayWidth: 150,
+            clockWidth: 100,
+            clusterWidth: 140,
+            gap: 10,
+            margin: 12,
+            barHeight: 46,
+            bottomMargin: 8
+        )
+        #expect(layout.islands.isEmpty)
+        #expect(!layout.showsOverflow)
     }
 }
