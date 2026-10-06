@@ -74,6 +74,9 @@ explicit user controls.
   data (clock, CPU/memory/disk/battery rings + uptime + process count,
   up/down rates + session peaks); metrics forwarded from the runtime monitor,
   process count piggybacked on the existing ps sample at no extra spawn.
+- [x] Widgets refinement pass: unified uppercase-micro headers on all cards
+  and forecast sections; theme logic untouched (dark/XP/98/Aero keep working
+  through the shared card backgrounds).
   name with avatar (CBIdentity, initials fallback) instead of "Your profile",
   a gear button jumping straight to Personalisation, and a power menu with
   Lock, Sleep, Restart, Shut Down, and Log Out — icons on the left, destructive

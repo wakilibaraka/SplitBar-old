@@ -2098,11 +2098,12 @@ private struct WidgetCard<Content: View>: View {
             HStack(spacing: 7) {
                 Image(systemName: symbol)
                     .foregroundStyle(tint)
-                Text(title)
+                Text(title.uppercased())
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.8)
                     .foregroundStyle(.primary.opacity(0.84))
                 Spacer(minLength: 0)
             }
-            .font(.system(size: 12, weight: .semibold))
 
             content
                 .frame(maxWidth: .infinity, minHeight: minContentHeight, alignment: .topLeading)
@@ -2251,8 +2252,10 @@ private struct WeatherWidget: View {
 
     private func forecastSectionHeader(_ title: String) -> some View {
         HStack {
-            Text(title)
+            Text(title.uppercased())
                 .font(.system(size: 10, weight: .semibold))
+                .tracking(0.6)
+                .foregroundStyle(.secondary)
             Spacer()
             if title == "14-day forecast" {
                 Text("Next 14 days")
