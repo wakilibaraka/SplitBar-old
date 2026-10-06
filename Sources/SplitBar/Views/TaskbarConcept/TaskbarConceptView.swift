@@ -522,8 +522,8 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var usesTaskbarGradient = false
     @Published fileprivate var taskbarGradientStart = Color(red: 0.78, green: 0.48, blue: 0.86)
     @Published fileprivate var taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)
-    @Published fileprivate var taskbarHeight: CGFloat = 46
-    @Published fileprivate var showsTaskbarPanel = false {
+    @Published var taskbarHeight: CGFloat = 46
+    @Published var showsTaskbarPanel = false {
         didSet { UserDefaults.standard.set(showsTaskbarPanel, forKey: "taskbar.panelShown") }
     }
     @Published fileprivate var taskbarIconSize = TaskbarIconSize.medium {
@@ -713,6 +713,36 @@ final class TaskbarConceptState: ObservableObject {
     }
 }
 
+struct TaskbarPanelContentView: View {
+    @ObservedObject var model: TaskbarConceptState
+    let onLaunchApplication: (String) -> Void
+
+    var body: some View {
+        Taskbar(
+            openPanel: $model.openPanel,
+            height: $model.taskbarHeight,
+            usesDockPresentation: model.usesDockPresentation,
+            surfaceStyle: model.surfaceStyle,
+            isDarkMode: model.isDarkMode,
+            usesTaskbarGradient: model.usesTaskbarGradient,
+            taskbarGradientStart: model.taskbarGradientStart,
+            taskbarGradientEnd: model.taskbarGradientEnd,
+            tint: model.clockTint,
+            dateStyle: model.dateStyle,
+            uses24HourTime: model.uses24HourTime,
+            showsSeconds: model.showsSeconds,
+            clockDisplayStyle: model.clockDisplayStyle,
+            pinnedBundleIDs: model.pinnedAppBundleIDs,
+            iconSize: model.taskbarIconSize,
+            trashPlacement: model.trashPlacement,
+            systemStatus: model.systemStatus,
+            onLaunchApplication: onLaunchApplication
+        )
+        .environment(\.surfaceTransparency, model.interfaceTransparency)
+        .preferredColorScheme(model.isDarkMode ? .dark : .light)
+    }
+}
+
 public struct TaskbarConceptView: View {
     @ObservedObject private var model: TaskbarConceptState
     private let onLaunchApplication: (String) -> Void
@@ -865,6 +895,7 @@ public struct TaskbarConceptView: View {
                         taskbarGradientStart: $model.taskbarGradientStart,
                         taskbarGradientEnd: $model.taskbarGradientEnd,
                         taskbarHeight: $model.taskbarHeight,
+                        showsTaskbarPanel: $model.showsTaskbarPanel,
                         taskbarIconSize: $model.taskbarIconSize,
                         trashPlacement: $model.trashPlacement,
                         panelWidths: $model.panelWidths,
@@ -3018,6 +3049,7 @@ private struct SettingsFlyout: View {
     @Binding var taskbarGradientStart: Color
     @Binding var taskbarGradientEnd: Color
     @Binding var taskbarHeight: CGFloat
+    @Binding var showsTaskbarPanel: Bool
     @Binding var taskbarIconSize: TaskbarIconSize
     @Binding var trashPlacement: TrashPlacement
     @Binding var panelWidths: [PanelKind: CGFloat]
@@ -3200,6 +3232,17 @@ private struct SettingsFlyout: View {
                     Text("Windows taskbar UI")
                         .font(.system(size: 11, weight: .medium))
                     Text("Turn off to preview a macOS-style Dock presentation")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+            Toggle(isOn: $showsTaskbarPanel) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Screen-edge panel")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Show the taskbar in a bottom-edge panel. Experimental; flyouts still open in the preview window.")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

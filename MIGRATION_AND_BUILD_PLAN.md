@@ -173,6 +173,15 @@ tested.
 
 - [x] Make the launcher pin list the single catalog-backed source for both
   launcher tiles and taskbar app icons; keep launches on `AppLaunchService`.
+- [x] Present the taskbar row in a bottom-edge screen panel
+  (`TaskbarPanelController` + `TaskbarPanelContentView`) as an opt-in,
+  independently reversible milestone. The panel is borderless and
+  non-activating (`canBecomeKey`/`canBecomeMain` false), floats at
+  `.floating`, joins all Spaces, spans the primary display's full visible
+  width, and resizes live with the taskbar height. The macOS Dock is untouched
+  and the preview window stays the default. Flyouts still render in the
+  preview window during this milestone; per-flyout panels above the bar are the
+  next slice.
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.

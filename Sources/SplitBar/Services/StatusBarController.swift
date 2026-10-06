@@ -5,9 +5,12 @@ import OSLog
 @MainActor
 public final class StatusBarController: NSObject, NSMenuDelegate {
     private var statusItem: NSStatusItem?
+    private var taskbarPanelItem: NSMenuItem?
     private let onToggleDock: () -> Void
     private let onOpenCommandPalette: () -> Void
     private let onOpenTaskbarPreview: () -> Void
+    private let onToggleTaskbarPanel: () -> Void
+    private let isTaskbarPanelShown: () -> Bool
     private let onOpenSystemMonitor: () -> Void
     private let onOpenSettings: () -> Void
     private let onChangeEdge: (DockEdge) -> Void
@@ -21,6 +24,8 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         onToggleDock: @escaping () -> Void,
         onOpenCommandPalette: @escaping () -> Void,
         onOpenTaskbarPreview: @escaping () -> Void,
+        onToggleTaskbarPanel: @escaping () -> Void,
+        isTaskbarPanelShown: @escaping () -> Bool,
         onOpenSystemMonitor: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
         onChangeEdge: @escaping (DockEdge) -> Void,
@@ -33,6 +38,8 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         self.onToggleDock = onToggleDock
         self.onOpenCommandPalette = onOpenCommandPalette
         self.onOpenTaskbarPreview = onOpenTaskbarPreview
+        self.onToggleTaskbarPanel = onToggleTaskbarPanel
+        self.isTaskbarPanelShown = isTaskbarPanelShown
         self.onOpenSystemMonitor = onOpenSystemMonitor
         self.onOpenSettings = onOpenSettings
         self.onChangeEdge = onChangeEdge
@@ -76,6 +83,15 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         )
         taskbarPreviewItem.target = self
         menu.addItem(taskbarPreviewItem)
+
+        let taskbarPanelItem = NSMenuItem(
+            title: "Taskbar Screen Panel (Experimental)",
+            action: #selector(handleToggleTaskbarPanel),
+            keyEquivalent: ""
+        )
+        taskbarPanelItem.target = self
+        menu.addItem(taskbarPanelItem)
+        self.taskbarPanelItem = taskbarPanelItem
 
         let paletteItem = NSMenuItem(
             title: "Command Palette...",
@@ -208,6 +224,14 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func handleOpenTaskbarPreview() {
         onOpenTaskbarPreview()
+    }
+
+    @objc private func handleToggleTaskbarPanel() {
+        onToggleTaskbarPanel()
+    }
+
+    public func menuWillOpen(_ menu: NSMenu) {
+        taskbarPanelItem?.state = isTaskbarPanelShown() ? .on : .off
     }
 
     @objc private func handleOpenSystemMonitor() {

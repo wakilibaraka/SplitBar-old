@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import CoreGraphics
 import Foundation
 import OSLog
@@ -180,6 +181,8 @@ public final class AppRuntimeController {
     private var currentPlaybackInterval: TimeInterval = 10.0
     private var taskbarConceptWindow: NSWindow?
     private let taskbarConceptState = TaskbarConceptState()
+    private let taskbarPanelController = TaskbarPanelController()
+    private var taskbarPanelSubscriptions = Set<AnyCancellable>()
     private var isLegacyEdgeDockEnabled = false
     private var settingsWindow: NSWindow?
     private var detailedMonitorHostingView: NSHostingView<DetailedSystemMonitorView>?
@@ -265,6 +268,12 @@ public final class AppRuntimeController {
             onOpenTaskbarPreview: {
                 statusSelf?.openTaskbarConceptWindow()
             },
+            onToggleTaskbarPanel: {
+                statusSelf?.toggleTaskbarPanel()
+            },
+            isTaskbarPanelShown: { [weak self] in
+                self?.taskbarConceptState.showsTaskbarPanel == true
+            },
             onOpenSystemMonitor: {
                 statusSelf?.openDetailedSystemMonitor()
             },
@@ -307,6 +316,7 @@ public final class AppRuntimeController {
         self.updateDockContent()
         self.syncPanels()
         self.setupDefaultShortcuts()
+        self.setupTaskbarPanel()
         self.setupClipboardMonitoring()
         self.setupLiveStreaming()
         Logger.lifecycle.info("AppRuntimeController initialized")
@@ -347,6 +357,40 @@ public final class AppRuntimeController {
         }
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+    }
+
+    private func setupTaskbarPanel() {
+        taskbarConceptState.$showsTaskbarPanel
+            .removeDuplicates()
+            .sink { [weak self] showsPanel in
+                guard let self else { return }
+                if showsPanel {
+                    self.showTaskbarPanel()
+                } else {
+                    self.taskbarPanelController.hide()
+                }
+            }
+            .store(in: &taskbarPanelSubscriptions)
+        taskbarConceptState.$taskbarHeight
+            .removeDuplicates()
+            .sink { [weak self] height in
+                self?.taskbarPanelController.updateHeight(height)
+            }
+            .store(in: &taskbarPanelSubscriptions)
+        if taskbarConceptState.showsTaskbarPanel {
+            showTaskbarPanel()
+        }
+    }
+
+    private func showTaskbarPanel() {
+        let content = TaskbarPanelContentView(model: taskbarConceptState) { [weak self] bundleIdentifier in
+            self?.launchPinnedApplication(bundleIdentifier: bundleIdentifier)
+        }
+        taskbarPanelController.show(content: AnyView(content), height: taskbarConceptState.taskbarHeight)
+    }
+
+    public func toggleTaskbarPanel() {
+        taskbarConceptState.showsTaskbarPanel.toggle()
     }
 
     public func openTaskbarConceptWindow() {
