@@ -983,6 +983,11 @@ struct TaskbarFlyoutContentView: View {
                 taskbarHeight: $model.taskbarHeight,
                 showsTaskbarPanel: $model.showsTaskbarPanel,
                 showWindowPreviews: $model.showWindowPreviews,
+                runningIndicatorStyle: $model.runningIndicatorStyle,
+                runningIndicatorSize: $model.runningIndicatorSize,
+                runningIndicatorColor: $model.runningIndicatorColor,
+                minimizeMode: $model.minimizeMode,
+                contextMenuStyle: $model.contextMenuStyle,
                 taskbarIconSize: $model.taskbarIconSize,
                 trashPlacement: $model.trashPlacement,
                 panelWidths: $model.panelWidths,
@@ -1284,6 +1289,11 @@ public struct TaskbarConceptView: View {
                         taskbarHeight: $model.taskbarHeight,
                         showsTaskbarPanel: $model.showsTaskbarPanel,
                         showWindowPreviews: $model.showWindowPreviews,
+                        runningIndicatorStyle: $model.runningIndicatorStyle,
+                        runningIndicatorSize: $model.runningIndicatorSize,
+                        runningIndicatorColor: $model.runningIndicatorColor,
+                        minimizeMode: $model.minimizeMode,
+                        contextMenuStyle: $model.contextMenuStyle,
                         taskbarIconSize: $model.taskbarIconSize,
                         trashPlacement: $model.trashPlacement,
                         panelWidths: $model.panelWidths,
@@ -3824,6 +3834,11 @@ private struct SettingsFlyout: View {
     @Binding var taskbarHeight: CGFloat
     @Binding var showsTaskbarPanel: Bool
     @Binding var showWindowPreviews: Bool
+    @Binding var runningIndicatorStyle: RunningIndicatorStyle
+    @Binding var runningIndicatorSize: RunningIndicatorSize
+    @Binding var runningIndicatorColor: Color
+    @Binding var minimizeMode: AppMinimizeMode
+    @Binding var contextMenuStyle: ContextMenuStyle
     @Binding var taskbarIconSize: TaskbarIconSize
     @Binding var trashPlacement: TrashPlacement
     @Binding var panelWidths: [PanelKind: CGFloat]
@@ -3987,6 +4002,121 @@ private struct SettingsFlyout: View {
         .buttonStyle(.plain)
     }
 
+    private var taskbarBehaviorSection: some View {
+        settingsSection("Taskbar behavior") {
+            Text("Running indicator")
+                .font(.system(size: 10, weight: .medium))
+            HStack(spacing: 8) {
+                ForEach(RunningIndicatorStyle.allCases) { style in
+                    indicatorStyleButton(style)
+                }
+            }
+            HStack {
+                ForEach(RunningIndicatorSize.allCases) { size in
+                    indicatorSizeButton(size)
+                }
+                Spacer(minLength: 8)
+                ColorPicker("Colour", selection: $runningIndicatorColor, supportsOpacity: false)
+                    .font(.system(size: 10, weight: .medium))
+            }
+            Text("Click focused app")
+                .font(.system(size: 10, weight: .medium))
+                .padding(.top, 2)
+            HStack(spacing: 8) {
+                ForEach(AppMinimizeMode.allCases) { mode in
+                    minimizeModeButton(mode)
+                }
+            }
+            Text("Minimize needs Accessibility; first use explains the prompt. Hide needs nothing.")
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+            Text("Right-click menu")
+                .font(.system(size: 10, weight: .medium))
+                .padding(.top, 2)
+            HStack(spacing: 8) {
+                ForEach(ContextMenuStyle.allCases) { style in
+                    contextMenuStyleButton(style)
+                }
+            }
+            Toggle(isOn: $showWindowPreviews) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Window previews")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Live thumbnails on icon hover. Needs Screen Recording; icon fallback otherwise.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+            .padding(.top, 2)
+        }
+    }
+
+    private func indicatorStyleButton(_ style: RunningIndicatorStyle) -> some View {
+        Button {
+            runningIndicatorStyle = style
+        } label: {
+            Text(style.title)
+                .font(.system(size: 9, weight: .semibold))
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(
+                    runningIndicatorStyle == style ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                    in: RoundedRectangle(cornerRadius: 9)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func indicatorSizeButton(_ size: RunningIndicatorSize) -> some View {
+        Button {
+            runningIndicatorSize = size
+        } label: {
+            Text(size.title)
+                .font(.system(size: 9, weight: .semibold))
+                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+                .background(
+                    runningIndicatorSize == size ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                    in: RoundedRectangle(cornerRadius: 9)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func minimizeModeButton(_ mode: AppMinimizeMode) -> some View {
+        Button {
+            minimizeMode = mode
+        } label: {
+            Text(mode.title)
+                .font(.system(size: 9, weight: .semibold))
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(
+                    minimizeMode == mode ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                    in: RoundedRectangle(cornerRadius: 9)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func contextMenuStyleButton(_ style: ContextMenuStyle) -> some View {
+        Button {
+            contextMenuStyle = style
+        } label: {
+            Text(style.title)
+                .font(.system(size: 9, weight: .semibold))
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(
+                    contextMenuStyle == style ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                    in: RoundedRectangle(cornerRadius: 9)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
     private var quickSettingsGrid: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 12) {
             taskbarModeSection
@@ -4016,18 +4146,7 @@ private struct SettingsFlyout: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Screen-edge panel")
                         .font(.system(size: 11, weight: .medium))
-                    Text("Show the taskbar in a bottom-edge panel. Experimental; flyouts still open in the preview window.")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.switch)
-            Toggle(isOn: $showWindowPreviews) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Window previews")
-                        .font(.system(size: 11, weight: .medium))
-                    Text("Live thumbnails on icon hover. Needs Screen Recording; icon fallback otherwise.")
+                    Text("Show the taskbar in a bottom-edge panel with flyouts above it.")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -4131,6 +4250,8 @@ private struct SettingsFlyout: View {
             }
 
             quickSettingsGrid
+
+            taskbarBehaviorSection
 
             settingsSection("Taskbar icons") {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {

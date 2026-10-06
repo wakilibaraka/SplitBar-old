@@ -242,6 +242,9 @@ tested.
   thumbnails, icon fallback plus a Screen Recording hint when capture is
   unavailable, and click-to-activate. Preview dismisses on hover exit, flyout
   open, mode off, and fullscreen.
+- [x] Settings redesign for taskbar behavior: one Taskbar behavior section
+  owns indicator style/size/colour, click minimize mode, menu style, and the
+  previews toggle in the established block-grid idiom.
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.
