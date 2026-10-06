@@ -5,13 +5,27 @@ import Foundation
 import IOKit.ps
 import IOBluetooth
 
+public struct BluetoothDeviceInfo: Equatable, Sendable {
+    public let address: String
+    public let name: String
+    public let connected: Bool
+
+    public init(address: String, name: String, connected: Bool) {
+        self.address = address
+        self.name = name
+        self.connected = connected
+    }
+}
+
 public struct SystemStatusSnapshot: Equatable, Sendable {
     public var batteryLevel: Int
     public var isCharging: Bool
     public var isPluggedIn: Bool
     public var wifiOn: Bool
     public var wifiBars: Int
+    public var wifiSSID: String?
     public var bluetoothOn: Bool
+    public var bluetoothDevices: [BluetoothDeviceInfo]
     public var volumeLevel: Double
     public var isMuted: Bool
 
@@ -21,7 +35,9 @@ public struct SystemStatusSnapshot: Equatable, Sendable {
         isPluggedIn: Bool,
         wifiOn: Bool,
         wifiBars: Int,
+        wifiSSID: String? = nil,
         bluetoothOn: Bool,
+        bluetoothDevices: [BluetoothDeviceInfo] = [],
         volumeLevel: Double,
         isMuted: Bool
     ) {
@@ -30,7 +46,9 @@ public struct SystemStatusSnapshot: Equatable, Sendable {
         self.isPluggedIn = isPluggedIn
         self.wifiOn = wifiOn
         self.wifiBars = wifiBars
+        self.wifiSSID = wifiSSID
         self.bluetoothOn = bluetoothOn
+        self.bluetoothDevices = bluetoothDevices
         self.volumeLevel = volumeLevel
         self.isMuted = isMuted
     }
@@ -52,6 +70,7 @@ public struct SystemStatusSnapshot: Equatable, Sendable {
 @MainActor
 public final class SystemStatusService {
     public private(set) var currentSnapshot = SystemStatusSnapshot.placeholder()
+    public var bluetoothDeviceMonitoringEnabled = false
     private var timer: Timer?
     private let queryQueue = DispatchQueue(label: "com.baraka.splitbar.systemstatus", qos: .utility)
     private var queryInFlight = false
@@ -82,8 +101,9 @@ public final class SystemStatusService {
     ) {
         guard !queryInFlight else { return }
         queryInFlight = true
+        let monitorDevices = bluetoothDeviceMonitoringEnabled
         queryQueue.async { [weak self] in
-            let snapshot = Self.sampleSnapshot()
+            let snapshot = Self.sampleSnapshot(monitorBluetoothDevices: monitorDevices)
             Task { @MainActor in
                 guard let self else { return }
                 self.queryInFlight = false
@@ -95,7 +115,39 @@ public final class SystemStatusService {
         }
     }
 
-    nonisolated private static func sampleSnapshot() -> SystemStatusSnapshot {
+    public func setBluetoothDeviceConnected(_ connected: Bool, address: String) {
+        queryQueue.async { [weak self] in
+            Self.setDeviceConnection(connected, address: address)
+            Task { @MainActor in
+                guard let self else { return }
+                let snapshot = Self.sampleSnapshot(monitorBluetoothDevices: self.bluetoothDeviceMonitoringEnabled)
+                if snapshot != self.currentSnapshot {
+                    self.currentSnapshot = snapshot
+                }
+            }
+        }
+    }
+
+    nonisolated private static func setDeviceConnection(_ connected: Bool, address: String) {
+        guard let device = IOBluetoothDevice.pairedDevices().first(where: { ($0 as? IOBluetoothDevice)?.addressString == address }) as? IOBluetoothDevice else {
+            return
+        }
+        if connected {
+            _ = device.openConnection()
+        } else {
+            _ = device.closeConnection()
+        }
+    }
+
+    nonisolated private static func sampleBluetoothDevices() -> [BluetoothDeviceInfo] {
+        (IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []).compactMap { device in
+            guard let address = device.addressString, let name = device.name else { return nil }
+            return BluetoothDeviceInfo(address: address, name: name, connected: device.isConnected())
+        }
+        .sorted { $0.connected && !$1.connected }
+    }
+
+    nonisolated private static func sampleSnapshot(monitorBluetoothDevices: Bool) -> SystemStatusSnapshot {
         let battery = sampleBattery()
         let wifi = sampleWiFi()
         let volume = sampleOutputVolume()
@@ -105,7 +157,9 @@ public final class SystemStatusService {
             isPluggedIn: battery.plugged,
             wifiOn: wifi.on,
             wifiBars: wifi.bars,
+            wifiSSID: wifi.ssid,
             bluetoothOn: sampleBluetoothPower(),
+            bluetoothDevices: monitorBluetoothDevices ? sampleBluetoothDevices() : [],
             volumeLevel: volume.level,
             isMuted: volume.muted
         )
@@ -127,11 +181,11 @@ public final class SystemStatusService {
         return (min(100, max(0, level)), charging, plugged)
     }
 
-    nonisolated private static func sampleWiFi() -> (on: Bool, bars: Int) {
+    nonisolated private static func sampleWiFi() -> (on: Bool, bars: Int, ssid: String?) {
         guard let interface = CWWiFiClient.shared().interface(),
               interface.powerOn()
         else {
-            return (false, 0)
+            return (false, 0, nil)
         }
         let rssi = interface.rssiValue()
         let bars: Int
@@ -144,7 +198,7 @@ public final class SystemStatusService {
         } else {
             bars = 0
         }
-        return (true, bars)
+        return (true, bars, interface.ssid())
     }
 
     nonisolated private static func sampleBluetoothPower() -> Bool {

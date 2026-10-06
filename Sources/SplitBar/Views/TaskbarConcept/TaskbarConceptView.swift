@@ -666,6 +666,15 @@ final class TaskbarConceptState: ObservableObject {
     @Published var hideMacDock = false {
         didSet { UserDefaults.standard.set(hideMacDock, forKey: "dock.hidden") }
     }
+    @Published var showWifiName = false {
+        didSet { UserDefaults.standard.set(showWifiName, forKey: "status.showWifiName") }
+    }
+    @Published var showBluetoothDevices = false {
+        didSet {
+            UserDefaults.standard.set(showBluetoothDevices, forKey: "status.showBluetoothDevices")
+            systemStatusService.bluetoothDeviceMonitoringEnabled = showBluetoothDevices
+        }
+    }
     @Published var previewBundleID: String?
     @Published var systemMetrics: SystemMetrics?
     @Published var weather = WeatherState.defaultSample()
@@ -801,6 +810,9 @@ final class TaskbarConceptState: ObservableObject {
         }
         showWindowPreviews = defaults.bool(forKey: "taskbar.windowPreviews")
         hideMacDock = defaults.bool(forKey: "dock.hidden")
+        showWifiName = defaults.bool(forKey: "status.showWifiName")
+        showBluetoothDevices = defaults.bool(forKey: "status.showBluetoothDevices")
+        systemStatusService.bluetoothDeviceMonitoringEnabled = showBluetoothDevices
         hiddenQuickSettingTitles = Set(
             (defaults.string(forKey: "quickSettings.hiddenTiles") ?? "")
                 .split(separator: "|")
@@ -943,6 +955,10 @@ final class TaskbarConceptState: ObservableObject {
         systemStatus = snapshot
     }
 
+    fileprivate func setBluetoothDeviceConnected(_ connected: Bool, address: String) {
+        systemStatusService.setBluetoothDeviceConnected(connected, address: address)
+    }
+
     fileprivate func resetPersonalisation() {
         surfaceStyle = .glass
         usesDockPresentation = false
@@ -1022,6 +1038,8 @@ struct TaskbarFlyoutContentView: View {
                 runningIndicatorColor: $model.runningIndicatorColor,
                 minimizeMode: $model.minimizeMode,
                 contextMenuStyle: $model.contextMenuStyle,
+                showWifiName: $model.showWifiName,
+                showBluetoothDevices: $model.showBluetoothDevices,
                 taskbarIconSize: $model.taskbarIconSize,
                 trashPlacement: $model.trashPlacement,
                 panelWidths: $model.panelWidths,
@@ -1331,6 +1349,8 @@ public struct TaskbarConceptView: View {
                         runningIndicatorColor: $model.runningIndicatorColor,
                         minimizeMode: $model.minimizeMode,
                         contextMenuStyle: $model.contextMenuStyle,
+                        showWifiName: $model.showWifiName,
+                        showBluetoothDevices: $model.showBluetoothDevices,
                         taskbarIconSize: $model.taskbarIconSize,
                         trashPlacement: $model.trashPlacement,
                         panelWidths: $model.panelWidths,
@@ -3140,6 +3160,9 @@ private struct MediaWidget: View {
 
 private struct BluetoothWidget: View {
     let powerOn: Bool
+    let monitoringEnabled: Bool
+    let devices: [BluetoothDeviceInfo]
+    let onToggleDevice: (Bool, String) -> Void
 
     var body: some View {
         WidgetCard(title: "Bluetooth devices", symbol: "bluetooth", tint: .blue) {
@@ -3152,10 +3175,37 @@ private struct BluetoothWidget: View {
                         .font(.system(size: 10, weight: .semibold))
                     Spacer(minLength: 0)
                 }
-                Text("Pairing and per-device batteries arrive with the Bluetooth panel.")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(devices, id: \.address) { device in
+                    Button {
+                        onToggleDevice(!device.connected, device.address)
+                    } label: {
+                        HStack(spacing: 9) {
+                            Circle()
+                                .fill(device.connected ? Color.blue : Color.secondary.opacity(0.45))
+                                .frame(width: 6, height: 6)
+                            Text(device.name)
+                                .font(.system(size: 10, weight: .medium))
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
+                            Text(device.connected ? "Connected" : "Tap to connect")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                if monitoringEnabled && devices.isEmpty {
+                    Text("No paired devices found. Enable Bluetooth access when prompted.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if !monitoringEnabled {
+                    Text("Pairing and per-device batteries arrive with the Bluetooth panel.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -3323,14 +3373,21 @@ private struct ControlsFlyout: View {
                         .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .topLeading)
                         statusReadoutTile(
                             title: "Wi-Fi",
-                            detail: model.systemStatus.wifiOn ? "On · \(model.systemStatus.wifiBars)/3 bars" : "Off",
+                            detail: wifiDetailText,
                             symbol: model.systemStatus.wifiOn ? "wifi" : "wifi.slash",
                             isOn: model.systemStatus.wifiOn
                         )
                         .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112)
                     }
 
-                    BluetoothWidget(powerOn: model.systemStatus.bluetoothOn)
+                    BluetoothWidget(
+                        powerOn: model.systemStatus.bluetoothOn,
+                        monitoringEnabled: model.showBluetoothDevices,
+                        devices: model.systemStatus.bluetoothDevices,
+                        onToggleDevice: { connected, address in
+                            model.setBluetoothDeviceConnected(connected, address: address)
+                        }
+                    )
 
                     LazyVGrid(columns: gridColumns, spacing: 6) {
                         ForEach(quickSettings.filter { visibleQuickSettings.contains($0.title) }) { setting in
@@ -3424,6 +3481,16 @@ private struct ControlsFlyout: View {
             hiddenTitles.insert(title)
         }
         model.hiddenQuickSettingTitles = hiddenTitles
+    }
+
+    private var wifiDetailText: String {
+        guard model.systemStatus.wifiOn else { return "Off" }
+        if model.showWifiName,
+           let ssid = model.systemStatus.wifiSSID,
+           !ssid.isEmpty {
+            return ssid
+        }
+        return "On · \(model.systemStatus.wifiBars)/3 bars"
     }
 
     private func statusReadoutTile(
@@ -3904,6 +3971,8 @@ private struct SettingsFlyout: View {
     @Binding var runningIndicatorColor: Color
     @Binding var minimizeMode: AppMinimizeMode
     @Binding var contextMenuStyle: ContextMenuStyle
+    @Binding var showWifiName: Bool
+    @Binding var showBluetoothDevices: Bool
     @Binding var taskbarIconSize: TaskbarIconSize
     @Binding var trashPlacement: TrashPlacement
     @Binding var panelWidths: [PanelKind: CGFloat]
@@ -4108,6 +4177,30 @@ private struct SettingsFlyout: View {
                     Text("Window previews")
                         .font(.system(size: 11, weight: .medium))
                     Text("Live thumbnails on icon hover. Needs Screen Recording; icon fallback otherwise.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+            .padding(.top, 2)
+            Toggle(isOn: $showWifiName) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Show Wi-Fi network name")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Needs Location; macOS prompts once on first read.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+            .padding(.top, 2)
+            Toggle(isOn: $showBluetoothDevices) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Bluetooth devices")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Lists paired devices with tap-to-connect. Prompts for Bluetooth on first read; per-device batteries have no public API.")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

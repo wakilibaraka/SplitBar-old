@@ -260,6 +260,10 @@ tested.
 - [x] Live Now Playing binding: board card renders the polled AppleScript
   state with idle card, progress bar, and working play/pause through the
   existing off-main transport; updates publish only on change.
+- [x] Wi-Fi SSID and Bluetooth devices behind opt-in toggles (both default
+  off): SSID resolves only when Location grants it, paired-device list with
+  tap-to-connect via public IOBluetooth, honest empty states. No public API
+  exists for per-device batteries — documented, not faked.
 - [x] Dock persist/restore infrastructure with default-OFF opt-in: original
   orientation/autohide persist to disk before any mutation, restore on
   terminate plus SIGTERM/SIGINT traps plus launch-time crash recovery,
