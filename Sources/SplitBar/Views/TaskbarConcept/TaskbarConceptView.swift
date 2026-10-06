@@ -548,6 +548,8 @@ final class TaskbarConceptState: ObservableObject {
     }
     @Published fileprivate var systemStatus = SystemStatusSnapshot.placeholder()
     private let systemStatusService = SystemStatusService()
+    @Published fileprivate var topProcesses: [TopProcess] = []
+    private let processSampleQueue = DispatchQueue(label: "com.baraka.splitbar.topprocesses", qos: .utility)
     @Published fileprivate var panelWidths: [PanelKind: CGFloat] = [:] {
         didSet {
             UserDefaults.standard.set(
@@ -664,6 +666,51 @@ final class TaskbarConceptState: ObservableObject {
         )
         systemStatusService.startMonitoring(interval: 10.0) { [weak self] snapshot in
             self?.systemStatus = snapshot
+        }
+        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.sampleTopProcessesIfNeeded()
+            }
+        }
+    }
+
+    fileprivate func sampleTopProcessesIfNeeded() {
+        guard openPanel == .start else { return }
+        processSampleQueue.async { [weak self] in
+            let sampled = Self.sampleTopProcesses()
+            DispatchQueue.main.async {
+                self?.topProcesses = sampled
+            }
+        }
+    }
+
+    nonisolated private static func sampleTopProcesses() -> [TopProcess] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/ps")
+        process.arguments = ["-axo", "comm,pcpu,rss"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard let output = String(data: data, encoding: .utf8) else { return [] }
+            var rows: [TopProcess] = []
+            for line in output.components(separatedBy: "\n").dropFirst() {
+                let parts = line.split(separator: " ", omittingEmptySubsequences: true)
+                guard parts.count >= 3,
+                      let cpu = Double(parts[parts.count - 2]),
+                      let rssKB = Double(parts[parts.count - 1])
+                else {
+                    continue
+                }
+                let name = parts.dropLast(2).joined(separator: " ")
+                guard !name.isEmpty else { continue }
+                rows.append(TopProcess(name: name, cpuPercent: cpu, memoryMB: rssKB / 1024))
+            }
+            return Array(rows.sorted { $0.cpuPercent > $1.cpuPercent }.prefix(5))
+        } catch {
+            return []
         }
     }
 
@@ -2139,6 +2186,80 @@ private struct SystemResourcesWidget: View {
     }
 }
 
+private struct TopProcess: Equatable {
+    let name: String
+    let cpuPercent: Double
+    let memoryMB: Double
+}
+
+private struct LauncherProcessesCard: View {
+    let processes: [TopProcess]
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Processes")
+                    .font(.system(size: 11, weight: .semibold))
+                Spacer(minLength: 4)
+                Text("LIVE")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.green)
+            }
+            HStack {
+                Text("PROCESS")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("CORE")
+                    .frame(width: 44, alignment: .trailing)
+                Text("MEM")
+                    .frame(width: 52, alignment: .trailing)
+            }
+            .font(.system(size: 8, weight: .bold))
+            .foregroundStyle(.secondary)
+            if processes.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 12)
+            } else {
+                VStack(spacing: 7) {
+                    ForEach(0..<processes.count, id: \.self) { index in
+                        processRow(processes[index])
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.045),
+            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+        )
+    }
+
+    private func processRow(_ process: TopProcess) -> some View {
+        HStack {
+            Text(process.name)
+                .font(.system(size: 9, weight: .medium))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(String(format: "%.1f%%", process.cpuPercent))
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(.green)
+                .frame(width: 44, alignment: .trailing)
+            Text(memoryText(process.memoryMB))
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+                .frame(width: 52, alignment: .trailing)
+        }
+    }
+
+    private func memoryText(_ mb: Double) -> String {        if mb >= 1024 {
+            return String(format: "%.1f GB", mb / 1024)
+        }
+        return String(format: "%.0f MB", mb)
+    }
+}
+
 private struct LauncherBackgroundAppsCard: View {
     private let backgroundApps: [(String, String, Color)] = [
         ("Browser", "1.2 GB", .blue),
@@ -3556,8 +3677,88 @@ private struct StartFlyout: View {
         }
     }
 
-    private func catalogAppCell(_ app: ApplicationDescriptor) -> some View {
+    private func pinnedCell(_ app: LauncherApp) -> some View {
         Button {
+            if isEditingPins {
+                model.setPinned(app.bundleIdentifier, isPinned: false)
+            } else {
+                onLaunchApplication(app.bundleIdentifier)
+            }
+        } label: {
+            VStack(spacing: 8) {
+                MacOSAppIcon(
+                    bundleIdentifier: app.bundleIdentifier,
+                    fallbackSymbol: app.symbol,
+                    fallbackColor: app.color,
+                    size: 34
+                )
+                .frame(width: 54, height: 54)
+                .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 15))
+                Text(app.title).font(.system(size: 10, weight: .medium))
+            }
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .topTrailing) {
+                if isEditingPins {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.red)
+                        .offset(x: 2, y: -2)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func pinEditCell(_ app: LauncherApp) -> some View {        let isPinned = model.pinnedAppBundleIDs.contains(app.bundleIdentifier)
+        return Button {
+            model.setPinned(app.bundleIdentifier, isPinned: !isPinned)
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: isPinned ? "pin.fill" : "plus")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(isPinned ? accent : .secondary)
+                Text(app.title)
+                    .font(.system(size: 9, weight: .medium))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 6)
+            .background(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.045), in: RoundedRectangle(cornerRadius: 7))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isPinned && model.pinnedAppBundleIDs.count >= 8)
+        .opacity(!isPinned && model.pinnedAppBundleIDs.count >= 8 ? 0.45 : 1)
+    }
+
+    private func folderCell(_ folder: LauncherFolder) -> some View {        Button {
+            if let url = folder.url {
+                NSWorkspace.shared.open(url)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: folder.symbol)
+                    .font(.system(size: 13))
+                    .foregroundStyle(folder.tint)
+                    .frame(width: 26, height: 26)
+                    .background(folder.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                Text(folder.title)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 42)
+            .background(
+                Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.05),
+                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func catalogAppCell(_ app: ApplicationDescriptor) -> some View {        Button {
             onLaunchApplication(app.bundleIdentifier)
         } label: {
             VStack(spacing: 8) {
@@ -3758,35 +3959,7 @@ private struct StartFlyout: View {
 
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 19) {
                         ForEach(Array(pinnedApps.prefix(4))) { app in
-                            Button {
-                                if isEditingPins {
-                                    model.setPinned(app.bundleIdentifier, isPinned: false)
-                                } else {
-                                    onLaunchApplication(app.bundleIdentifier)
-                                }
-                            } label: {
-                                VStack(spacing: 8) {
-                                    MacOSAppIcon(
-                                        bundleIdentifier: app.bundleIdentifier,
-                                        fallbackSymbol: app.symbol,
-                                        fallbackColor: app.color,
-                                        size: 34
-                                    )
-                                    .frame(width: 54, height: 54)
-                                    .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 15))
-                                    Text(app.title).font(.system(size: 10, weight: .medium))
-                                }
-                                .frame(maxWidth: .infinity)
-                                .overlay(alignment: .topTrailing) {
-                                    if isEditingPins {
-                                        Image(systemName: "minus.circle.fill")
-                                            .font(.system(size: 13))
-                                            .foregroundStyle(.red)
-                                            .offset(x: 2, y: -2)
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
+                            pinnedCell(app)
                         }
                     }
 
@@ -3812,26 +3985,7 @@ private struct StartFlyout: View {
 
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
                             ForEach(apps) { app in
-                                let isPinned = model.pinnedAppBundleIDs.contains(app.bundleIdentifier)
-                                Button {
-                                    model.setPinned(app.bundleIdentifier, isPinned: !isPinned)
-                                } label: {
-                                    HStack(spacing: 5) {
-                                        Image(systemName: isPinned ? "pin.fill" : "plus")
-                                            .font(.system(size: 8, weight: .semibold))
-                                            .foregroundStyle(isPinned ? accent : .secondary)
-                                        Text(app.title)
-                                            .font(.system(size: 9, weight: .medium))
-                                            .lineLimit(1)
-                                        Spacer(minLength: 0)
-                                    }
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 6)
-                                    .background(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.045), in: RoundedRectangle(cornerRadius: 7))
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(!isPinned && model.pinnedAppBundleIDs.count >= 8)
-                                .opacity(!isPinned && model.pinnedAppBundleIDs.count >= 8 ? 0.45 : 1)
+                                pinEditCell(app)
                             }
                         }
                     }
@@ -3853,59 +4007,11 @@ private struct StartFlyout: View {
 
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
                         ForEach(folders) { folder in
-                            Button {
-                                if let url = folder.url {
-                                    NSWorkspace.shared.open(url)
-                                }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: folder.symbol)
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(folder.tint)
-                                        .frame(width: 26, height: 26)
-                                        .background(folder.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                                    Text(folder.title)
-                                        .font(.system(size: 10, weight: .medium))
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.85)
-                                    Spacer(minLength: 0)
-                                }
-                                .padding(.horizontal, 8)
-                                .frame(height: 42)
-                                .background(
-                                    Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.05),
-                                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                )
-                            }
-                            .buttonStyle(.plain)
+                            folderCell(folder)
                         }
                     }
 
-                    Text("All programs")
-                        .font(.system(size: 13, weight: .semibold))
-                        .padding(.top, 7)
-
-                    ForEach([
-                        ("A", "Accessibility", "figure.walk"),
-                        ("C", "Calculator", "calculator.fill"),
-                        ("F", "Files", "folder.fill"),
-                        ("M", "Media", "play.rectangle.fill"),
-                        ("N", "Notes", "note.text")
-                    ], id: \.1) { letter, name, symbol in
-                        HStack(spacing: 8) {
-                            Text(letter)
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(accent)
-                                .frame(width: 20, height: 20)
-                                .background(accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
-                            Image(systemName: symbol)
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                            Text(name)
-                                .font(.system(size: 9, weight: .medium))
-                            Spacer()
-                        }
-                    }
+                    LauncherProcessesCard(processes: model.topProcesses)
 
                     Spacer(minLength: 0)
                 }

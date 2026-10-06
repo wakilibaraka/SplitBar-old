@@ -68,6 +68,8 @@ explicit user controls.
   catalog apps once per open with A-Z/Category grouping, live search filter,
   cached icons, and tap-to-launch. Categories come from
   LSApplicationCategoryType; dockbar patterns reimplemented cleanly.
+- [x] Launcher Processes card replaces the static All-programs placeholder:
+  live top-5 CPU table sampled every 5 s only while the launcher is open.
   name with avatar (CBIdentity, initials fallback) instead of "Your profile",
   a gear button jumping straight to Personalisation, and a power menu with
   Lock, Sleep, Restart, Shut Down, and Log Out — icons on the left, destructive
