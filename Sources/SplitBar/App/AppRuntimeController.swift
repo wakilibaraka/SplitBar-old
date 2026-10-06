@@ -405,6 +405,9 @@ public final class AppRuntimeController {
             },
             onTaskbarIconClick: { [weak self] bundleIdentifier in
                 self?.handleTaskbarIconClick(bundleIdentifier: bundleIdentifier)
+            },
+            onTaskbarTileAction: { [weak self] action in
+                self?.handleTaskbarTileAction(action)
             }
         )
         taskbarPanelController.show(content: AnyView(content), height: taskbarConceptState.taskbarHeight)
@@ -527,6 +530,9 @@ public final class AppRuntimeController {
                 },
                 onTaskbarIconClick: { [weak self] bundleIdentifier in
                     self?.handleTaskbarIconClick(bundleIdentifier: bundleIdentifier)
+                },
+                onTaskbarTileAction: { [weak self] action in
+                    self?.handleTaskbarTileAction(action)
                 }
             )
             let hostingView = NSHostingView(rootView: conceptView)
@@ -717,6 +723,28 @@ public final class AppRuntimeController {
             app.hide()
         } else {
             app.activate()
+        }
+    }
+
+    func handleTaskbarTileAction(_ action: TaskbarTileAction) {
+        switch action {
+        case .revealInFinder(let bundleID):
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        case .hideApp(let bundleID):
+            NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleID })?.hide()
+        case .quitApp(let bundleID):
+            NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleID })?.terminate()
+        case .newWindow(let bundleID):
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = ["-n", url.path]
+            try? process.run()
+        case .togglePin(let bundleID):
+            taskbarConceptState.togglePinned(bundleID)
+        case .openRecent(let url):
+            NSWorkspace.shared.open(url)
         }
     }
 

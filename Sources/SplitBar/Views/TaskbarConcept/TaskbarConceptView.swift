@@ -441,6 +441,29 @@ enum AppMinimizeMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum ContextMenuStyle: String, CaseIterable, Identifiable {
+    case native
+    case windows
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .native: "Native"
+        case .windows: "Windows"
+        }
+    }
+}
+
+enum TaskbarTileAction {
+    case revealInFinder(bundleID: String)
+    case hideApp(bundleID: String)
+    case quitApp(bundleID: String)
+    case newWindow(bundleID: String)
+    case togglePin(bundleID: String)
+    case openRecent(URL)
+}
+
 enum PanelKind: String, CaseIterable, Identifiable {
     case start
     case widgets
@@ -633,6 +656,9 @@ final class TaskbarConceptState: ObservableObject {
     @Published var minimizeMode = AppMinimizeMode.hide {
         didSet { UserDefaults.standard.set(minimizeMode.rawValue, forKey: "taskbar.minimizeMode") }
     }
+    @Published var contextMenuStyle = ContextMenuStyle.native {
+        didSet { UserDefaults.standard.set(contextMenuStyle.rawValue, forKey: "taskbar.menuStyle") }
+    }
     @Published var systemMetrics: SystemMetrics?
     @Published var networkPeakIn: Double = 0
     @Published var networkPeakOut: Double = 0
@@ -753,6 +779,9 @@ final class TaskbarConceptState: ObservableObject {
         if let savedMinimizeMode = defaults.string(forKey: "taskbar.minimizeMode").flatMap(AppMinimizeMode.init(rawValue:)) {
             minimizeMode = savedMinimizeMode
         }
+        if let savedMenuStyle = defaults.string(forKey: "taskbar.menuStyle").flatMap(ContextMenuStyle.init(rawValue:)) {
+            contextMenuStyle = savedMenuStyle
+        }
         hiddenQuickSettingTitles = Set(
             (defaults.string(forKey: "quickSettings.hiddenTiles") ?? "")
                 .split(separator: "|")
@@ -872,6 +901,10 @@ final class TaskbarConceptState: ObservableObject {
         pinnedAppBundleIDs = updated
     }
 
+    func togglePinned(_ bundleID: String) {
+        setPinned(bundleID, isPinned: !pinnedAppBundleIDs.contains(bundleID))
+    }
+
     fileprivate func resetPersonalisation() {
         surfaceStyle = .glass
         usesDockPresentation = false
@@ -959,6 +992,7 @@ struct TaskbarPanelContentView: View {
     @ObservedObject var model: TaskbarConceptState
     let onLaunchApplication: (String) -> Void
     let onTaskbarIconClick: (String) -> Void
+    let onTaskbarTileAction: (TaskbarTileAction) -> Void
 
     var body: some View {
         Taskbar(
@@ -984,8 +1018,10 @@ struct TaskbarPanelContentView: View {
             indicatorStyle: model.runningIndicatorStyle,
             indicatorSize: model.runningIndicatorSize,
             indicatorColor: model.runningIndicatorColor,
+            menuStyle: model.contextMenuStyle,
             onLaunchApplication: onLaunchApplication,
-            onTaskbarIconClick: onTaskbarIconClick
+            onTaskbarIconClick: onTaskbarIconClick,
+            onTaskbarTileAction: onTaskbarTileAction
         )
         .environment(\.surfaceTransparency, model.interfaceTransparency)
         .preferredColorScheme(model.isDarkMode ? .dark : .light)
@@ -996,11 +1032,13 @@ public struct TaskbarConceptView: View {
     @ObservedObject private var model: TaskbarConceptState
     private let onLaunchApplication: (String) -> Void
     private let onTaskbarIconClick: (String) -> Void
+    private let onTaskbarTileAction: (TaskbarTileAction) -> Void
 
-    init(model: TaskbarConceptState, onLaunchApplication: @escaping (String) -> Void, onTaskbarIconClick: @escaping (String) -> Void) {
+    init(model: TaskbarConceptState, onLaunchApplication: @escaping (String) -> Void, onTaskbarIconClick: @escaping (String) -> Void, onTaskbarTileAction: @escaping (TaskbarTileAction) -> Void) {
         self._model = ObservedObject(wrappedValue: model)
         self.onLaunchApplication = onLaunchApplication
         self.onTaskbarIconClick = onTaskbarIconClick
+        self.onTaskbarTileAction = onTaskbarTileAction
     }
 
     private var openPanel: OpenPanel? {
@@ -1186,8 +1224,10 @@ public struct TaskbarConceptView: View {
                     indicatorStyle: model.runningIndicatorStyle,
                     indicatorSize: model.runningIndicatorSize,
                     indicatorColor: model.runningIndicatorColor,
+                    menuStyle: model.contextMenuStyle,
                     onLaunchApplication: onLaunchApplication,
-                    onTaskbarIconClick: onTaskbarIconClick
+                    onTaskbarIconClick: onTaskbarIconClick,
+                    onTaskbarTileAction: onTaskbarTileAction
                 )
                 .zIndex(3)
             }
@@ -1296,8 +1336,10 @@ private struct Taskbar: View {
     let indicatorStyle: RunningIndicatorStyle
     let indicatorSize: RunningIndicatorSize
     let indicatorColor: Color
+    let menuStyle: ContextMenuStyle
     let onLaunchApplication: (String) -> Void
     let onTaskbarIconClick: (String) -> Void
+    let onTaskbarTileAction: (TaskbarTileAction) -> Void
 
     private var glyphSize: CGFloat { height * iconSize.glyphFraction }
     private var tileSide: CGFloat { max(28, height - 4) }
@@ -1514,6 +1556,103 @@ private struct Taskbar: View {
         }
         .buttonStyle(.plain)
         .help(app?.title ?? bundleIdentifier)
+        .contextMenu {
+            tileContextMenu(bundleIdentifier)
+        }
+    }
+
+    @ViewBuilder
+    private func tileContextMenu(_ bundleIdentifier: String) -> some View {
+        switch menuStyle {
+        case .native:
+            nativeTileMenu(bundleIdentifier)
+        case .windows:
+            windowsTileMenu(bundleIdentifier)
+        }
+    }
+
+    @ViewBuilder
+    private func nativeTileMenu(_ bundleIdentifier: String) -> some View {
+        let isRunning = runningBundleIDs.contains(bundleIdentifier)
+        Button(isRunning ? "Activate" : "Open") {
+            onTaskbarIconClick(bundleIdentifier)
+        }
+        Button("Show in Finder") {
+            onTaskbarTileAction(.revealInFinder(bundleID: bundleIdentifier))
+        }
+        if isRunning {
+            Divider()
+            Button("Hide") {
+                onTaskbarTileAction(.hideApp(bundleID: bundleIdentifier))
+            }
+            Button("Quit") {
+                onTaskbarTileAction(.quitApp(bundleID: bundleIdentifier))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func windowsTileMenu(_ bundleIdentifier: String) -> some View {
+        let isRunning = runningBundleIDs.contains(bundleIdentifier)
+        let isPinned = pinnedBundleIDs.contains(bundleIdentifier)
+        Button("Open") {
+            onTaskbarIconClick(bundleIdentifier)
+        }
+        Button("Open new window") {
+            onTaskbarTileAction(.newWindow(bundleID: bundleIdentifier))
+        }
+        Button("Open file location") {
+            onTaskbarTileAction(.revealInFinder(bundleID: bundleIdentifier))
+        }
+        let windows = AppWindowPreviewService().windows(
+            forBundleIdentifier: bundleIdentifier,
+            appName: LauncherDefaults.apps.first { $0.bundleIdentifier == bundleIdentifier }?.title ?? bundleIdentifier
+        )
+        if !windows.isEmpty {
+            Divider()
+            ForEach(windows.prefix(5)) { window in
+                Button(window.title) {
+                    AppWindowPreviewService().focusWindow(info: window, bundleIdentifier: bundleIdentifier)
+                }
+            }
+        }
+        let recents = recentDocuments(for: bundleIdentifier)
+        if !recents.isEmpty {
+            Divider()
+            Menu("Recent") {
+                ForEach(recents, id: \.self) { url in
+                    Button(url.deletingPathExtension().lastPathComponent) {
+                        onTaskbarTileAction(.openRecent(url))
+                    }
+                }
+            }
+        }
+        Divider()
+        Button(isPinned ? "Unpin from taskbar" : "Pin to taskbar") {
+            onTaskbarTileAction(.togglePin(bundleID: bundleIdentifier))
+        }
+        if isRunning {
+            Button("Quit") {
+                onTaskbarTileAction(.quitApp(bundleID: bundleIdentifier))
+            }
+        }
+    }
+
+    private func recentDocuments(for bundleIdentifier: String) -> [URL] {
+        let recents = NSDocumentController.shared.recentDocumentURLs
+        var matches: [URL] = []
+        for url in recents.prefix(20) {
+            guard let appURL = NSWorkspace.shared.urlForApplication(toOpen: url),
+                  Bundle(url: appURL)?.bundleIdentifier == bundleIdentifier
+            else {
+                continue
+            }
+            matches.append(url)
+            if matches.count >= 5 {
+                break
+            }
+        }
+        return matches
     }
 
     private func runningIndicator(isFrontmost: Bool) -> some View {

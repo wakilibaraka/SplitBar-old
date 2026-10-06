@@ -74,6 +74,10 @@ explicit user controls.
   pinned bottom.
 - [x] Pinned drag reorder in the launcher (unpin already exists via Edit mode
   and lands in context menus next).
+- [x] Right-click tile menus in Native (Open/Activate, Show in Finder, Hide,
+  Quit) and Windows (Open, new window, file location, window list, filtered
+  recents, pin/unpin, Quit) styles, default Native; all actions on public API
+  with per-window focus falling back to app activation.
 - [x] Launcher Processes card replaces the static All-programs placeholder:
   live top-5 CPU table sampled every 5 s only while the launcher is open.
 - [x] Widgets board gains Date, System rings, and Network widgets with live
