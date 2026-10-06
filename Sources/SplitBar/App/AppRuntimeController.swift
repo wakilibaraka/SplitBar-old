@@ -813,6 +813,10 @@ public final class AppRuntimeController {
         weatherService.onUpdate = { [weak self] state in
             self?.taskbarConceptState.weather = state
         }
+        taskbarConceptState.nowPlaying = nowPlayingService.currentState
+        taskbarConceptState.onTogglePlayback = { [weak self] in
+            self?.nowPlayingService.togglePlayPause()
+        }
     }
 
     private func setupClipboardMonitoring() {
@@ -1161,8 +1165,11 @@ public final class AppRuntimeController {
     }
 
     private func startPlaybackStreaming(interval: TimeInterval) {
-        nowPlayingService.startMonitoring(interval: interval) { [weak self] _ in
+        nowPlayingService.startMonitoring(interval: interval) { [weak self] state in
             guard let self else { return }
+            if state != self.taskbarConceptState.nowPlaying {
+                self.taskbarConceptState.nowPlaying = state
+            }
             self.updateDockContent()
             if self.activeFlyoutWidgetID == "now_playing",
                let activeID = self.state.flyout.activeItemID {

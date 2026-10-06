@@ -665,6 +665,8 @@ final class TaskbarConceptState: ObservableObject {
     @Published var previewBundleID: String?
     @Published var systemMetrics: SystemMetrics?
     @Published var weather = WeatherState.defaultSample()
+    @Published var nowPlaying = NowPlayingState.idle()
+    var onTogglePlayback: (() -> Void)?
     @Published var networkPeakIn: Double = 0
     @Published var networkPeakOut: Double = 0
     private let processSampleQueue = DispatchQueue(label: "com.baraka.splitbar.topprocesses", qos: .utility)
@@ -714,7 +716,6 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var volume: Double = 0.68
     @Published fileprivate var appVolume: Double = 0.52
     @Published fileprivate var brightness: Double = 0.82
-    @Published fileprivate var isPlaying = false
 
     init() {
         let defaults = UserDefaults.standard
@@ -3026,36 +3027,62 @@ private struct MediaWidget: View {
     @ObservedObject var model: TaskbarConceptState
     let contentHeight: CGFloat
 
+    private var isIdle: Bool { model.nowPlaying == .idle() }
+
     var body: some View {
         WidgetCard(title: "Now playing", symbol: "music.note", tint: .purple, minContentHeight: contentHeight) {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 9)
-                    .fill(LinearGradient(colors: [.purple.opacity(0.8), .pink.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .overlay {
-                        Image(systemName: "waveform")
-                            .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    RoundedRectangle(cornerRadius: 9)
+                        .fill(LinearGradient(colors: [.purple.opacity(0.8), .pink.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .overlay {
+                            Image(systemName: isIdle ? "music.note" : "waveform")
+                                .foregroundStyle(.white)
+                        }
+                        .frame(width: 43, height: 43)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(isIdle ? "Nothing playing" : model.nowPlaying.trackTitle)
+                            .font(.system(size: 10, weight: .semibold))
+                            .lineLimit(1)
+                        Text(isIdle ? "Play Music or Spotify" : nowPlayingSubtitle)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
-                    .frame(width: 43, height: 43)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Close to You")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text("Reality Club")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    Button {
+                        model.onTogglePlayback?()
+                    } label: {
+                        Image(systemName: model.nowPlaying.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 30, height: 30)
+                            .background(Color.white.opacity(0.75), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.roseAccent)
+                    .disabled(model.onTogglePlayback == nil && !isIdle)
                 }
-                Spacer(minLength: 0)
-                Button {
-                    model.isPlaying.toggle()
-                } label: {
-                    Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 30, height: 30)
-                        .background(Color.white.opacity(0.75), in: Circle())
+                if !isIdle, model.nowPlaying.duration > 0 {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.primary.opacity(0.08))
+                            Capsule()
+                                .fill(Color.purple.opacity(0.8))
+                                .frame(width: geometry.size.width * CGFloat(model.nowPlaying.progressFraction))
+                        }
+                    }
+                    .frame(height: 4)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.roseAccent)
             }
         }
+    }
+
+    private var nowPlayingSubtitle: String {
+        let artist = model.nowPlaying.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        if artist.isEmpty {
+            return model.nowPlaying.playerSource
+        }
+        return "\(artist) · \(model.nowPlaying.playerSource)"
     }
 }
 

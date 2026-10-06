@@ -250,6 +250,9 @@ tested.
   Codable disk cache served stale across launches and failures, offline/sample
   states in the UI, and the fabricated humidity/wind buttons removed. Verified
   live against the local area.
+- [x] Live Now Playing binding: board card renders the polled AppleScript
+  state with idle card, progress bar, and working play/pause through the
+  existing off-main transport; updates publish only on change.
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.
