@@ -724,6 +724,9 @@ enum TaskbarTileAction {
     case newWindow(bundleID: String)
     case togglePin(bundleID: String)
     case openRecent(URL)
+    case addDivider(afterBundleID: String)
+    case removeDivider(afterBundleID: String)
+    case moveDivider(id: UUID, afterBundleID: String)
 }
 
 enum PanelKind: String, CaseIterable, Identifiable {
@@ -1443,6 +1446,8 @@ struct TaskbarFlyoutContentView: View {
                 surfaceStyle: $model.surfaceStyle,
                 taskbarMode: $model.taskbarMode,
                 islandGap: $model.islandGap,
+                userDividers: $model.userDividers,
+                pinnedAppBundleIDs: model.pinnedAppBundleIDs,
                 isDarkMode: $model.isDarkMode,
                 wallpaperPreset: $model.wallpaperPreset,
                 pastelTint: $model.pastelTint,
@@ -1740,6 +1745,8 @@ public struct TaskbarConceptView: View {
                         surfaceStyle: $model.surfaceStyle,
                         taskbarMode: $model.taskbarMode,
                         islandGap: $model.islandGap,
+                        userDividers: $model.userDividers,
+                        pinnedAppBundleIDs: model.pinnedAppBundleIDs,
                         isDarkMode: $model.isDarkMode,
                         wallpaperPreset: $model.wallpaperPreset,
                         pastelTint: $model.pastelTint,
@@ -1975,6 +1982,7 @@ struct TaskbarIslandContent: View {
             previewsEnabled: model.showWindowPreviews,
             previewBundleID: $model.previewBundleID,
             clusterOrder: model.clusterOrder,
+            dividers: model.userDividers,
             onTaskbarIconClick: onTaskbarIconClick,
             onTaskbarTileAction: onTaskbarTileAction,
             onToggleControls: { model.openPanel = model.openPanel == .controls ? nil : .controls },
@@ -2116,6 +2124,7 @@ private struct TaskbarTiles {
     let previewsEnabled: Bool
     var previewBundleID: Binding<String?>
     let clusterOrder: [String]
+    let dividers: [TaskbarDivider]
     let onTaskbarIconClick: (String) -> Void
     let onTaskbarTileAction: (TaskbarTileAction) -> Void
     let onToggleControls: () -> Void
@@ -2199,6 +2208,34 @@ private struct TaskbarTiles {
                 onTaskbarTileAction(.quitApp(bundleID: bundleIdentifier))
             }
         }
+        dividerMenu(for: bundleIdentifier)
+    }
+
+    @ViewBuilder
+    private func dividerMenu(for bundleIdentifier: String) -> some View {
+        Divider()
+        Menu("Divider") {
+            Button(hasDividerAfter(bundleIdentifier) ? "Remove divider here" : "Add divider after this app") {
+                if hasDividerAfter(bundleIdentifier) {
+                    onTaskbarTileAction(.removeDivider(afterBundleID: bundleIdentifier))
+                } else {
+                    onTaskbarTileAction(.addDivider(afterBundleID: bundleIdentifier))
+                }
+            }
+            if !dividers.isEmpty {
+                Menu("Move divider to here") {
+                    ForEach(Array(dividers.enumerated()), id: \.element.id) { index, divider in
+                        Button("Divider \(index + 1)") {
+                            onTaskbarTileAction(.moveDivider(id: divider.id, afterBundleID: bundleIdentifier))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func hasDividerAfter(_ bundleIdentifier: String) -> Bool {
+        dividers.contains { $0.anchorBundleID == bundleIdentifier }
     }
 
     @ViewBuilder
@@ -2247,6 +2284,7 @@ private struct TaskbarTiles {
                 onTaskbarTileAction(.quitApp(bundleID: bundleIdentifier))
             }
         }
+        dividerMenu(for: bundleIdentifier)
     }
 
     private func recentDocuments(for bundleIdentifier: String) -> [URL] {
@@ -2328,6 +2366,7 @@ private struct Taskbar: View {
             previewsEnabled: model.showWindowPreviews,
             previewBundleID: $model.previewBundleID,
             clusterOrder: model.clusterOrder,
+            dividers: model.userDividers,
             onTaskbarIconClick: onTaskbarIconClick,
             onTaskbarTileAction: onTaskbarTileAction,
             onToggleControls: { toggle(.controls) },
@@ -4653,6 +4692,8 @@ private struct SettingsFlyout: View {
     @Binding var surfaceStyle: SurfaceStyle
     @Binding var taskbarMode: TaskbarMode
     @Binding var islandGap: CGFloat
+    @Binding var userDividers: [TaskbarDivider]
+    let pinnedAppBundleIDs: [String]
     @Binding var isDarkMode: Bool
     @Binding var wallpaperPreset: WallpaperPreset
     @Binding var pastelTint: Color
@@ -5093,6 +5134,83 @@ private struct SettingsFlyout: View {
         }
     }
 
+    private var dividerSection: some View {
+        settingsSection("Dividers") {
+            if userDividers.isEmpty {
+                Text("No dividers. Right-click a taskbar icon and choose Divider to place one after it.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 6) {
+                    ForEach(Array(userDividers.enumerated()), id: \.element.id) { index, divider in
+                        HStack(spacing: 8) {
+                            Text("Divider \(index + 1)")
+                                .font(.system(size: 11, weight: .medium))
+                            Text(divider.anchorBundleID.map(taskbarDisplayName(for:)) ?? "End of the strip")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
+                            Menu("Move after") {
+                                ForEach(pinnedAppBundleIDs, id: \.self) { bundleID in
+                                    Button(taskbarDisplayName(for: bundleID)) {
+                                        moveDivider(divider.id, after: bundleID)
+                                    }
+                                }
+                            }
+                            .menuStyle(.borderlessButton)
+                            .frame(maxWidth: 130)
+                            Button(role: .destructive) {
+                                removeDivider(divider.id)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 10, weight: .semibold))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Remove divider")
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+            Menu {
+                ForEach(pinnedAppBundleIDs, id: \.self) { bundleID in
+                    Button(taskbarDisplayName(for: bundleID)) {
+                        addDivider(after: bundleID)
+                    }
+                }
+            } label: {
+                Label("Add divider after an app", systemImage: "plus")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .menuStyle(.borderlessButton)
+            .disabled(pinnedAppBundleIDs.isEmpty || taskbarMode == .macOS)
+        }
+    }
+
+    private func addDivider(after bundleID: String) {
+        guard taskbarMode != .macOS, !hasDividerAfter(bundleID) else { return }
+        userDividers.append(TaskbarDivider(anchorBundleID: bundleID))
+    }
+
+    private func moveDivider(_ id: UUID, after bundleID: String) {
+        guard taskbarMode != .macOS,
+              let index = userDividers.firstIndex(where: { $0.id == id })
+        else { return }
+        userDividers[index].anchorBundleID = bundleID
+    }
+
+    private func removeDivider(_ id: UUID) {
+        userDividers.removeAll { $0.id == id }
+    }
+
+    private func hasDividerAfter(_ bundleIdentifier: String) -> Bool {
+        userDividers.contains { $0.anchorBundleID == bundleIdentifier }
+    }
+
     private var appearanceSection: some View {
         settingsSection("Appearance") {
             Toggle(isOn: $isDarkMode) {
@@ -5187,6 +5305,8 @@ private struct SettingsFlyout: View {
             }
 
             quickSettingsGrid
+
+            dividerSection
 
             taskbarBehaviorSection
 

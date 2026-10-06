@@ -894,6 +894,14 @@ public final class AppRuntimeController {
             taskbarConceptState.togglePinned(bundleID)
         case .openRecent(let url):
             NSWorkspace.shared.open(url)
+        case .addDivider(let bundleID):
+            taskbarConceptState.addDivider(after: bundleID)
+        case .removeDivider(let bundleID):
+            for divider in taskbarConceptState.userDividers where divider.anchorBundleID == bundleID {
+                taskbarConceptState.removeDivider(divider.id)
+            }
+        case .moveDivider(let id, let bundleID):
+            taskbarConceptState.moveDivider(id, after: bundleID)
         }
     }
 
