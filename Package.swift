@@ -21,6 +21,14 @@ let package = Package(
             swiftSettings: [
                 .swiftLanguageMode(.v5)
             ]
+        ),
+        .testTarget(
+            name: "SplitBarTests",
+            dependencies: ["SplitBar"],
+            path: "Tests/SplitBarTests",
+            swiftSettings: [
+                .swiftLanguageMode(.v5)
+            ]
         )
     ]
 )

@@ -278,6 +278,11 @@ tested.
   restart, then full restore deleted the state file and returned all three
   values to baseline. Fixed two findings on the way: the hide path never
   restarted the Dock, and unretained signal sources swallowed SIGTERM.
+- [x] Split-bar data model: five taskbar modes, section-to-island mapping with
+  an exhaustiveness guarantee, dividers as data with orphan pruning, per-mode
+  trash anchors, and cluster order — all pure logic covered by a new
+  SplitBarTests target (6 tests green). eskele patterns adapted with
+  attribution in NOTICE.
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.

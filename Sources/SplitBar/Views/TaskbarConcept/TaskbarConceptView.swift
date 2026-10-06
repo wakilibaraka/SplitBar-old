@@ -353,7 +353,7 @@ private enum TaskbarIconSize: String, CaseIterable, Identifiable {
     }
 }
 
-private enum TrashPlacement: String, CaseIterable, Identifiable {
+enum TrashPlacement: String, CaseIterable, Identifiable {
     case withApps
     case beforeTray
     case beforeClock
@@ -368,6 +368,100 @@ private enum TrashPlacement: String, CaseIterable, Identifiable {
         case .beforeClock: "Before clock"
         case .farRight: "Far right"
         }
+    }
+}
+
+enum TaskbarMode: String, CaseIterable, Identifiable {
+    case windows
+    case macOS
+    case split3
+    case split4
+    case centered
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .windows: "Windows"
+        case .macOS: "macOS"
+        case .split3: "Split 3"
+        case .split4: "Split 4"
+        case .centered: "Centered"
+        }
+    }
+
+    var isSingleIsland: Bool {
+        switch self {
+        case .windows, .macOS, .centered: true
+        case .split3, .split4: false
+        }
+    }
+}
+
+enum TaskbarSection: String, CaseIterable, Identifiable {
+    case weather
+    case apps
+    case tray
+    case clock
+
+    var id: String { rawValue }
+
+    static func islands(for mode: TaskbarMode) -> [[TaskbarSection]] {
+        switch mode {
+        case .windows, .macOS, .centered:
+            return [[.weather, .apps, .tray, .clock]]
+        case .split3:
+            return [[.weather], [.apps], [.tray, .clock]]
+        case .split4:
+            return [[.weather], [.apps], [.tray], [.clock]]
+        }
+    }
+}
+
+struct TaskbarDivider: Identifiable, Equatable, Codable, Sendable {
+    var id: UUID
+    var anchorBundleID: String?
+
+    init(id: UUID = UUID(), anchorBundleID: String? = nil) {
+        self.id = id
+        self.anchorBundleID = anchorBundleID
+    }
+}
+
+enum StripItem: Equatable {
+    case app(String)
+    case divider(UUID)
+}
+
+enum TaskbarStrip {
+    static func compose(pins: [String], runningOrder: [String], dividers: [TaskbarDivider]) -> [StripItem] {
+        var items: [StripItem] = []
+        var seen = Set<String>()
+        for bundleID in pins + runningOrder.filter({ !pins.contains($0) }) {
+            guard seen.insert(bundleID).inserted else { continue }
+            items.append(.app(bundleID))
+            for divider in dividers where divider.anchorBundleID == bundleID {
+                items.append(.divider(divider.id))
+            }
+        }
+        for divider in dividers where divider.anchorBundleID == nil {
+            items.append(.divider(divider.id))
+        }
+        return pruned(items)
+    }
+
+    static func pruned(_ items: [StripItem]) -> [StripItem] {
+        var result: [StripItem] = []
+        for item in items {
+            if case .divider = item {
+                guard let last = result.last, case .app = last else { continue }
+            }
+            result.append(item)
+        }
+        while case .divider = result.last {
+            result.removeLast()
+        }
+        return result
     }
 }
 
@@ -638,6 +732,29 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var trashPlacement = TrashPlacement.withApps {
         didSet { UserDefaults.standard.set(trashPlacement.rawValue, forKey: "taskbar.trashPlacement") }
     }
+    @Published var taskbarMode = TaskbarMode.windows {
+        didSet { UserDefaults.standard.set(taskbarMode.rawValue, forKey: "taskbar.mode") }
+    }
+    @Published var userDividers: [TaskbarDivider] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(userDividers) {
+                UserDefaults.standard.set(data, forKey: "taskbar.dividers")
+            }
+        }
+    }
+    @Published var trashAnchors: [String: String] = [:] {
+        didSet { UserDefaults.standard.set(trashAnchors, forKey: "taskbar.trashAnchors") }
+    }
+    @Published var clusterOrder: [String] = ["downloads", "trash", "status"] {
+        didSet { UserDefaults.standard.set(clusterOrder, forKey: "taskbar.clusterOrder") }
+    }
+
+    func trashPlacement(for mode: TaskbarMode) -> TrashPlacement {
+        if let saved = trashAnchors[mode.rawValue].flatMap(TrashPlacement.init(rawValue:)) {
+            return saved
+        }
+        return trashPlacement
+    }
     @Published fileprivate var systemStatus = SystemStatusSnapshot.placeholder()
     private let systemStatusService = SystemStatusService()
     @Published fileprivate var topProcesses: [TopProcess] = []
@@ -807,6 +924,18 @@ final class TaskbarConceptState: ObservableObject {
         }
         if let savedTrashPlacement = defaults.string(forKey: "taskbar.trashPlacement").flatMap(TrashPlacement.init(rawValue:)) {
             trashPlacement = savedTrashPlacement
+        }
+        if let savedMode = defaults.string(forKey: "taskbar.mode").flatMap(TaskbarMode.init(rawValue:)) {
+            taskbarMode = savedMode
+        }
+        if let dividerData = defaults.data(forKey: "taskbar.dividers"),
+           let savedDividers = try? JSONDecoder().decode([TaskbarDivider].self, from: dividerData) {
+            userDividers = savedDividers
+        }
+        trashAnchors = defaults.dictionary(forKey: "taskbar.trashAnchors") as? [String: String] ?? [:]
+        let savedCluster = defaults.stringArray(forKey: "taskbar.clusterOrder") ?? []
+        if !savedCluster.isEmpty {
+            clusterOrder = savedCluster
         }
         showsTaskbarPanel = defaults.bool(forKey: "taskbar.panelShown")
         let savedWidths = defaults.dictionary(forKey: "panels.widths") as? [String: Double] ?? [:]

@@ -36,3 +36,9 @@ shape used by Status Trio's DDCPrivateAPI module, which itself carries the
 MIT-licensed AppleSiliconDDC notice (Copyright (c) 2021 Istvan T.). The
 implementation here is original; only the interface shape and the MIT
 attribution pattern were studied. No third-party source code is included.
+
+The taskbar strip composition (divider-as-data items with orphan pruning),
+per-display filtering discipline, and settings-driven preview discipline follow
+patterns studied from eskele by hossainalhaidari
+(https://github.com/hossainalhaidari/eskele), MIT licensed. The implementation
+here is original; no eskele source code is included.
