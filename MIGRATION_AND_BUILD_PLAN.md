@@ -217,6 +217,11 @@ tested.
   mode is on (reusing the state-preserving flyout host, per-flyout widths,
   ESC and click-outside dismissal); the preview window renders them only when
   panel mode is off.
+- [x] Dock-like floating behavior is live: the strip drops
+  `.fullScreenAuxiliary` so fullscreen Spaces hide it, a `FullscreenMonitor`
+  hides it per display on Space/app switches via `CGWindowList` scan (also
+  dismissing open flyouts), and the controller is keyed per display with only
+  the primary enabled — multi-display placement can switch the set on.
 - [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.

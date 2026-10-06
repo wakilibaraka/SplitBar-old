@@ -364,6 +364,9 @@ public final class AppRuntimeController {
     }
 
     private func setupTaskbarPanel() {
+        taskbarPanelController.onFullscreenBegan = { [weak self] in
+            self?.taskbarConceptState.openPanel = nil
+        }
         taskbarConceptState.$showsTaskbarPanel
             .removeDuplicates()
             .sink { [weak self] showsPanel in

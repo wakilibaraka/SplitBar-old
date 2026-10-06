@@ -138,3 +138,7 @@ public func edgeHandleFrame(
 public func edgePanelCollectionBehavior() -> NSWindow.CollectionBehavior {
     return [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 }
+
+public func taskbarStripCollectionBehavior() -> NSWindow.CollectionBehavior {
+    return [.canJoinAllSpaces, .stationary, .ignoresCycle]
+}
