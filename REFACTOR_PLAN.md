@@ -129,6 +129,15 @@ sharing the runtime's `Set<AnyCancellable>`.
   testable without sleeping.
 - Two `privacy: .public` log allowlist entries moved with the code, from
   `AppRuntimeController.swift` to `ClipboardCoordinator.swift`.
+- `ShortcutCoordinator` needs a route target the runtime cannot supply while it is still
+  initialising, so construction and `route(to:)` are separate. Follow this shape for
+  any coordinator that needs the runtime.
+- A service protocol that a coordinator hands to a background queue must be declared
+  `Sendable` (`ClipboardPersisting`): capturing a non-Sendable existential in a
+  `@Sendable` closure is a warning, and warnings are errors here.
+- Routing tests need a stub that behaves like the real thing: `selectItem(id:)` must
+  move the selection, or a clamp-at-the-ends rule cannot be observed.
+
 
 **Sequencing note:** do C2.1–C2.3 first. They are the ones that can ship real
 tests, which pays for the refactor. Panel and Dock coordinators move later because
@@ -263,12 +272,14 @@ and `swift test` before the commit.
 
 | Slice | Commit | Result |
 |---|---|---|
-| C2.1 | see log | `ClipboardCoordinator` extracted (`App/Coordinators/ClipboardCoordinator.swift`, 271 lines) with `ClipboardCoordinating`, `ClipboardMonitoring` and `ClipboardPersisting`. Runtime 2,763 → 2,618 lines. Nine methods and all clipboard storage left the controller. 9 new tests (45 → 54). Build clean, logging lint passes, move verified. |
-| C1.4b | see log | Flyouts extracted and `TaskbarConceptView.swift` deleted (7,800 lines total → 0): `TaskbarSurfaces.swift` (572), `Widgets/` (271 + 612), `Launcher/` (493 + 132), `QuickSettings/` (333), `Calendar/` (309 + 86), `Settings/` (289 + 1,172 + 47). Build clean, 45 tests pass, move verified. |
-| C1.4a | see log | Strip views extracted to `TaskbarStrip/`: `TaskbarStripViews.swift` (946), `TileViews.swift` (303), `TileStores.swift` (95); the chord-format and app-naming helpers moved to `Support/`. Source file 5,687 → 4,349 lines. Build clean, 45 tests pass, move verified. `TaskbarConceptView` deliberately stays until C1.4f: it references every flyout, so moving it earlier would force each later slice to widen types it is about to move anyway. |
-| C1.3 | see log | State extracted: `TaskbarState.swift` (803) holds `TaskbarConceptState` with `LauncherApp`, `LauncherFolder`, `LauncherDefaults`, `TopProcess`; `DesignSystem/ClockStyle.swift` (74) takes the clock style enums, `clockTime`, and the `Date`/`Calendar` helpers. Source file 6,546 → 5,687 lines. Build clean, 45 tests pass, move verified. |
-| C1.2 | see log | Strip model extracted: `DesignSystem/StripModel.swift` (615), `WallpaperPreset.swift` (52), `WidgetChrome.swift` (12); the widget catalogue appended to `WidgetProvider.swift` (61 → 142). Source file 7,252 → 6,546 lines. Build clean, 45 tests pass, move verified. |
-| C1.1 | see log | Design system extracted to `DesignSystem/`: `SurfaceStyle.swift` (452), `PanelStyle.swift` (97), `ColorExtensions.swift` (34). Source file 7,800 → 7,252 lines. Build clean, 45 tests pass. |
+| C2.3 | `4a58eb3` | `ShortcutCoordinator` extracted with `ShortcutCoordinating`, `ShortcutActionRouting` and `GlobalShortcutRegistering`; the 40-line routing switch left the runtime, which now conforms to `ShortcutActionRouting`. Runtime 2,611 → 2,587 lines. 9 new tests (58 → 67). |
+| C2.2 | `06b0470` | `WeatherCoordinator` extracted with `WeatherCoordinating` and `WeatherRefreshing`; the live-versus-sample decision became a tested pure function. Runtime 2,618 → 2,611 lines. 4 new tests (54 → 58). |
+| C2.1 | `c28e720` | `ClipboardCoordinator` extracted (271 lines) with `ClipboardCoordinating`, `ClipboardMonitoring` and `ClipboardPersisting`. Nine methods and all clipboard storage left the controller. Runtime 2,763 → 2,618 lines. 9 new tests (45 → 54). |
+| C1.4b | `d33bbbe` | Flyouts extracted and `TaskbarConceptView.swift` deleted (7,800 lines → 0): `TaskbarSurfaces.swift` (572), `Widgets/` (271 + 612), `Launcher/` (493 + 132), `QuickSettings/` (333), `Calendar/` (309 + 86), `Settings/` (289 + 1,172 + 47). |
+| C1.4a | `14e83a4` | Strip views extracted to `TaskbarStrip/`: `TaskbarStripViews.swift` (946), `TileViews.swift` (303), `TileStores.swift` (95); chord-format and app-naming helpers moved to `Support/`. Source file 5,687 → 4,349 lines. `TaskbarConceptView` deliberately waited for C1.4b: it references every flyout. |
+| C1.3 | `f903f4a` | State extracted: `TaskbarState.swift` (803) holds `TaskbarConceptState` with `LauncherApp`, `LauncherFolder`, `LauncherDefaults`, `TopProcess`; `DesignSystem/ClockStyle.swift` (74) takes the clock style enums, `clockTime` and the `Date`/`Calendar` helpers. Source file 6,546 → 5,687 lines. |
+| C1.2 | `4df2613` | Strip model extracted: `DesignSystem/StripModel.swift` (615), `WallpaperPreset.swift` (52), `WidgetChrome.swift` (12); the widget catalogue appended to `WidgetProvider.swift` (61 → 142). Source file 7,252 → 6,546 lines. |
+| C1.1 | `5586c2c` | Design system extracted to `DesignSystem/`: `SurfaceStyle.swift` (452), `PanelStyle.swift` (97), `ColorExtensions.swift` (34). Source file 7,800 → 7,252 lines. |
 
 **Mechanics.** `scripts/split_swift.py` performs the moves. It finds top-level
 declarations by column-0 indentation rather than brace counting, because string
