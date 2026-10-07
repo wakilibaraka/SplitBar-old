@@ -3,3 +3,10 @@
 .DS_Store
 
 dmg_stage/
+
+# release artifacts (built by scripts/build_app.sh, attached to GitHub Releases)
+*.dmg
+*.zip
+dmg_stage/
+*.dSYM
+*.xcuserstate

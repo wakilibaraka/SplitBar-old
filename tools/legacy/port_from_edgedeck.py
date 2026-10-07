@@ -1,3 +1,12 @@
+"""One-shot historical script: renamed an EdgeDeck checkout into this repo.
+
+NOT part of the build. It contains absolute paths from the original author's
+machine and will not run anywhere else. Kept only as a record of how the
+EdgeDeck sources became SplitBar sources.
+
+Usage (only meaningful on the original machine):
+    python tools/legacy/port_from_edgedeck.py
+"""
 import os
 import re
 import shutil
