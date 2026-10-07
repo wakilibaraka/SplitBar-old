@@ -40,6 +40,21 @@ For the review-driven improvement backlog, invariants and per-task status, read
 - **Panel hosts**: `TaskbarPanelController` (strip or per-island panels keyed by
   display), `FlyoutPanelController`, `EdgePanelController`. Display policy lives
   in `DisplayCoordinator` (primary display only for now).
+- **Hybrid architecture** ([HYBRID_PLAN.md](./HYBRID_PLAN.md)): AppKit for
+  shell mechanics, SwiftUI for faces, plus a Core Graphics **LayerFX** engine
+  (Phase 2, done):
+  - `LayerFX` (DesignSystem/LayerFX.swift) draws *in-bounds decoration only*
+    for 5 owned styles: neumorphism, windowsAero, classic98, claymorphism,
+    neobrutalism. Fills stay in `GlassProvider`; outer shadows stay in the
+    SwiftUI surface modifiers.
+  - `LayerFXSpec` is pure/Equatable; `LayerFXRenderer` is pure `CGContext`
+    (bitmap-tested in `Tests/SplitBarTests/LayerFXTests.swift`). Specs use
+    screen coords (y-down); renderer converts to CG y-up.
+  - Kill switch: `SPLITBAR_LAYERFX=0` env or `layerfx.enabled` UserDefaults
+    (default on) reverts surfaces to legacy SwiftUI rendering.
+  - The three surface modifiers (`.flyoutSurface`/`.widgetCard`/`.taskbarSurface`)
+    consume `LayerFX.activeSpec(...)`; legacy strokes/gradients remain behind
+    `layerFX == nil` for unsupported styles.
 - **DockController constraints** (never break these):
   - Persist original Dock orientation + autohide state to disk *before* mutating,
     atomically, in a versioned file.

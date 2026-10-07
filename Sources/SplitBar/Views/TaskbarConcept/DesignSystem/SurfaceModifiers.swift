@@ -8,18 +8,20 @@ public struct FlyoutSurfaceModifier: ViewModifier {
 
     public func body(content: Content) -> some View {
         let tokens = ThemeTokens.resolve(style: style, darkMode: darkMode)
-        
+        let layerFX = LayerFX.activeSpec(style: style, darkMode: darkMode, role: .panel, cornerRadius: cornerRadius)
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
         content
             .background(
                 style.usesMaterial ? tokens.surface : Color.clear,
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                in: shape
             )
             .background(
                 panelBackground(style: style, darkMode: darkMode, transparency: transparency),
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                in: shape
             )
             .overlay {
-                if style == .windowsAero {
+                if layerFX == nil, style == .windowsAero {
                     LinearGradient(
                         colors: [
                             Color.white.opacity(0.4),
@@ -30,16 +32,20 @@ public struct FlyoutSurfaceModifier: ViewModifier {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    .clipShape(shape)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .clipShape(shape)
             .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(
+                if let layerFX {
+                    LayerFXView(spec: layerFX)
+                        .allowsHitTesting(false)
+                } else {
+                    shape.strokeBorder(
                         borderColor,
                         lineWidth: borderWidth
                     )
+                }
             }
             .shadow(
                 color: shadowColor,
@@ -47,6 +53,24 @@ public struct FlyoutSurfaceModifier: ViewModifier {
                 x: shadowOffset.x,
                 y: shadowOffset.y
             )
+            .shadow(
+                color: extrudeShadowColor,
+                radius: extrudeShadowRadius,
+                x: -3,
+                y: -3
+            )
+    }
+
+    /// Neumorphism's raised counterpart: a light highlight on the top-left,
+    /// paired with the dark drop shadow for a true extruded dual-shadow look.
+    /// `.clear` for every other style so nothing changes visually.
+    private var extrudeShadowColor: Color {
+        guard style == .neumorphism else { return .clear }
+        return darkMode ? .white.opacity(0.10) : .white.opacity(0.85)
+    }
+
+    private var extrudeShadowRadius: CGFloat {
+        style == .neumorphism ? 6 : 0
     }
 
     private var borderColor: Color {
@@ -73,6 +97,9 @@ public struct FlyoutSurfaceModifier: ViewModifier {
     }
 
     private var shadowColor: Color {
+        if style == .neobrutalism {
+            return .black.opacity(darkMode ? 0.9 : 1.0)
+        }
         if darkMode {
             return .black.opacity(style == .classic98 ? 0.3 : 0.6)
         } else {
@@ -83,6 +110,7 @@ public struct FlyoutSurfaceModifier: ViewModifier {
     private var shadowRadius: CGFloat {
         switch style {
         case .glassmorphism: return 22
+        case .neobrutalism: return 0
         case .classic98, .cyberdeck: return 0
         case .visionOS: return 32
         default: return 14
@@ -91,6 +119,7 @@ public struct FlyoutSurfaceModifier: ViewModifier {
 
     private var shadowOffset: CGPoint {
         switch style {
+        case .neobrutalism: return CGPoint(x: 4, y: 4)
         case .classic98: return CGPoint(x: 2, y: 3)
         case .cyberdeck: return CGPoint(x: 4, y: 4)
         default: return CGPoint(x: 0, y: 8)
@@ -112,18 +141,26 @@ public struct WidgetCardModifier: ViewModifier {
 
     public func body(content: Content) -> some View {
         let tokens = ThemeTokens.resolve(style: style, darkMode: darkMode)
-        
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let layerFX = LayerFX.activeSpec(
+            style: style,
+            darkMode: darkMode,
+            role: .card,
+            cornerRadius: cornerRadius,
+            showsBorder: showsBorder
+        )
+
         content
             .background(
                 style.usesMaterial ? tokens.card : Color.clear,
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                in: shape
             )
             .background(
                 cardBackground(style: style, darkMode: darkMode, transparency: transparency),
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                in: shape
             )
             .overlay {
-                if style == .windowsAero {
+                if layerFX == nil, style == .windowsAero {
                     LinearGradient(
                         colors: [
                             Color.white.opacity(0.3),
@@ -133,20 +170,22 @@ public struct WidgetCardModifier: ViewModifier {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    .clipShape(shape)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .clipShape(shape)
             .overlay {
-                if showsBorder {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(
-                            borderColor,
-                            lineWidth: borderWidth
-                        )
+                if let layerFX {
+                    LayerFXView(spec: layerFX)
+                        .allowsHitTesting(false)
+                } else if showsBorder {
+                    shape.strokeBorder(
+                        borderColor,
+                        lineWidth: borderWidth
+                    )
                 }
             }
-            .shadow(color: primaryShadowColor, radius: primaryShadowRadius, x: 0, y: primaryShadowOffset)
+            .shadow(color: primaryShadowColor, radius: primaryShadowRadius, x: primaryShadowOffsetX, y: primaryShadowOffset)
             .shadow(color: secondaryShadowColor, radius: 5, x: -3, y: -3)
     }
 
@@ -182,12 +221,14 @@ public struct WidgetCardModifier: ViewModifier {
     }
 
     private var primaryShadowColor: Color {
+        if style == .neobrutalism { return .black.opacity(darkMode ? 0.9 : 1.0) }
         if style == .glassmorphism { return .black.opacity(0.035) }
         if style == .classic98 || style == .cyberdeck { return .clear }
         return .black.opacity(0.09)
     }
 
     private var primaryShadowRadius: CGFloat {
+        if style == .neobrutalism { return 0 }
         switch style {
         case .claymorphism: return 12
         case .visionOS: return 16
@@ -195,8 +236,14 @@ public struct WidgetCardModifier: ViewModifier {
         }
     }
 
+    /// Neobrutalism: hard offset shadow, zero blur, per the design language.
+    private var primaryShadowOffsetX: CGFloat {
+        style == .neobrutalism ? 4 : 0
+    }
+
     private var primaryShadowOffset: CGFloat {
         switch style {
+        case .neobrutalism: return 4
         case .neumorphism: return 2
         default: return 4
         }
@@ -223,17 +270,20 @@ public struct TaskbarSurfaceModifier: ViewModifier {
     let cornerRadius: CGFloat
 
     public func body(content: Content) -> some View {
-        content
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let layerFX = LayerFX.activeSpec(style: style, darkMode: darkMode, role: .taskbar, cornerRadius: cornerRadius)
+
+        return content
             .background(
                 style.usesMaterial ? style.taskbarFill(darkMode: darkMode) : Color.clear,
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                in: shape
             )
             .background(
                 taskbarBackground(style: style, darkMode: darkMode, transparency: transparency),
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                in: shape
             )
             .overlay {
-                if style == .windowsAero {
+                if layerFX == nil, style == .windowsAero {
                     LinearGradient(
                         colors: [
                             Color.white.opacity(0.5),
@@ -244,16 +294,20 @@ public struct TaskbarSurfaceModifier: ViewModifier {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    .clipShape(shape)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .clipShape(shape)
             .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(
+                if let layerFX {
+                    LayerFXView(spec: layerFX)
+                        .allowsHitTesting(false)
+                } else {
+                    shape.strokeBorder(
                         borderColor,
                         lineWidth: borderWidth
                     )
+                }
             }
     }
 

@@ -56,7 +56,9 @@ enum LauncherDefaults {
 @MainActor
 final class TaskbarConceptState: ObservableObject {
     @Published var openPanel: OpenPanel?
-    @Published var surfaceStyle = SurfaceStyle.glassmorphism
+    @Published var surfaceStyle = SurfaceStyle.glassmorphism {
+        didSet { UserDefaults.standard.set(surfaceStyle.rawValue, forKey: "surface.style") }
+    }
     @Published var isDarkMode = false
     @Published var wallpaperPreset = WallpaperPreset.pastelBloom {
         didSet { UserDefaults.standard.set(wallpaperPreset.rawValue, forKey: "wallpaper.preset") }
@@ -433,6 +435,9 @@ final class TaskbarConceptState: ObservableObject {
         let defaults = UserDefaults.standard
         if let savedWallpaper = defaults.string(forKey: "wallpaper.preset").flatMap(WallpaperPreset.init(rawValue:)) {
             wallpaperPreset = savedWallpaper
+        }
+        if let savedStyle = defaults.string(forKey: "surface.style").flatMap(SurfaceStyle.init(rawValue:)) {
+            surfaceStyle = savedStyle
         }
         if let values = defaults.array(forKey: "wallpaper.customStart") as? [Double],
            let color = Color.fromStoredRGBA(values) {

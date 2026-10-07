@@ -121,7 +121,7 @@ struct TaskbarStripTests {
     }
 
     @Test func themeTokensComplete() {
-        #expect(SurfaceStyle.allCases.count == 14)
+        #expect(SurfaceStyle.allCases.count == 16)
         for style in SurfaceStyle.allCases {
             #expect(style.accentGradient(darkMode: false).count >= 2)
             #expect(style.accentGradient(darkMode: true).count >= 2)
