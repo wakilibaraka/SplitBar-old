@@ -8,6 +8,7 @@ public struct ClipboardHistoryView: View {
     public let onDelete: (UUID) -> Void
     public let onClearUnpinned: () -> Void
     public let onClearAll: () -> Void
+    public let onPause: (TimeInterval) -> Void
 
     @State private var searchQuery: String = ""
     @State private var showingClearConfirmation: Bool = false
@@ -18,13 +19,15 @@ public struct ClipboardHistoryView: View {
         onTogglePin: @escaping (UUID) -> Void,
         onDelete: @escaping (UUID) -> Void,
         onClearUnpinned: @escaping () -> Void,
-        onClearAll: @escaping () -> Void
+        onClearAll: @escaping () -> Void,
+        onPause: @escaping (TimeInterval) -> Void = { _ in }
     ) {
         self.history = history
         self.onCopy = onCopy
         self.onTogglePin = onTogglePin
         self.onDelete = onDelete
         self.onClearUnpinned = onClearUnpinned
+        self.onPause = onPause
         self.onClearAll = onClearAll
     }
 
@@ -71,6 +74,15 @@ public struct ClipboardHistoryView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .pointingHandCursor()
+
+                Button("Pause 1h") {
+                    onPause(3600)
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .pointingHandCursor()
+                .help("Stop recording clipboard entries for one hour")
 
                 Spacer()
 

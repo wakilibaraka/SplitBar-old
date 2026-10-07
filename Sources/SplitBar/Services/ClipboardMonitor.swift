@@ -58,6 +58,14 @@ public final class ClipboardMonitor: @unchecked Sendable {
         }
         lastChangeCount = currentCount
 
+        // Never capture values an app marked as private, transient or
+        // machine-generated (password managers, secure fields).
+        if ClipboardPrivacyFilter.shouldSkip(
+            typeIdentifiers: pasteboard.types?.map(\.rawValue) ?? []
+        ) {
+            return
+        }
+
         let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         guard shouldCaptureClipboard(
             frontmostBundleIdentifier: frontmostID,

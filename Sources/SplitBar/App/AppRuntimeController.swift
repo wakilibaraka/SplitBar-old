@@ -182,6 +182,7 @@ public final class AppRuntimeController {
     private var currentPlaybackInterval: TimeInterval = 10.0
     private var taskbarConceptWindow: NSWindow?
     private let taskbarConceptState = TaskbarConceptState()
+    private var clipboardPausedUntil: Date?
     private let taskbarPanelController = TaskbarPanelController()
     private let displayCoordinator = DisplayCoordinator()
     private let taskbarFlyoutController = FlyoutPanelController()
@@ -800,6 +801,13 @@ public final class AppRuntimeController {
         if previous.aiAccountSwitchingEnabled != newPreferences.aiAccountSwitchingEnabled {
             aiUsageService.accountSwitchingEnabled = newPreferences.aiAccountSwitchingEnabled
         }
+        if previous.clipboardHistoryEnabled != newPreferences.clipboardHistoryEnabled {
+            if newPreferences.clipboardHistoryEnabled {
+                setupClipboardMonitoring()
+            } else {
+                clipboardMonitor.stopMonitoring()
+            }
+        }
         clipboardMonitor.updateExcludedBundleIdentifiers(newPreferences.clipboardExcludedBundleIdentifiers)
         refreshSettingsWindow()
         // Açık flyout yeni temaya hemen uysun
@@ -940,7 +948,26 @@ public final class AppRuntimeController {
             .store(in: &taskbarPanelSubscriptions)
     }
 
+    /// Clipboard history is opt-in: with it off no timer is scheduled and
+    /// nothing is written to disk.
+    /// Suspends clipboard capture for `seconds` without forgetting the setting.
+    private func pauseClipboard(for seconds: TimeInterval) {
+        clipboardMonitor.stopMonitoring()
+        clipboardPausedUntil = Date(timeIntervalSinceNow: seconds)
+        Logger.clipboard.notice("Clipboard capture paused")
+    }
+
     private func setupClipboardMonitoring() {
+        if let pausedUntil = clipboardPausedUntil, pausedUntil > Date() {
+            clipboardMonitor.stopMonitoring()
+            return
+        }
+        clipboardPausedUntil = nil
+        guard preferences.clipboardHistoryEnabled else {
+            clipboardMonitor.stopMonitoring()
+            Logger.clipboard.debug("Clipboard history disabled")
+            return
+        }
         clipboardMonitor.startMonitoring(
             interval: 0.6,
             excludedBundleIdentifiers: preferences.clipboardExcludedBundleIdentifiers
@@ -1352,6 +1379,9 @@ public final class AppRuntimeController {
                 },
                 onClearAll: { [weak self] in
                     self?.clearAllClipboard()
+                },
+                onPause: { [weak self] seconds in
+                    self?.pauseClipboard(for: seconds)
                 }
             )
             contentView = AnyView(
@@ -2386,10 +2416,11 @@ public final class AppRuntimeController {
             materialStyle: .system,
             shortcutBindings: defaultShortcuts,
             clipboardRetention: ClipboardRetentionPolicy(maxEntries: 100, maxBlobBytes: 10 * 1024 * 1024),
-            clipboardExcludedBundleIdentifiers: ["com.1password.1password", "com.apple.keychainaccess"],
+            clipboardExcludedBundleIdentifiers: ClipboardPrivacyFilter.defaultExcludedBundleIdentifiers,
             selectedScreenIdentifier: nil,
             reduceMotion: false,
             language: .english,
+            clipboardHistoryEnabled: false,
             aiAccountSwitchingEnabled: false,
             ipGeolocationEnabled: false,
             faviconServiceEnabled: false,

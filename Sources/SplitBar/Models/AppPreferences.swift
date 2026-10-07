@@ -9,6 +9,8 @@ public struct AppPreferences: Codable, Equatable, Sendable {
     public var selectedScreenIdentifier: String?
     public var reduceMotion: Bool
     public var language: AppLanguage
+    /// Clipboard history is off by default: it persists text and images.
+    public var clipboardHistoryEnabled: Bool
     /// Opt-in gate for reading Claude Code / Codex credentials, switching
     /// accounts, and contacting provider OAuth endpoints. Off by default: the
     /// Claude Code status-line bridge is the only always-available source.
@@ -28,6 +30,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         selectedScreenIdentifier: String?,
         reduceMotion: Bool,
         language: AppLanguage,
+        clipboardHistoryEnabled: Bool,
         aiAccountSwitchingEnabled: Bool,
         ipGeolocationEnabled: Bool,
         faviconServiceEnabled: Bool,
@@ -41,6 +44,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         self.selectedScreenIdentifier = selectedScreenIdentifier
         self.reduceMotion = reduceMotion
         self.language = language
+        self.clipboardHistoryEnabled = clipboardHistoryEnabled
         self.aiAccountSwitchingEnabled = aiAccountSwitchingEnabled
         self.ipGeolocationEnabled = ipGeolocationEnabled
         self.faviconServiceEnabled = faviconServiceEnabled
@@ -56,6 +60,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         case selectedScreenIdentifier
         case reduceMotion
         case language
+        case clipboardHistoryEnabled
         case aiAccountSwitchingEnabled
         case ipGeolocationEnabled
         case faviconServiceEnabled
@@ -73,6 +78,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         self.reduceMotion = try container.decode(Bool.self, forKey: .reduceMotion)
         self.language = try container.decodeIfPresent(AppLanguage.self, forKey: .language) ?? .english
         // Privacy gates default to off for existing configurations too.
+        self.clipboardHistoryEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardHistoryEnabled) ?? false
         self.aiAccountSwitchingEnabled = try container.decodeIfPresent(Bool.self, forKey: .aiAccountSwitchingEnabled) ?? false
         self.ipGeolocationEnabled = try container.decodeIfPresent(Bool.self, forKey: .ipGeolocationEnabled) ?? false
         self.faviconServiceEnabled = try container.decodeIfPresent(Bool.self, forKey: .faviconServiceEnabled) ?? false
@@ -89,6 +95,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         try container.encodeIfPresent(selectedScreenIdentifier, forKey: .selectedScreenIdentifier)
         try container.encode(reduceMotion, forKey: .reduceMotion)
         try container.encode(language, forKey: .language)
+        try container.encode(clipboardHistoryEnabled, forKey: .clipboardHistoryEnabled)
         try container.encode(aiAccountSwitchingEnabled, forKey: .aiAccountSwitchingEnabled)
         try container.encode(ipGeolocationEnabled, forKey: .ipGeolocationEnabled)
         try container.encode(faviconServiceEnabled, forKey: .faviconServiceEnabled)

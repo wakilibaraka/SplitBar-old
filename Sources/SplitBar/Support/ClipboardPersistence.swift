@@ -15,15 +15,31 @@ public struct ClipboardPersistence: Sendable {
         baseURL.appendingPathComponent("blobs")
     }
 
-    public func saveHistory(_ entries: [ClipboardEntry]) throws {
-        try FileManager.default.createDirectory(
-            at: baseURL,
-            withIntermediateDirectories: true
+    /// Creates a directory that only the user can traverse.
+    private func createPrivateDirectory(at url: URL) throws {
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: url.path
         )
+    }
+
+    /// Writes a file readable only by its owner.
+    private func writePrivate(_ data: Data, to url: URL) throws {
+        try data.write(to: url, options: .atomic)
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: url.path
+        )
+    }
+
+    public func saveHistory(_ entries: [ClipboardEntry]) throws {
+        try createPrivateDirectory(at: baseURL)
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        // Compact, not pretty-printed: history is machine-read, not a document.
+        encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(entries)
-        try data.write(to: historyFileURL, options: .atomic)
+        try writePrivate(data, to: historyFileURL)
     }
 
     public func loadHistory() throws -> [ClipboardEntry] {
@@ -46,11 +62,9 @@ public struct ClipboardPersistence: Sendable {
 
     public func saveBlob(data: Data, relativePath: String) throws {
         let fileURL = blobsDirectoryURL.appendingPathComponent(relativePath)
-        try FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try data.write(to: fileURL, options: .atomic)
+        try createPrivateDirectory(at: blobsDirectoryURL)
+        try createPrivateDirectory(at: fileURL.deletingLastPathComponent())
+        try writePrivate(data, to: fileURL)
     }
 
     public func loadBlob(relativePath: String) -> Data? {
