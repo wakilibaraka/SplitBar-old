@@ -1,6 +1,6 @@
 # SplitBar — Structural Refactor Plan (C1, C2, C3, C5, C6)
 
-Status: **planned, not started** · Baseline: v0.3.0 · Measured 2026-10-07
+Status: **in progress** (C1 executing) · Baseline: v0.3.0 · Measured 2026-10-07
 
 This expands the five structural tasks in `IMPROVEMENT_PLAN.md` into executable
 work. It changes no behaviour. Every phase is a sequence of small PRs that keep
@@ -238,3 +238,18 @@ large branch.
 - **D1** VoiceOver walkthrough and **D5** hot-plug verification need a human on a
   physical machine.
 - **B5** remainder (CoreLocation, SSID authorisation) needs a device.
+
+## 10. Progress log
+
+Each slice is one commit, verified with `swift build -Xswiftc -warnings-as-errors`
+and `swift test` before the commit.
+
+| Slice | Commit | Result |
+|---|---|---|
+| C1.1 | see log | Design system extracted to `DesignSystem/`: `SurfaceStyle.swift` (452), `PanelStyle.swift` (97), `ColorExtensions.swift` (34). Source file 7,800 → 7,252 lines. Build clean, 45 tests pass. |
+
+**Mechanics.** `scripts/split_swift.py` performs the moves. It finds top-level
+declarations by column-0 indentation rather than brace counting, because string
+literals in this file contain braces. Doc comments and attributes directly above
+a declaration are moved with it, so `@MainActor` never detaches from its type.
+Moved declarations lose `private`, since they become module-internal.
