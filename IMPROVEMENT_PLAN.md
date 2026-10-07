@@ -72,6 +72,7 @@ Status legend: **done** · **partial** · **todo** · **blocked** (needs a perso
 | D5 | Multi-display | P3 | todo | C2 |
 | E1 | Developer ID signing + notarization | P1 | **blocked (no Team ID)** | A4, C7 |
 | E2 | Restore agent via `SMAppService` | P2 | done | – |
+| E4 | Logging-privacy lint, bundle CI, docs sync | P1 | done | B1, A4 |
 | E3 | Binary hygiene (strip, rpath, prefix-map, helper ID) | P1 | done | A4 |
 
 ## 4. Task details
@@ -210,6 +211,25 @@ Release builds use `-Xswiftc -file-prefix-map`, binaries are stripped, the Xcode
 toolchain rpath is deleted with `install_name_tool`, and the helper is signed
 with the stable identifier `com.baraka.splitbar.dockrestore`. Verified: no
 `/Users/` paths in the binary, no Xcode rpath.
+
+## 4a. Execution notes (2026-10 session)
+
+- `B5` is deliberately **partial**: the favicon and IP-geolocation gates are in
+  place, but the app still derives weather coordinates from `ipwho.is` when the
+  gate is on rather than from `CLLocationManager`, and `CWInterface.ssid()` is
+  still read without requesting authorisation. Both need a device to validate.
+- `A3` and `E1` are blocked on the owner: a licence choice for this code, a
+  provenance decision for `Reference/`, and a paid Apple Developer ID.
+- `C1`/`C2` (splitting the two large files), `C3`, `C5` and `C6` were left alone
+  deliberately: they are multi-PR mechanical programmes and interleaving them
+  with security work would have made review harder, not easier.
+- The debug-path leak and Xcode rpath issues are fixed for release builds only.
+  `scripts/build_app.sh` prints a warning when building without `--release` so a
+  debug bundle is never mistaken for a distributable one.
+- CI runs `macos-26` and now includes a logging-privacy job and a bundle job that
+  asserts the helper, required plist keys, icon, signature, and the absence of
+  `/Users/` paths and Xcode rpaths. That job caught the debug-bundle path leak
+  during this session.
 
 ## 5. HUMAN decisions (agents must not decide these)
 
