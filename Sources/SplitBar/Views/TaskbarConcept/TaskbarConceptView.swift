@@ -306,6 +306,40 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
             }
         }
     }
+
+    // MARK: Theme-matched wallpaper gradient
+    func accentGradient(darkMode: Bool) -> [Color] {
+        switch self {
+        case .glassmorphism:
+            [Color(red: 0.30, green: 0.48, blue: 0.67), Color(red: 0.91, green: 0.69, blue: 0.87), Color(red: 0.47, green: 0.70, blue: 0.86)]
+        case .liquidGlass:
+            [Color(red: 0.25, green: 0.55, blue: 0.95), Color(red: 0.55, green: 0.45, blue: 0.95), Color(red: 0.40, green: 0.85, blue: 1.0)]
+        case .windowsAero:
+            [Color(red: 0.08, green: 0.35, blue: 0.62), Color(red: 0.43, green: 0.76, blue: 1.0), Color(red: 0.36, green: 0.76, blue: 0.78)]
+        case .neumorphism:
+            [Color(red: 0.55, green: 0.60, blue: 0.75), Color(red: 0.82, green: 0.85, blue: 0.95), Color(red: 0.65, green: 0.70, blue: 0.90)]
+        case .claymorphism:
+            [Color(red: 1.0, green: 0.75, blue: 0.80), Color(red: 0.75, green: 0.70, blue: 0.95), Color(red: 1.0, green: 0.85, blue: 0.75)]
+        case .skeuomorphism:
+            [Color(red: 0.55, green: 0.45, blue: 0.35), Color(red: 0.84, green: 0.76, blue: 0.68), Color(red: 0.40, green: 0.32, blue: 0.24)]
+        case .flatDesign:
+            [Color(red: 0.15, green: 0.35, blue: 0.85), Color(red: 0.25, green: 0.54, blue: 0.97), Color(red: 0.10, green: 0.25, blue: 0.70)]
+        case .neobrutalism:
+            [Color(red: 1.0, green: 0.90, blue: 0.20), Color(red: 1.0, green: 0.45, blue: 0.35), Color(red: 0.95, green: 0.75, blue: 0.15)]
+        case .minimalism:
+            [Color(red: 0.80, green: 0.82, blue: 0.88), Color(red: 0.95, green: 0.95, blue: 0.97), Color(red: 0.70, green: 0.72, blue: 0.80)]
+        case .aqua:
+            [Color(red: 0.15, green: 0.45, blue: 0.90), Color(red: 0.45, green: 0.75, blue: 1.0), Color(red: 0.10, green: 0.35, blue: 0.80)]
+        case .frutigerAero:
+            [Color(red: 0.35, green: 0.70, blue: 0.92), Color(red: 0.45, green: 0.80, blue: 0.45), Color(red: 0.25, green: 0.55, blue: 0.85)]
+        case .y2k:
+            [Color(red: 0.60, green: 0.70, blue: 1.0), Color(red: 0.85, green: 0.60, blue: 0.95), Color(red: 0.45, green: 0.75, blue: 1.0)]
+        case .windowsXP:
+            [Color(red: 0.15, green: 0.35, blue: 0.75), Color(red: 0.36, green: 0.62, blue: 0.95), Color(red: 0.10, green: 0.25, blue: 0.60)]
+        case .classic98:
+            [Color(red: 0.55, green: 0.55, blue: 0.58), Color(red: 0.75, green: 0.75, blue: 0.78), Color(red: 0.45, green: 0.45, blue: 0.48)]
+        }
+    }
 }
 
 private func panelBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
@@ -1130,6 +1164,8 @@ private enum WallpaperPreset: String, CaseIterable, Identifiable {
     case midnight
     case graphite
     case custom
+    case weatherReactive
+    case themeMatched
 
     var id: String { rawValue }
 
@@ -1141,6 +1177,8 @@ private enum WallpaperPreset: String, CaseIterable, Identifiable {
         case .midnight: "Midnight"
         case .graphite: "Graphite"
         case .custom: "Custom"
+        case .weatherReactive: "Weather reactive"
+        case .themeMatched: "Theme matched"
         }
     }
 
@@ -1158,6 +1196,10 @@ private enum WallpaperPreset: String, CaseIterable, Identifiable {
             [Color(red: 0.055, green: 0.065, blue: 0.08), Color(red: 0.15, green: 0.17, blue: 0.20), Color(red: 0.085, green: 0.10, blue: 0.12)]
         case .custom:
             []
+        case .weatherReactive:
+            [Color(red: 0.45, green: 0.70, blue: 0.95), Color(red: 0.35, green: 0.45, blue: 0.58)]
+        case .themeMatched:
+            [Color(red: 0.91, green: 0.69, blue: 0.87), Color(red: 0.47, green: 0.70, blue: 0.86)]
         }
     }
 
@@ -2076,7 +2118,9 @@ public struct TaskbarConceptView: View {
                     preset: wallpaperPreset,
                     pastelTint: pastelTint,
                     gradientEndTint: gradientEndTint,
-                    gradientAngle: gradientAngle
+                    gradientAngle: gradientAngle,
+                    surfaceStyle: surfaceStyle,
+                    weather: model.weather
                 )
 
                 VStack(alignment: .leading, spacing: 0) {
@@ -2257,6 +2301,12 @@ private struct DesktopBackdrop: View {
     let pastelTint: Color
     let gradientEndTint: Color
     let gradientAngle: Double
+    let surfaceStyle: SurfaceStyle
+    let weather: WeatherState
+
+    private var weatherKind: WeatherBackdropKind {
+        weatherBackdropKind(for: weather)
+    }
 
     private var gradientStart: UnitPoint {
         UnitPoint(x: 0.5 - cos(gradientAngle * .pi / 180) / 2, y: 0.5 - sin(gradientAngle * .pi / 180) / 2)
@@ -2270,6 +2320,12 @@ private struct DesktopBackdrop: View {
         if preset == .custom {
             return [pastelTint, gradientEndTint]
         }
+        if preset == .weatherReactive {
+            return weatherBackdropPalette(for: weatherKind)
+        }
+        if preset == .themeMatched {
+            return surfaceStyle.accentGradient(darkMode: isDarkMode)
+        }
         if isDarkMode && !preset.isDark {
             return [
                 Color(red: 0.035, green: 0.055, blue: 0.10),
@@ -2278,6 +2334,14 @@ private struct DesktopBackdrop: View {
             ]
         }
         return preset.colors
+    }
+
+    private var particleIntensity: Double {
+        switch weatherKind {
+        case .storm, .rain, .snow: 1.0
+        case .cloudy, .fog: 0.7
+        case .clearNight, .clearDay: 0.6
+        }
     }
 
     var body: some View {
@@ -2317,6 +2381,10 @@ private struct DesktopBackdrop: View {
                 .frame(width: 960, height: 480)
                 .rotationEffect(.degrees(-26))
                 .offset(x: 210, y: 135)
+
+            if preset == .weatherReactive {
+                WeatherParticles(kind: weatherKind, intensity: particleIntensity)
+            }
         }
         .ignoresSafeArea()
     }

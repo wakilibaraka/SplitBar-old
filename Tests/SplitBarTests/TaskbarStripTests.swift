@@ -119,6 +119,29 @@ struct TaskbarStripTests {
         #expect(FlyoutAnimation.allCases.count == 9)
     }
 
+    @Test func weatherBackdropMapping() {
+        func weather(symbol: String, text: String) -> WeatherState {
+            WeatherState(
+                cityName: "Test",
+                temperatureCelsius: 20,
+                conditionText: text,
+                symbolName: symbol,
+                highCelsius: 22,
+                lowCelsius: 15,
+                hourly: [],
+                lastUpdated: Date()
+            )
+        }
+        #expect(weatherBackdropKind(for: weather(symbol: "cloud.bolt.fill", text: "Thunderstorm")) == .storm)
+        #expect(weatherBackdropKind(for: weather(symbol: "cloud.snow.fill", text: "Snow")) == .snow)
+        #expect(weatherBackdropKind(for: weather(symbol: "cloud.rain.fill", text: "Rain")) == .rain)
+        #expect(weatherBackdropKind(for: weather(symbol: "cloud.fog.fill", text: "Fog")) == .fog)
+        #expect(weatherBackdropKind(for: weather(symbol: "cloud.fill", text: "Overcast")) == .cloudy)
+        #expect(weatherBackdropKind(for: weather(symbol: "moon.fill", text: "Clear")) == .clearNight)
+        #expect(weatherBackdropKind(for: weather(symbol: "sun.max.fill", text: "Sunny")) == .clearDay)
+        #expect(weatherBackdropPalette(for: .rain).count == 2)
+    }
+
     @Test func singleIslandModesProduceNoIslands() {
         let layout = TaskbarStrip.layoutIslands(
             screenWidth: 1728,
