@@ -20,174 +20,359 @@ enum OpenPanel: Equatable {
     }
 }
 
+// MARK: - SurfaceStyle — 14 named design-language themes
 enum SurfaceStyle: String, CaseIterable, Identifiable {
-    case glass
-    case clay
-    case neumorphic
-    case windowsXP
-    case classic98
-    case aero
+
+    // Glassmorphism family
+    case glassmorphism   // was "glass" — frosted, thin light edge
+    case liquidGlass     // Apple Liquid Glass — lensing + adaptive tint
+    case windowsAero     // was "aero" — transparent blur, specular sweeps
+
+    // Material / Soft family
+    case neumorphism     // was "neumorphic" — dual soft shadows, one surface
+    case claymorphism    // was "clay" — oversized radii, floating puffy look
+    case skeuomorphism   // simulated real materials (leather / metal tints)
+
+    // Flat / Bold family
+    case flatDesign      // solid 2D, no depth
+    case neobrutalism    // thick outlines, hard offset shadows, saturated color
+    case minimalism      // maximum negative space, near-monochrome
+
+    // Retro / Nostalgic family
+    case aqua            // classic macOS candy-gel controls (Aqua)
+    case frutigerAero    // glossy glass + nature palette (sky-blue / grass-green)
+    case y2k             // liquid chrome, gel plastic, iridescent blue-silver
+
+    // Legacy Windows
+    case windowsXP       // Luna blue gradient bars
+    case classic98       // grey beveled panels
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .glass: "Glass"
-        case .clay: "Clay"
-        case .neumorphic: "Neumorphic"
-        case .windowsXP: "Windows XP"
-        case .classic98: "Windows 98"
-        case .aero: "Aero glass"
+        case .glassmorphism: "Glassmorphism"
+        case .liquidGlass:   "Liquid Glass"
+        case .windowsAero:   "Windows Aero"
+        case .neumorphism:   "Neumorphism"
+        case .claymorphism:  "Claymorphism"
+        case .skeuomorphism: "Skeuomorphism"
+        case .flatDesign:    "Flat Design"
+        case .neobrutalism:  "Neobrutalism"
+        case .minimalism:    "Minimalism"
+        case .aqua:          "Aqua"
+        case .frutigerAero:  "Frutiger Aero"
+        case .y2k:           "Y2K"
+        case .windowsXP:     "Windows XP"
+        case .classic98:     "Windows 98"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .glass: "Soft translucent layers"
-        case .clay: "Warm, gently raised cards"
-        case .neumorphic: "Quiet embossed surfaces"
-        case .windowsXP: "Blue Luna bars and soft corners"
-        case .classic98: "Classic grey beveled panels"
-        case .aero: "Iridescent blue glass and light"
+        case .glassmorphism: "Frosted translucent layers"
+        case .liquidGlass:   "Apple's adaptive water-drop glass"
+        case .windowsAero:   "Iridescent blue glass and light"
+        case .neumorphism:   "Quiet embossed soft shadows"
+        case .claymorphism:  "Puffy 3D play-doh surfaces"
+        case .skeuomorphism: "Simulated real leather and metal"
+        case .flatDesign:    "Solid 2D colors, zero depth"
+        case .neobrutalism:  "Bold blocks and hard offset shadows"
+        case .minimalism:    "Almost nothing, perfectly placed"
+        case .aqua:          "Classic Mac candy-gel controls"
+        case .frutigerAero:  "Glossy glass meets nature"
+        case .y2k:           "Chrome bubblegum millennium"
+        case .windowsXP:     "Blue Luna bars and soft corners"
+        case .classic98:     "Classic grey beveled panels"
         }
     }
 
+    // MARK: Panel fill (flyouts & settings panel)
     func panelFill(darkMode: Bool) -> Color {
         if darkMode {
             switch self {
-            case .glass: Color(red: 0.10, green: 0.12, blue: 0.17)
-            case .clay: Color(red: 0.17, green: 0.14, blue: 0.18)
-            case .neumorphic: Color(red: 0.13, green: 0.14, blue: 0.18)
-            case .windowsXP: Color(red: 0.07, green: 0.14, blue: 0.29)
-            case .classic98: Color(red: 0.16, green: 0.16, blue: 0.17)
-            case .aero: Color(red: 0.08, green: 0.16, blue: 0.25)
+            case .glassmorphism: Color(red: 0.10, green: 0.12, blue: 0.17)
+            case .liquidGlass:   Color(red: 0.10, green: 0.12, blue: 0.18)
+            case .windowsAero:   Color(red: 0.08, green: 0.16, blue: 0.25)
+            case .neumorphism:   Color(red: 0.122, green: 0.125, blue: 0.188)
+            case .claymorphism:  Color(red: 0.17, green: 0.14, blue: 0.18)
+            case .skeuomorphism: Color(red: 0.14, green: 0.10, blue: 0.08)
+            case .flatDesign:    Color(red: 0.12, green: 0.16, blue: 0.22)
+            case .neobrutalism:  Color(red: 0.10, green: 0.10, blue: 0.10)
+            case .minimalism:    Color(red: 0.08, green: 0.08, blue: 0.09)
+            case .aqua:          Color(red: 0.06, green: 0.16, blue: 0.32)
+            case .frutigerAero:  Color(red: 0.05, green: 0.18, blue: 0.28)
+            case .y2k:           Color(red: 0.12, green: 0.14, blue: 0.22)
+            case .windowsXP:     Color(red: 0.07, green: 0.14, blue: 0.29)
+            case .classic98:     Color(red: 0.16, green: 0.16, blue: 0.17)
             }
         } else {
             switch self {
-            case .glass: .white.opacity(0.58)
-            case .clay: Color(red: 0.98, green: 0.92, blue: 0.92)
-            case .neumorphic: Color(red: 0.91, green: 0.92, blue: 0.96)
-            case .windowsXP: Color(red: 0.86, green: 0.91, blue: 0.98)
-            case .classic98: Color(red: 0.77, green: 0.77, blue: 0.77)
-            case .aero: Color(red: 0.73, green: 0.87, blue: 0.97)
+            case .glassmorphism: .white.opacity(0.58)
+            case .liquidGlass:   .white.opacity(0.65)
+            case .windowsAero:   Color(red: 0.73, green: 0.87, blue: 0.97)
+            case .neumorphism:   Color(red: 0.910, green: 0.918, blue: 0.941)
+            case .claymorphism:  Color(red: 0.98, green: 0.92, blue: 0.92)
+            case .skeuomorphism: Color(red: 0.84, green: 0.76, blue: 0.68)
+            case .flatDesign:    Color(red: 0.17, green: 0.45, blue: 0.91)
+            case .neobrutalism:  Color(red: 0.98, green: 0.96, blue: 0.30)
+            case .minimalism:    .white.opacity(0.95)
+            case .aqua:          Color(red: 0.72, green: 0.86, blue: 0.97)
+            case .frutigerAero:  Color(red: 0.74, green: 0.91, blue: 0.96)
+            case .y2k:           Color(red: 0.82, green: 0.88, blue: 1.0)
+            case .windowsXP:     Color(red: 0.86, green: 0.91, blue: 0.98)
+            case .classic98:     Color(red: 0.77, green: 0.77, blue: 0.77)
             }
         }
     }
 
+    // MARK: Card fill (widget cards, settings section backgrounds)
     func cardFill(darkMode: Bool) -> Color {
         if darkMode {
             switch self {
-            case .glass: Color(red: 0.15, green: 0.18, blue: 0.24)
-            case .clay: Color(red: 0.23, green: 0.18, blue: 0.23)
-            case .neumorphic: Color(red: 0.19, green: 0.20, blue: 0.25)
-            case .windowsXP: Color(red: 0.12, green: 0.23, blue: 0.40)
-            case .classic98: Color(red: 0.23, green: 0.23, blue: 0.25)
-            case .aero: Color(red: 0.12, green: 0.23, blue: 0.31)
+            case .glassmorphism: Color(red: 0.15, green: 0.18, blue: 0.24)
+            case .liquidGlass:   Color(red: 0.16, green: 0.19, blue: 0.26)
+            case .windowsAero:   Color(red: 0.12, green: 0.23, blue: 0.31)
+            case .neumorphism:   Color(red: 0.145, green: 0.150, blue: 0.222)
+            case .claymorphism:  Color(red: 0.23, green: 0.18, blue: 0.23)
+            case .skeuomorphism: Color(red: 0.20, green: 0.16, blue: 0.12)
+            case .flatDesign:    Color(red: 0.17, green: 0.22, blue: 0.30)
+            case .neobrutalism:  Color(red: 0.18, green: 0.18, blue: 0.18)
+            case .minimalism:    Color(red: 0.10, green: 0.10, blue: 0.11)
+            case .aqua:          Color(red: 0.10, green: 0.22, blue: 0.40)
+            case .frutigerAero:  Color(red: 0.08, green: 0.22, blue: 0.34)
+            case .y2k:           Color(red: 0.16, green: 0.18, blue: 0.28)
+            case .windowsXP:     Color(red: 0.12, green: 0.23, blue: 0.40)
+            case .classic98:     Color(red: 0.23, green: 0.23, blue: 0.25)
             }
         } else {
             switch self {
-            case .glass: .white.opacity(0.72)
-            case .clay: Color(red: 0.99, green: 0.95, blue: 0.94)
-            case .neumorphic: Color(red: 0.94, green: 0.95, blue: 0.98)
-            case .windowsXP: Color(red: 0.96, green: 0.97, blue: 0.99)
-            case .classic98: Color(red: 0.82, green: 0.82, blue: 0.82)
-            case .aero: Color(red: 0.84, green: 0.93, blue: 0.99)
+            case .glassmorphism: .white.opacity(0.72)
+            case .liquidGlass:   .white.opacity(0.78)
+            case .windowsAero:   Color(red: 0.84, green: 0.93, blue: 0.99)
+            case .neumorphism:   Color(red: 0.940, green: 0.945, blue: 0.965)
+            case .claymorphism:  Color(red: 0.99, green: 0.95, blue: 0.94)
+            case .skeuomorphism: Color(red: 0.90, green: 0.84, blue: 0.76)
+            case .flatDesign:    Color(red: 0.25, green: 0.54, blue: 0.97)
+            case .neobrutalism:  Color(red: 1.0, green: 0.98, blue: 0.40)
+            case .minimalism:    .white.opacity(0.92)
+            case .aqua:          Color(red: 0.82, green: 0.92, blue: 0.99)
+            case .frutigerAero:  Color(red: 0.84, green: 0.96, blue: 0.98)
+            case .y2k:           Color(red: 0.88, green: 0.92, blue: 1.0)
+            case .windowsXP:     Color(red: 0.96, green: 0.97, blue: 0.99)
+            case .classic98:     Color(red: 0.82, green: 0.82, blue: 0.82)
             }
         }
     }
 
+    // MARK: Corner radius
     var cornerRadius: CGFloat {
         switch self {
-        case .glass: 22
-        case .clay: 20
-        case .neumorphic: 16
-        case .windowsXP: 10
-        case .classic98: 2
-        case .aero: 18
+        case .glassmorphism: 22
+        case .liquidGlass:   26
+        case .windowsAero:   10
+        case .neumorphism:   16
+        case .claymorphism:  28
+        case .skeuomorphism: 8
+        case .flatDesign:    4
+        case .neobrutalism:  0
+        case .minimalism:    6
+        case .aqua:          14
+        case .frutigerAero:  20
+        case .y2k:           12
+        case .windowsXP:     10
+        case .classic98:     2
         }
     }
 
+    // MARK: Taskbar bar fill
     func taskbarFill(darkMode: Bool) -> Color {
         if darkMode {
             switch self {
-            case .glass, .clay, .neumorphic, .aero: Color(red: 0.08, green: 0.11, blue: 0.16).opacity(0.9)
-            case .windowsXP: Color(red: 0.04, green: 0.13, blue: 0.30)
-            case .classic98: Color(red: 0.21, green: 0.21, blue: 0.22)
+            case .glassmorphism, .liquidGlass:
+                Color(red: 0.08, green: 0.11, blue: 0.16).opacity(0.9)
+            case .windowsAero:
+                Color(red: 0.08, green: 0.20, blue: 0.31).opacity(0.85)
+            case .neumorphism:
+                Color(red: 0.108, green: 0.112, blue: 0.172)
+            case .claymorphism:
+                Color(red: 0.15, green: 0.11, blue: 0.16)
+            case .skeuomorphism:
+                Color(red: 0.10, green: 0.07, blue: 0.05)
+            case .flatDesign:
+                Color(red: 0.10, green: 0.14, blue: 0.20)
+            case .neobrutalism:
+                Color(red: 0.08, green: 0.08, blue: 0.08)
+            case .minimalism:
+                Color(red: 0.05, green: 0.05, blue: 0.06)
+            case .aqua:
+                Color(red: 0.04, green: 0.12, blue: 0.28)
+            case .frutigerAero:
+                Color(red: 0.03, green: 0.14, blue: 0.22)
+            case .y2k:
+                Color(red: 0.08, green: 0.10, blue: 0.18)
+            case .windowsXP:
+                Color(red: 0.04, green: 0.13, blue: 0.30)
+            case .classic98:
+                Color(red: 0.21, green: 0.21, blue: 0.22)
             }
         } else {
             switch self {
-            case .glass, .clay, .neumorphic: Color.white.opacity(0.78)
-            case .windowsXP: Color(red: 0.70, green: 0.82, blue: 0.98)
-            case .classic98: Color(red: 0.76, green: 0.76, blue: 0.76)
-            case .aero: Color(red: 0.42, green: 0.69, blue: 0.88).opacity(0.65)
+            case .glassmorphism, .liquidGlass:
+                Color.white.opacity(0.78)
+            case .windowsAero:
+                Color(red: 0.42, green: 0.69, blue: 0.88).opacity(0.65)
+            case .neumorphism:
+                Color(red: 0.878, green: 0.886, blue: 0.910)
+            case .claymorphism:
+                Color(red: 0.96, green: 0.88, blue: 0.88)
+            case .skeuomorphism:
+                Color(red: 0.32, green: 0.26, blue: 0.20)
+            case .flatDesign:
+                Color(red: 0.17, green: 0.45, blue: 0.91)
+            case .neobrutalism:
+                Color(red: 0.98, green: 0.96, blue: 0.30)
+            case .minimalism:
+                .white
+            case .aqua:
+                Color(red: 0.18, green: 0.52, blue: 0.92)
+            case .frutigerAero:
+                Color(red: 0.36, green: 0.76, blue: 0.88)
+            case .y2k:
+                Color(red: 0.58, green: 0.72, blue: 0.96)
+            case .windowsXP:
+                Color(red: 0.70, green: 0.82, blue: 0.98)
+            case .classic98:
+                Color(red: 0.76, green: 0.76, blue: 0.76)
             }
         }
     }
 
+    // MARK: Accent colour
     func accent(darkMode: Bool) -> Color {
         if darkMode {
             switch self {
-            case .glass, .clay, .neumorphic: Color(red: 1.0, green: 0.58, blue: 0.68)
-            case .windowsXP, .aero: Color(red: 0.43, green: 0.76, blue: 1.0)
-            case .classic98: Color(red: 0.68, green: 0.75, blue: 1.0)
+            case .glassmorphism, .claymorphism:
+                Color(red: 1.0, green: 0.58, blue: 0.68)
+            case .liquidGlass:
+                Color(red: 0.40, green: 0.85, blue: 1.0)
+            case .windowsAero, .windowsXP:
+                Color(red: 0.43, green: 0.76, blue: 1.0)
+            case .neumorphism:
+                Color(red: 0.55, green: 0.65, blue: 1.0)
+            case .skeuomorphism:
+                Color(red: 0.98, green: 0.82, blue: 0.50)
+            case .flatDesign:
+                Color(red: 0.40, green: 0.72, blue: 1.0)
+            case .neobrutalism:
+                Color(red: 0.98, green: 0.88, blue: 0.10)
+            case .minimalism:
+                .white
+            case .aqua:
+                Color(red: 0.30, green: 0.72, blue: 1.0)
+            case .frutigerAero:
+                Color(red: 0.38, green: 0.92, blue: 0.58)
+            case .y2k:
+                Color(red: 0.50, green: 0.80, blue: 1.0)
+            case .classic98:
+                Color(red: 0.68, green: 0.75, blue: 1.0)
             }
         } else {
             switch self {
-            case .glass, .clay, .neumorphic: .roseAccent
-            case .windowsXP: Color(red: 0.05, green: 0.35, blue: 0.81)
-            case .classic98: Color(red: 0.12, green: 0.22, blue: 0.52)
-            case .aero: Color(red: 0.12, green: 0.57, blue: 0.91)
+            case .glassmorphism, .claymorphism:
+                .roseAccent
+            case .liquidGlass:
+                Color(red: 0.05, green: 0.45, blue: 0.92)
+            case .windowsAero, .windowsXP:
+                Color(red: 0.05, green: 0.35, blue: 0.81)
+            case .neumorphism:
+                Color(red: 0.38, green: 0.48, blue: 0.88)
+            case .skeuomorphism:
+                Color(red: 0.70, green: 0.52, blue: 0.18)
+            case .flatDesign:
+                Color(red: 0.17, green: 0.45, blue: 0.91)
+            case .neobrutalism:
+                Color(red: 0.10, green: 0.10, blue: 0.10)
+            case .minimalism:
+                .primary
+            case .aqua:
+                Color(red: 0.10, green: 0.42, blue: 0.86)
+            case .frutigerAero:
+                Color(red: 0.16, green: 0.62, blue: 0.32)
+            case .y2k:
+                Color(red: 0.26, green: 0.52, blue: 0.96)
+            case .classic98:
+                Color(red: 0.12, green: 0.22, blue: 0.52)
             }
         }
     }
 }
 
 private func panelBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
-    return switch style {
-    case .glass:
-        AnyShapeStyle(
-            (transparency > 0.72 ? Material.ultraThin : Material.regular)
-                .opacity(1 - transparency * 0.68)
-        )
-    case .aero:
-        AnyShapeStyle(Material.ultraThin.opacity(1 - transparency * 0.68))
-    case .clay, .neumorphic, .windowsXP, .classic98:
-        AnyShapeStyle(style.panelFill(darkMode: darkMode).opacity(1 - transparency * 0.68))
+    let opacity = 1 - transparency * 0.68
+    switch style {
+    case .glassmorphism:
+        return AnyShapeStyle((transparency > 0.55 ? Material.ultraThin : Material.regular).opacity(opacity))
+    case .liquidGlass:
+        return AnyShapeStyle(Material.regular.opacity(opacity))
+    case .windowsAero:
+        return AnyShapeStyle(Material.ultraThin.opacity(opacity))
+    case .neobrutalism:
+        // Neobrutalism = full opacity, bold and graphic
+        return AnyShapeStyle(style.panelFill(darkMode: darkMode))
+    case .minimalism:
+        return AnyShapeStyle(style.panelFill(darkMode: darkMode).opacity(min(1.0, opacity * 1.1)))
+    default:
+        return AnyShapeStyle(style.panelFill(darkMode: darkMode).opacity(opacity))
     }
 }
 
 private func cardBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
-    return switch style {
-    case .glass:
-        AnyShapeStyle(
-            (transparency > 0.72 ? Material.ultraThin : Material.regular)
-                .opacity(1 - transparency * 0.42)
-        )
-    case .aero:
-        AnyShapeStyle(Material.ultraThin.opacity(1 - transparency * 0.42))
-    case .clay, .neumorphic, .windowsXP, .classic98:
-        AnyShapeStyle(style.cardFill(darkMode: darkMode).opacity(1 - transparency * 0.42))
+    let opacity = 1 - transparency * 0.42
+    switch style {
+    case .glassmorphism:
+        return AnyShapeStyle((transparency > 0.55 ? Material.ultraThin : Material.regular).opacity(opacity))
+    case .liquidGlass:
+        return AnyShapeStyle(Material.ultraThinMaterial.opacity(opacity))
+    case .windowsAero:
+        return AnyShapeStyle(Material.ultraThin.opacity(opacity))
+    case .neobrutalism:
+        return AnyShapeStyle(style.cardFill(darkMode: darkMode))
+    case .minimalism:
+        return AnyShapeStyle(style.cardFill(darkMode: darkMode).opacity(min(1.0, opacity * 1.1)))
+    default:
+        return AnyShapeStyle(style.cardFill(darkMode: darkMode).opacity(opacity))
     }
 }
 
 private func surfaceWash(style: SurfaceStyle, darkMode: Bool) -> Color {
     if darkMode {
-        return style == .aero ? Color(red: 0.08, green: 0.20, blue: 0.31).opacity(0.45) : Color.black.opacity(0.24)
+        switch style {
+        case .windowsAero:   return Color(red: 0.08, green: 0.20, blue: 0.31).opacity(0.45)
+        case .aqua:          return Color(red: 0.04, green: 0.18, blue: 0.40).opacity(0.40)
+        case .frutigerAero:  return Color(red: 0.04, green: 0.18, blue: 0.28).opacity(0.40)
+        default:             return Color.black.opacity(0.24)
+        }
     }
-    return switch style {
-    case .aero: Color(red: 0.44, green: 0.75, blue: 0.95).opacity(0.3)
-    case .windowsXP: Color(red: 0.23, green: 0.52, blue: 0.87).opacity(0.13)
-    case .classic98: Color(red: 0.55, green: 0.55, blue: 0.55).opacity(0.12)
-    default: Color.roseMist.opacity(0.42)
+    switch style {
+    case .windowsAero:   return Color(red: 0.44, green: 0.75, blue: 0.95).opacity(0.30)
+    case .windowsXP:     return Color(red: 0.23, green: 0.52, blue: 0.87).opacity(0.13)
+    case .classic98:     return Color(red: 0.55, green: 0.55, blue: 0.55).opacity(0.12)
+    case .aqua:          return Color(red: 0.18, green: 0.52, blue: 0.92).opacity(0.25)
+    case .frutigerAero:  return Color(red: 0.20, green: 0.70, blue: 0.88).opacity(0.20)
+    case .y2k:           return Color(red: 0.50, green: 0.70, blue: 1.0).opacity(0.18)
+    case .neobrutalism:  return .clear
+    case .minimalism:    return .clear
+    default:             return Color.roseMist.opacity(0.42)
     }
 }
 
 private struct SurfaceStyleKey: EnvironmentKey {
-    static let defaultValue = SurfaceStyle.glass
+    static let defaultValue = SurfaceStyle.glassmorphism
 }
 
 private struct TransparencyKey: EnvironmentKey {
-    static let defaultValue = 0.68
+    static let defaultValue = 0.40
 }
 
 private struct AeroSheen: ViewModifier {
@@ -197,7 +382,7 @@ private struct AeroSheen: ViewModifier {
 
     func body(content: Content) -> some View {
         content.overlay {
-            if surfaceStyle == .aero {
+            if surfaceStyle == .windowsAero {
                 RoundedRectangle(cornerRadius: cornerRadius ?? surfaceStyle.cornerRadius, style: .continuous)
                     .fill(
                         LinearGradient(
@@ -874,7 +1059,7 @@ private enum LauncherDefaults {
 @MainActor
 final class TaskbarConceptState: ObservableObject {
     @Published var openPanel: OpenPanel?
-    @Published var surfaceStyle = SurfaceStyle.glass
+    @Published var surfaceStyle = SurfaceStyle.glassmorphism
     @Published fileprivate var isDarkMode = false
     @Published fileprivate var wallpaperPreset = WallpaperPreset.pastelBloom {
         didSet { UserDefaults.standard.set(wallpaperPreset.rawValue, forKey: "wallpaper.preset") }
@@ -888,7 +1073,7 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var gradientAngle = 35.0 {
         didSet { persist(key: "wallpaper.gradientAngle", value: gradientAngle) }
     }
-    @Published fileprivate var interfaceTransparency = 0.68
+    @Published fileprivate var interfaceTransparency = 0.40
     @Published fileprivate var usesTaskbarGradient = false
     @Published fileprivate var taskbarGradientStart = Color(red: 0.78, green: 0.48, blue: 0.86)
     @Published fileprivate var taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)
@@ -1383,7 +1568,7 @@ final class TaskbarConceptState: ObservableObject {
     }
 
     fileprivate func resetPersonalisation() {
-        surfaceStyle = .glass
+        surfaceStyle = .glassmorphism
         taskbarMode = .windows
         islandGap = 10
         centeredBarWidth = 720
@@ -1395,7 +1580,7 @@ final class TaskbarConceptState: ObservableObject {
         pastelTint = Color(red: 0.91, green: 0.69, blue: 0.87)
         gradientEndTint = Color(red: 0.47, green: 0.70, blue: 0.86)
         gradientAngle = 35.0
-        interfaceTransparency = 0.68
+        interfaceTransparency = 0.40
         usesTaskbarGradient = false
         taskbarGradientStart = Color(red: 0.78, green: 0.48, blue: 0.86)
         taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)
@@ -1790,7 +1975,7 @@ public struct TaskbarConceptView: View {
                         onResetPersonalisation: { model.resetPersonalisation() },
                         cornerRadius: model.shellRadius(for: .flyouts)
                     )
-                    .frame(width: panelFrameWidth(.settings, available: geometry.size.width - 40), height: min(680, geometry.size.height - taskbarHeight - 34))
+                    .frame(width: panelFrameWidth(.settings, available: geometry.size.width - 40), height: max(560, min(geometry.size.height * 0.88, geometry.size.height - taskbarHeight - 40)))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .padding(.bottom, taskbarHeight)
                     .transition(.scale(scale: 0.94).combined(with: .opacity))
@@ -2478,7 +2663,7 @@ private struct Taskbar: View {
         } else if model.usesTaskbarGradient {
             Rectangle()
                 .fill(LinearGradient(colors: [model.taskbarGradientStart, model.taskbarGradientEnd], startPoint: .leading, endPoint: .trailing))
-        } else if model.surfaceStyle == .aero {
+        } else if model.surfaceStyle == .windowsAero {
             Rectangle()
                 .fill(.ultraThinMaterial)
                 .overlay {
@@ -2493,16 +2678,44 @@ private struct Taskbar: View {
                     )
                 }
         } else {
+            let fill: AnyShapeStyle = {
+                switch model.surfaceStyle {
+                case .windowsXP:
+                    return AnyShapeStyle(LinearGradient(
+                        colors: [Color(red: 0.15, green: 0.44, blue: 0.88), Color(red: 0.04, green: 0.22, blue: 0.61)],
+                        startPoint: .top, endPoint: .bottom
+                    ))
+                case .aqua:
+                    return AnyShapeStyle(LinearGradient(
+                        colors: [Color(red: 0.30, green: 0.65, blue: 0.96), Color(red: 0.10, green: 0.40, blue: 0.88)],
+                        startPoint: .top, endPoint: .bottom
+                    ))
+                case .frutigerAero:
+                    return AnyShapeStyle(LinearGradient(
+                        colors: [Color(red: 0.42, green: 0.78, blue: 0.96), Color(red: 0.18, green: 0.62, blue: 0.82)],
+                        startPoint: .top, endPoint: .bottom
+                    ))
+                case .y2k:
+                    return AnyShapeStyle(LinearGradient(
+                        colors: [Color(red: 0.72, green: 0.82, blue: 1.0), Color(red: 0.44, green: 0.60, blue: 0.96)],
+                        startPoint: .top, endPoint: .bottom
+                    ))
+                default:
+                    return AnyShapeStyle(model.surfaceStyle.taskbarFill(darkMode: model.isDarkMode))
+                }
+            }()
             Rectangle()
-                .fill(
-                    model.surfaceStyle == .windowsXP
-                        ? AnyShapeStyle(LinearGradient(colors: [Color(red: 0.15, green: 0.44, blue: 0.88), Color(red: 0.04, green: 0.22, blue: 0.61)], startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(model.surfaceStyle.taskbarFill(darkMode: model.isDarkMode))
-                )
+                .fill(fill)
                 .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.42))
-                        .frame(height: 1)
+                    if model.surfaceStyle == .neobrutalism {
+                        Rectangle()
+                            .fill(Color.black)
+                            .frame(height: 3)
+                    } else {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.42))
+                            .frame(height: 1)
+                    }
                 }
         }
     }
@@ -3222,7 +3435,7 @@ private struct WidgetsPanel: View {
             RoundedRectangle(cornerRadius: shellRadius, style: .continuous)
                 .strokeBorder(surfaceStyle == .classic98 ? Color.white.opacity(0.95) : Color.white.opacity(0.72), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
         }
-        .shadow(color: .black.opacity(surfaceStyle == .classic98 ? 0.12 : 0.18), radius: surfaceStyle == .glass ? 22 : 14, x: 0, y: surfaceStyle == .classic98 ? 3 : 8)
+        .shadow(color: .black.opacity(surfaceStyle == .classic98 ? 0.12 : 0.18), radius: surfaceStyle == .glassmorphism ? 22 : 14, x: 0, y: surfaceStyle == .classic98 ? 3 : 8)
         .aeroSheen(cornerRadius: shellRadius)
     }
 
@@ -3360,10 +3573,10 @@ private struct WidgetCard<Content: View>: View {
         )
         .overlay {
             RoundedRectangle(cornerRadius: surfaceStyle == .windowsXP ? 9 : (surfaceStyle == .classic98 ? 2 : 15), style: .continuous)
-                .strokeBorder(surfaceStyle == .classic98 ? Color.white : (surfaceStyle == .neumorphic ? Color.black.opacity(0.035) : Color.white.opacity(0.9)), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
+                .strokeBorder(surfaceStyle == .classic98 ? Color.white : (surfaceStyle == .neumorphism ? Color.black.opacity(0.035) : Color.white.opacity(0.9)), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
         }
-        .shadow(color: .black.opacity(surfaceStyle == .glass ? 0.035 : 0.09), radius: surfaceStyle == .clay ? 12 : 8, x: 0, y: surfaceStyle == .neumorphic ? 2 : 4)
-        .shadow(color: .white.opacity(surfaceStyle == .neumorphic ? 0.75 : 0), radius: 5, x: -3, y: -3)
+        .shadow(color: .black.opacity(surfaceStyle == .glassmorphism ? 0.035 : 0.09), radius: surfaceStyle == .claymorphism ? 12 : 8, x: 0, y: surfaceStyle == .neumorphism ? 2 : 4)
+        .shadow(color: .white.opacity(surfaceStyle == .neumorphism ? 0.75 : 0), radius: 5, x: -3, y: -3)
         .aeroSheen()
     }
 }
@@ -4698,6 +4911,7 @@ private struct TaskbarModeThumbnail: View {
 }
 
 private struct SettingsFlyout: View {
+    // MARK: - Bindings (all preserved)
     @Binding var surfaceStyle: SurfaceStyle
     @Binding var taskbarMode: TaskbarMode
     @Binding var islandGap: CGFloat
@@ -4739,11 +4953,36 @@ private struct SettingsFlyout: View {
     let onClose: () -> Void
     let onResetPersonalisation: () -> Void
     let cornerRadius: CGFloat
+
+    // MARK: - State
     @State private var isConfirmingReset = false
+    @State private var selectedTab = SFTab.taskbar
+
+    // MARK: - Environment
     @Environment(\.surfaceStyle) private var currentStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
 
+    // MARK: - Tab definition
+    private enum SFTab: String, CaseIterable {
+        case taskbar  = "Taskbar"
+        case themes   = "Themes"
+        case widgets  = "Widgets"
+        case flyouts  = "Flyouts"
+        case advanced = "Advanced"
+
+        var icon: String {
+            switch self {
+            case .taskbar:  "square.3.layers.3d.bottom.filled"
+            case .themes:   "paintbrush.fill"
+            case .widgets:  "square.grid.2x2.fill"
+            case .flyouts:  "sidebar.right"
+            case .advanced: "gearshape.2.fill"
+            }
+        }
+    }
+
+    // MARK: - Helpers
     private var sectionFill: Color {
         Color.primary.opacity(colorScheme == .dark ? 0.13 : 0.045)
     }
@@ -4752,90 +4991,26 @@ private struct SettingsFlyout: View {
         _ title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
             content()
             Spacer(minLength: 0)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(sectionFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func sliderValueLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .medium, design: .rounded))
+            .font(.system(size: 12, weight: .medium, design: .rounded))
             .foregroundStyle(.secondary)
-            .frame(minWidth: 38, alignment: .trailing)
+            .frame(minWidth: 44, alignment: .trailing)
     }
 
-    private func cornerStyleButton(_ style: CornerStyle, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(style.title)
-                .font(.system(size: 9, weight: .semibold))
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(
-                    selected ? accent.opacity(0.12) : Color.primary.opacity(0.035),
-                    in: RoundedRectangle(cornerRadius: 9)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func cornerSurfaceRow(_ title: String, selection: Binding<CornerStyle>) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 10, weight: .medium))
-            Spacer()
-            Picker("", selection: selection) {
-                ForEach(CornerStyle.allCases) { style in
-                    Text(style.title).tag(style)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 190)
-        }
-    }
-
-    private func surfaceStyleRow(_ style: SurfaceStyle) -> some View {
-        Button {
-            surfaceStyle = style
-        } label: {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: style == .classic98 ? 2 : 10)
-                    .fill(style.cardFill(darkMode: isDarkMode))
-                    .overlay {
-                        Circle()
-                            .fill(accent.opacity(0.75))
-                            .frame(width: 18, height: 18)
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: style == .classic98 ? 2 : 10)
-                            .strokeBorder(style == .classic98 ? Color.white : Color.white.opacity(0.9), lineWidth: style == .classic98 ? 2 : 1)
-                    }
-                    .frame(width: 48, height: 38)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(style.title)
-                        .font(.system(size: 11, weight: .semibold))
-                    Text(style.subtitle)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if surfaceStyle == style {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(accent)
-                }
-            }
-            .padding(9)
-            .background(
-                surfaceStyle == style ? style.accent(darkMode: isDarkMode).opacity(0.1) : Color.primary.opacity(0.035),
-                in: RoundedRectangle(cornerRadius: style.cornerRadius)
-            )
-        }
-        .buttonStyle(.plain)
+    private var effectiveTrashPlacement: TrashPlacement {
+        trashAnchors[taskbarMode.rawValue].flatMap(TrashPlacement.init(rawValue:)) ?? trashPlacement
     }
 
     private func panelWidthBinding(for kind: PanelKind) -> Binding<Double> {
@@ -4843,28 +5018,6 @@ private struct SettingsFlyout: View {
             get: { Double(panelWidths[kind] ?? kind.defaultWidth) },
             set: { panelWidths[kind] = min(kind.maximumWidth, max(kind.minimumWidth, CGFloat($0))) }
         )
-    }
-
-    private func iconSizePresetButton(_ size: TaskbarIconSize) -> some View {
-        Button {
-            taskbarIconSize = size
-        } label: {
-            VStack(spacing: 7) {
-                Image(systemName: "app.fill")
-                    .font(.system(size: 14 + CGFloat(TaskbarIconSize.allCases.firstIndex(of: size) ?? 1) * 4, weight: .medium))
-                    .foregroundStyle(accent)
-                    .frame(height: 26)
-                Text(size.title)
-                    .font(.system(size: 9, weight: .semibold))
-            }
-            .padding(.vertical, 9)
-            .frame(maxWidth: .infinity)
-            .background(
-                taskbarIconSize == size ? accent.opacity(0.12) : Color.primary.opacity(0.035),
-                in: RoundedRectangle(cornerRadius: 10)
-            )
-        }
-        .buttonStyle(.plain)
     }
 
     private func clusterItemTitle(_ key: String) -> String {
@@ -4880,346 +5033,6 @@ private struct SettingsFlyout: View {
         let target = index + offset
         guard clusterOrder.indices.contains(target) else { return }
         clusterOrder.swapAt(index, target)
-    }
-
-    private var effectiveTrashPlacement: TrashPlacement {
-        trashAnchors[taskbarMode.rawValue].flatMap(TrashPlacement.init(rawValue:)) ?? trashPlacement
-    }
-
-    private func trashPlacementButton(_ placement: TrashPlacement) -> some View {
-        Button {
-            trashAnchors[taskbarMode.rawValue] = placement.rawValue
-        } label: {
-            Text(placement.title)
-                .font(.system(size: 9, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(
-                    effectiveTrashPlacement == placement ? accent.opacity(0.12) : Color.primary.opacity(0.035),
-                    in: RoundedRectangle(cornerRadius: 9)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func panelWidthRow(_ kind: PanelKind) -> some View {
-        HStack {
-            Text(kind.title)
-                .font(.system(size: 10, weight: .medium))
-                .frame(width: 96, alignment: .leading)
-            Slider(value: panelWidthBinding(for: kind), in: Double(kind.minimumWidth)...Double(kind.maximumWidth), step: 10)
-                .tint(accent)
-            sliderValueLabel("\(Int(panelWidths[kind] ?? kind.defaultWidth)) pt")
-        }
-    }
-
-    private func wallpaperPresetButton(_ preset: WallpaperPreset) -> some View {
-        Button {
-            wallpaperPreset = preset
-            isDarkMode = preset.isDark
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(
-                        LinearGradient(
-                            colors: preset == .custom ? [pastelTint, gradientEndTint] : preset.colors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(height: 38)
-                Text(preset.title)
-                    .font(.system(size: 9, weight: .semibold))
-                    .lineLimit(1)
-            }
-            .padding(6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                wallpaperPreset == preset ? accent.opacity(0.12) : Color.primary.opacity(0.035),
-                in: RoundedRectangle(cornerRadius: 10)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var taskbarBehaviorSection: some View {
-        settingsSection("Taskbar behavior") {
-            Text("Running indicator")
-                .font(.system(size: 10, weight: .medium))
-            HStack(spacing: 8) {
-                ForEach(RunningIndicatorStyle.allCases) { style in
-                    indicatorStyleButton(style)
-                }
-            }
-            HStack {
-                ForEach(RunningIndicatorSize.allCases) { size in
-                    indicatorSizeButton(size)
-                }
-                Spacer(minLength: 8)
-                ColorPicker("Colour", selection: $runningIndicatorColor, supportsOpacity: false)
-                    .font(.system(size: 10, weight: .medium))
-            }
-            Text("Click focused app")
-                .font(.system(size: 10, weight: .medium))
-                .padding(.top, 2)
-            HStack(spacing: 8) {
-                ForEach(AppMinimizeMode.allCases) { mode in
-                    minimizeModeButton(mode)
-                }
-            }
-            Text("Minimize needs Accessibility; first use explains the prompt. Hide needs nothing.")
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-            Text("Right-click menu")
-                .font(.system(size: 10, weight: .medium))
-                .padding(.top, 2)
-            HStack(spacing: 8) {
-                ForEach(ContextMenuStyle.allCases) { style in
-                    contextMenuStyleButton(style)
-                }
-            }
-            Toggle(isOn: $showWindowPreviews) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Window previews")
-                        .font(.system(size: 11, weight: .medium))
-                    Text("Live thumbnails on icon hover. Needs Screen Recording; icon fallback otherwise.")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.switch)
-            .padding(.top, 2)
-            Toggle(isOn: $showWifiName) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Show Wi-Fi network name")
-                        .font(.system(size: 11, weight: .medium))
-                    Text("Needs Location; macOS prompts once on first read.")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.switch)
-            .padding(.top, 2)
-            Toggle(isOn: $showBluetoothDevices) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Bluetooth devices")
-                        .font(.system(size: 11, weight: .medium))
-                    Text("Lists paired devices with tap-to-connect. Prompts for Bluetooth on first read; per-device batteries have no public API.")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.switch)
-            .padding(.top, 2)
-            Toggle(isOn: $ddcBrightnessEnabled) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("External display brightness (DDC)")
-                        .font(.system(size: 11, weight: .medium))
-                    Text("Uses a private display API, isolated and probed at runtime. External writes are hardware-unverified; built-in display uses public API.")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.switch)
-            .padding(.top, 2)
-        }
-    }
-
-    private func indicatorStyleButton(_ style: RunningIndicatorStyle) -> some View {
-        Button {
-            runningIndicatorStyle = style
-        } label: {
-            Text(style.title)
-                .font(.system(size: 9, weight: .semibold))
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(
-                    runningIndicatorStyle == style ? accent.opacity(0.12) : Color.primary.opacity(0.035),
-                    in: RoundedRectangle(cornerRadius: 9)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func indicatorSizeButton(_ size: RunningIndicatorSize) -> some View {
-        Button {
-            runningIndicatorSize = size
-        } label: {
-            Text(size.title)
-                .font(.system(size: 9, weight: .semibold))
-                .padding(.vertical, 8)
-                .padding(.horizontal, 10)
-                .background(
-                    runningIndicatorSize == size ? accent.opacity(0.12) : Color.primary.opacity(0.035),
-                    in: RoundedRectangle(cornerRadius: 9)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func minimizeModeButton(_ mode: AppMinimizeMode) -> some View {
-        Button {
-            minimizeMode = mode
-        } label: {
-            Text(mode.title)
-                .font(.system(size: 9, weight: .semibold))
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(
-                    minimizeMode == mode ? accent.opacity(0.12) : Color.primary.opacity(0.035),
-                    in: RoundedRectangle(cornerRadius: 9)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func contextMenuStyleButton(_ style: ContextMenuStyle) -> some View {
-        Button {
-            contextMenuStyle = style
-        } label: {
-            Text(style.title)
-                .font(.system(size: 9, weight: .semibold))
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(
-                    contextMenuStyle == style ? accent.opacity(0.12) : Color.primary.opacity(0.035),
-                    in: RoundedRectangle(cornerRadius: 9)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var quickSettingsGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 12) {
-            taskbarModeSection
-            appearanceSection
-            transparencySection
-            taskbarHeightSection
-        }
-    }
-
-    private var taskbarModeSection: some View {
-        settingsSection("Taskbar mode") {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    ForEach(TaskbarMode.allCases) { mode in
-                        Button {
-                            taskbarMode = mode
-                        } label: {
-                            TaskbarModeThumbnail(mode: mode, isSelected: taskbarMode == mode)
-                        }
-                        .buttonStyle(.plain)
-                        .help(mode.detail)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(taskbarMode.title)
-                        .font(.system(size: 11, weight: .medium))
-                    Text(taskbarMode.detail)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if taskbarMode.isSplit {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text("Island gap")
-                                .font(.system(size: 11, weight: .medium))
-                            Spacer()
-                            Text("\(Int(islandGap)) pt")
-                                .font(.system(size: 10, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                        }
-                        Slider(value: $islandGap, in: 0...40, step: 1)
-                    }
-                }
-                Toggle(isOn: $showsTaskbarPanel) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Screen-edge panel")
-                            .font(.system(size: 11, weight: .medium))
-                        Text("Show the taskbar in a bottom-edge panel with flyouts above it.")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .toggleStyle(.switch)
-            }
-            Toggle(isOn: $hideMacDock) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Hide macOS Dock")
-                        .font(.system(size: 11, weight: .medium))
-                    Text("Experimental and reversible. Original Dock settings restore on quit, crash recovery included.")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.switch)
-        }
-    }
-
-    private var dividerSection: some View {
-        settingsSection("Dividers") {
-            if userDividers.isEmpty {
-                Text("No dividers. Right-click a taskbar icon and choose Divider to place one after it.")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                VStack(spacing: 6) {
-                    ForEach(Array(userDividers.enumerated()), id: \.element.id) { index, divider in
-                        HStack(spacing: 8) {
-                            Text("Divider \(index + 1)")
-                                .font(.system(size: 11, weight: .medium))
-                            Text(divider.anchorBundleID.map(taskbarDisplayName(for:)) ?? "End of the strip")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                            Spacer(minLength: 0)
-                            Menu("Move after") {
-                                ForEach(pinnedAppBundleIDs, id: \.self) { bundleID in
-                                    Button(taskbarDisplayName(for: bundleID)) {
-                                        moveDivider(divider.id, after: bundleID)
-                                    }
-                                }
-                            }
-                            .menuStyle(.borderlessButton)
-                            .frame(maxWidth: 130)
-                            Button(role: .destructive) {
-                                removeDivider(divider.id)
-                            } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 10, weight: .semibold))
-                            }
-                            .buttonStyle(.plain)
-                            .help("Remove divider")
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-            }
-            Menu {
-                ForEach(pinnedAppBundleIDs, id: \.self) { bundleID in
-                    Button(taskbarDisplayName(for: bundleID)) {
-                        addDivider(after: bundleID)
-                    }
-                }
-            } label: {
-                Label("Add divider after an app", systemImage: "plus")
-                    .font(.system(size: 11, weight: .medium))
-            }
-            .menuStyle(.borderlessButton)
-            .disabled(pinnedAppBundleIDs.isEmpty || taskbarMode == .macOS)
-        }
     }
 
     private func addDivider(after bundleID: String) {
@@ -5242,288 +5055,853 @@ private struct SettingsFlyout: View {
         userDividers.contains { $0.anchorBundleID == bundleIdentifier }
     }
 
-    private var appearanceSection: some View {
+    // MARK: - Body
+    var body: some View {
+        VStack(spacing: 0) {
+            headerBar
+            tabBar
+            Divider().opacity(0.35)
+            tabContent
+        }
+        .background(
+            panelBackground(style: currentStyle, darkMode: colorScheme == .dark, transparency: transparency),
+            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        )
+        .background(surfaceWash(style: currentStyle, darkMode: colorScheme == .dark))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(
+                    currentStyle == .classic98 ? Color.white :
+                    currentStyle == .neobrutalism ? Color.black : Color.white.opacity(0.76),
+                    lineWidth: currentStyle == .classic98 ? 2 : currentStyle == .neobrutalism ? 3 : 1
+                )
+        }
+        .shadow(
+            color: currentStyle == .neobrutalism ? .black.opacity(0.85) : .black.opacity(0.16),
+            radius: currentStyle == .neobrutalism ? 0 : 22,
+            x: currentStyle == .neobrutalism ? 6 : 0,
+            y: currentStyle == .neobrutalism ? 6 : 10
+        )
+    }
+
+    // MARK: - Header bar
+    private var headerBar: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Personalisation")
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                Text("Make this taskbar feel like yours")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                isConfirmingReset = true
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 34, height: 34)
+                    .background(sectionFill, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .help("Reset to defaults")
+            .confirmationDialog(
+                "Reset Personalisation?",
+                isPresented: $isConfirmingReset,
+                titleVisibility: .visible
+            ) {
+                Button("Reset everything", role: .destructive) { onResetPersonalisation() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Widths, icons, trash position, wallpaper and taskbar appearance return to defaults. Pins and widgets are untouched.")
+            }
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 34, height: 34)
+                    .background(sectionFill, in: Circle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 20)
+        .padding(.bottom, 10)
+    }
+
+    // MARK: - Tab bar
+    private var tabBar: some View {
+        HStack(spacing: 4) {
+            ForEach(SFTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    VStack(spacing: 5) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 13, weight: .medium))
+                        Text(tab.rawValue)
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundStyle(selectedTab == tab ? accent : .secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(
+                        selectedTab == tab ? accent.opacity(0.10) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 9)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+    }
+
+    // MARK: - Tab content router
+    @ViewBuilder
+    private var tabContent: some View {
+        switch selectedTab {
+        case .taskbar:  taskbarTab
+        case .themes:   themesTab
+        case .widgets:  widgetsTab
+        case .flyouts:  flyoutsTab
+        case .advanced: advancedTab
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: - Tab 1: Taskbar
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private var taskbarTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                taskbarModeCard
+                if taskbarMode == .centered || taskbarMode == .macOS {
+                    barWidthCard
+                }
+                dividerCard
+                clusterOrderCard
+            }
+            .padding(18)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var taskbarModeCard: some View {
+        settingsSection("Taskbar mode") {
+            HStack(spacing: 8) {
+                ForEach(TaskbarMode.allCases) { mode in
+                    Button { taskbarMode = mode } label: {
+                        TaskbarModeThumbnail(mode: mode, isSelected: taskbarMode == mode)
+                    }
+                    .buttonStyle(.plain)
+                    .help(mode.detail)
+                }
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(taskbarMode.title)
+                    .font(.system(size: 13, weight: .medium))
+                Text(taskbarMode.detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if taskbarMode.isSplit {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Island gap")
+                            .font(.system(size: 13, weight: .medium))
+                        Spacer()
+                        sliderValueLabel("\(Int(islandGap)) pt")
+                    }
+                    Slider(value: $islandGap, in: 0...40, step: 1).tint(accent)
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Taskbar height")
+                    .font(.system(size: 13, weight: .medium))
+                // Height presets: XS/S/M/L/XL
+                HStack(spacing: 6) {
+                    let presets: [(String, CGFloat)] = [("XS", 32), ("S", 38), ("M", 42), ("L", 46), ("XL", 52)]
+                    ForEach(presets, id: \.0) { label, h in
+                        Button {
+                            withAnimation(.spring(response: 0.25)) { taskbarHeight = h }
+                        } label: {
+                            Text(label)
+                                .font(.system(size: 11, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(
+                                    abs(taskbarHeight - h) < 1 ? accent.opacity(0.14) : Color.primary.opacity(0.045),
+                                    in: RoundedRectangle(cornerRadius: 8)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                HStack {
+                    Slider(value: $taskbarHeight, in: 32...56, step: 2).tint(accent)
+                    sliderValueLabel("\(Int(taskbarHeight)) pt")
+                }
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                Toggle(isOn: $showsTaskbarPanel) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Screen-edge panel")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Show the taskbar in a bottom-edge panel.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                Toggle(isOn: $hideMacDock) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Hide macOS Dock")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Experimental and fully reversible. Original Dock settings restore on quit.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .toggleStyle(.switch)
+            }
+        }
+    }
+
+    private var barWidthCard: some View {
+        settingsSection("Bar width") {
+            HStack {
+                Text("Centered width")
+                    .font(.system(size: 13, weight: .medium))
+                Spacer()
+                sliderValueLabel("\(Int(centeredBarWidth)) pt")
+            }
+            Slider(value: $centeredBarWidth, in: 360...1600, step: 20).tint(accent)
+            Text("Narrower bars leave more desktop visible.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var dividerCard: some View {
+        settingsSection("Dividers") {
+            if userDividers.isEmpty {
+                Text("No dividers yet. Right-click any taskbar icon and choose Divider to place one after it.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 6) {
+                    ForEach(Array(userDividers.enumerated()), id: \.element.id) { index, divider in
+                        HStack(spacing: 8) {
+                            Text("Divider \(index + 1)")
+                                .font(.system(size: 12, weight: .medium))
+                            Text(divider.anchorBundleID.map(taskbarDisplayName(for:)) ?? "End of strip")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
+                            Menu("Move") {
+                                ForEach(pinnedAppBundleIDs, id: \.self) { bundleID in
+                                    Button(taskbarDisplayName(for: bundleID)) {
+                                        moveDivider(divider.id, after: bundleID)
+                                    }
+                                }
+                            }
+                            .menuStyle(.borderlessButton)
+                            .frame(maxWidth: 80)
+                            Button(role: .destructive) {
+                                removeDivider(divider.id)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
+                    }
+                }
+            }
+            Menu {
+                ForEach(pinnedAppBundleIDs, id: \.self) { bundleID in
+                    Button(taskbarDisplayName(for: bundleID)) { addDivider(after: bundleID) }
+                }
+            } label: {
+                Label("Add divider after an app", systemImage: "plus")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .menuStyle(.borderlessButton)
+            .disabled(pinnedAppBundleIDs.isEmpty || taskbarMode == .macOS)
+        }
+    }
+
+    private var clusterOrderCard: some View {
+        settingsSection("Cluster order") {
+            Text("Downloads, Trash, and system status travel as one cluster.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            VStack(spacing: 6) {
+                ForEach(Array(clusterOrder.enumerated()), id: \.element) { index, key in
+                    HStack(spacing: 8) {
+                        Text(clusterItemTitle(key))
+                            .font(.system(size: 12, weight: .medium))
+                        Spacer(minLength: 0)
+                        Button { moveClusterItem(key, offset: -1) } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(index == 0)
+                        Button { moveClusterItem(key, offset: 1) } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(index == clusterOrder.count - 1)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
+                }
+            }
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: - Tab 2: Themes
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private var themesTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                themeSwatchCard
+                appearanceCard
+                transparencyCard
+                cornersCard
+                taskbarGradientCard
+            }
+            .padding(18)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var themeSwatchCard: some View {
+        settingsSection("Surface theme") {
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
+                spacing: 10
+            ) {
+                ForEach(SurfaceStyle.allCases) { style in
+                    themeSwatchButton(style)
+                }
+            }
+            HStack {
+                Text(surfaceStyle.title)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text(surfaceStyle.subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 2)
+            Text("Theme applies across the taskbar, all flyouts, and widget cards.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func themeSwatchButton(_ style: SurfaceStyle) -> some View {
+        Button { surfaceStyle = style } label: {
+            VStack(spacing: 6) {
+                ZStack(alignment: .bottom) {
+                    // Panel fill preview
+                    RoundedRectangle(cornerRadius: max(4, style.cornerRadius * 0.45), style: .continuous)
+                        .fill(style.panelFill(darkMode: isDarkMode))
+                    // Mini taskbar strip
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(style.taskbarFill(darkMode: isDarkMode))
+                        .frame(height: 10)
+                        .padding(.horizontal, 2)
+                        .padding(.bottom, 2)
+                    // Mini accent dots
+                    HStack(spacing: 3) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            Circle()
+                                .fill(style.accent(darkMode: isDarkMode).opacity(0.8))
+                                .frame(width: 5, height: 5)
+                        }
+                    }
+                    .padding(.bottom, 14)
+                    // Selection ring
+                    if surfaceStyle == style {
+                        RoundedRectangle(cornerRadius: max(4, style.cornerRadius * 0.45), style: .continuous)
+                            .strokeBorder(accent, lineWidth: 2.5)
+                    }
+                    // Neobrutalism: hard black border
+                    if style == .neobrutalism {
+                        Rectangle()
+                            .strokeBorder(Color.black, lineWidth: 2)
+                    }
+                }
+                .frame(height: 62)
+                Text(style.title)
+                    .font(.system(size: 9, weight: surfaceStyle == style ? .semibold : .medium))
+                    .foregroundStyle(surfaceStyle == style ? accent : .primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var appearanceCard: some View {
         settingsSection("Appearance") {
             Toggle(isOn: $isDarkMode) {
                 Label(
                     isDarkMode ? "Dark appearance" : "Light appearance",
                     systemImage: isDarkMode ? "moon.stars.fill" : "sun.max.fill"
                 )
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
             }
             .toggleStyle(.switch)
         }
     }
 
-    private var transparencySection: some View {
+    private var transparencyCard: some View {
         settingsSection("Transparency") {
             Toggle(isOn: Binding(
                 get: { interfaceTransparency > 0 },
-                set: { interfaceTransparency = $0 ? 0.68 : 0 }
+                set: { interfaceTransparency = $0 ? 0.40 : 0 }
             )) {
                 Text("Enable transparency")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
             }
             .toggleStyle(.switch)
             Slider(value: $interfaceTransparency, in: 0...0.9, step: 0.01)
                 .tint(accent)
                 .disabled(interfaceTransparency == 0)
             HStack {
-                sliderValueLabel("\(Int(interfaceTransparency * 100))%")
-                Spacer(minLength: 0)
-                Text("Panels and taskbar")
-                    .font(.system(size: 9))
+                Text("\(Int(interfaceTransparency * 100))%")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var taskbarHeightSection: some View {
-        settingsSection("Taskbar height") {
-            Slider(value: $taskbarHeight, in: 32...48, step: 2)
-                .tint(accent)
-            HStack {
-                Text("Compact")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                sliderValueLabel("\(Int(taskbarHeight)) pt")
-            }
-        }
-    }
-
-    var body: some View {
-        ScrollView {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Personalisation")
-                        .font(.system(size: 24, weight: .semibold, design: .rounded))
-                    Text("Make this taskbar feel like yours")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
                 Spacer()
-                Button {
-                    isConfirmingReset = true
-                } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(width: 32, height: 32)
-                        .background(sectionFill, in: Circle())
-                }
-                .buttonStyle(.plain)
-                .help("Reset Personalisation to defaults")
-                .confirmationDialog(
-                    "Reset Personalisation?",
-                    isPresented: $isConfirmingReset,
-                    titleVisibility: .visible
-                ) {
-                    Button("Reset everything", role: .destructive) {
-                        onResetPersonalisation()
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("Widths, icons, trash position, wallpaper, and taskbar appearance return to defaults. Pins and widgets are untouched.")
-                }
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(width: 32, height: 32)
-                        .background(sectionFill, in: Circle())
-                }
-                .buttonStyle(.plain)
+                Text("Applies to panels and taskbar")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
+        }
+    }
 
-            quickSettingsGrid
-
-            dividerSection
-
-            taskbarBehaviorSection
-
-            settingsSection("Taskbar icons") {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                    ForEach(TaskbarIconSize.allCases) { size in
-                        iconSizePresetButton(size)
-                    }
-                }
-                Text("Trash position in \(taskbarMode.title)")
-                    .font(.system(size: 10, weight: .medium))
-                    .padding(.top, 2)
-                HStack(spacing: 8) {
-                    ForEach(TrashPlacement.allCases) { placement in
-                        trashPlacementButton(placement)
-                    }
-                }
-                HStack(spacing: 8) {
-                    Button {
-                        trashPlacement = effectiveTrashPlacement
-                        for mode in TaskbarMode.allCases {
-                            trashAnchors[mode.rawValue] = effectiveTrashPlacement.rawValue
-                        }
-                    } label: {
-                        Label("Use in every mode", systemImage: "arrow.left.arrow.right")
-                            .font(.system(size: 9, weight: .medium))
+    private var cornersCard: some View {
+        settingsSection("Corners") {
+            HStack(spacing: 8) {
+                ForEach(CornerStyle.allCases) { style in
+                    Button { cornerStyle = style } label: {
+                        Text(style.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                cornerStyle == style ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
                     }
                     .buttonStyle(.plain)
-                    if trashAnchors[taskbarMode.rawValue] != nil {
-                        Button {
-                            trashAnchors[taskbarMode.rawValue] = nil
-                        } label: {
-                            Label("Reset \(taskbarMode.title)", systemImage: "arrow.uturn.backward")
-                                .font(.system(size: 9, weight: .medium))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .foregroundStyle(accent)
-            }
-
-            settingsSection("Cluster order") {
-                Text("Downloads, Trash, and system status travel together as one cluster.")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                VStack(spacing: 6) {
-                    ForEach(Array(clusterOrder.enumerated()), id: \.element) { index, key in
-                        HStack(spacing: 8) {
-                            Text(clusterItemTitle(key))
-                                .font(.system(size: 11, weight: .medium))
-                            Spacer(minLength: 0)
-                            Button {
-                                moveClusterItem(key, offset: -1)
-                            } label: {
-                                Image(systemName: "chevron.left")
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(index == 0)
-                            Button {
-                                moveClusterItem(key, offset: 1)
-                            } label: {
-                                Image(systemName: "chevron.right")
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(index == clusterOrder.count - 1)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
-                    }
                 }
             }
-
-            if taskbarMode == .centered || taskbarMode == .macOS {
-                settingsSection("Bar width") {
-                    HStack {
-                        Text("Centered width")
-                            .font(.system(size: 11, weight: .medium))
-                        Spacer()
-                        Text("\(Int(centeredBarWidth)) pt")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
+            HStack {
+                Text("Apply corners to")
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                Picker("", selection: $cornerScope) {
+                    ForEach(CornerScope.allCases) { scope in
+                        Text(scope.title).tag(scope)
                     }
-                    Slider(value: $centeredBarWidth, in: 360...1600, step: 20)
-                    Text("Narrower bars leave more desktop visible while keeping every section reachable.")
-                        .font(.system(size: 9))
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+            }
+            if cornerScope == .perSurface {
+                cornerSurfaceRow("Taskbar", selection: $cornerTaskbar)
+                cornerSurfaceRow("Widgets", selection: $cornerWidgets)
+                cornerSurfaceRow("Flyouts", selection: $cornerFlyouts)
+            }
+            Text("Pill rounds shells fully. Sharp floors at 2 pt so beveled themes keep reading correctly.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func cornerSurfaceRow(_ title: String, selection: Binding<CornerStyle>) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+            Spacer()
+            Picker("", selection: selection) {
+                ForEach(CornerStyle.allCases) { style in
+                    Text(style.title).tag(style)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 200)
+        }
+    }
+
+    private var taskbarGradientCard: some View {
+        settingsSection("Taskbar gradient") {
+            Toggle("Use custom gradient", isOn: $usesTaskbarGradient)
+                .toggleStyle(.switch)
+                .font(.system(size: 13, weight: .medium))
+            if usesTaskbarGradient {
+                HStack(spacing: 16) {
+                    ColorPicker("Start", selection: $taskbarGradientStart, supportsOpacity: false)
+                    ColorPicker("End", selection: $taskbarGradientEnd, supportsOpacity: false)
+                }
+                .font(.system(size: 12, weight: .medium))
+            }
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: - Tab 3: Widgets & Wallpaper
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private var widgetsTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                wallpaperPresetsCard
+                wallpaperGradientCard
+            }
+            .padding(18)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var wallpaperPresetsCard: some View {
+        settingsSection("Desktop wallpaper") {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                ForEach(WallpaperPreset.allCases) { preset in
+                    wallpaperPresetButton(preset)
+                }
+            }
+            Text("Choose a preset, or Custom to pick your own gradient colours.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            if wallpaperPreset == .custom {
+                HStack(spacing: 16) {
+                    ColorPicker("Start colour", selection: $pastelTint, supportsOpacity: false)
+                    ColorPicker("End colour", selection: $gradientEndTint, supportsOpacity: false)
+                }
+                .font(.system(size: 12, weight: .medium))
+            }
+        }
+    }
+
+    private func wallpaperPresetButton(_ preset: WallpaperPreset) -> some View {
+        Button {
+            wallpaperPreset = preset
+            isDarkMode = preset.isDark
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        LinearGradient(
+                            colors: preset == .custom ? [pastelTint, gradientEndTint] : preset.colors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(height: 44)
+                Text(preset.title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .padding(7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                wallpaperPreset == preset ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                in: RoundedRectangle(cornerRadius: 11)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var wallpaperGradientCard: some View {
+        settingsSection("Wallpaper gradient") {
+            HStack {
+                Text("Angle")
+                    .font(.system(size: 13, weight: .medium))
+                Slider(value: $gradientAngle, in: 0...360, step: 1).tint(accent)
+                sliderValueLabel("\(Int(gradientAngle))°")
+            }
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: - Tab 4: Flyouts
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private var flyoutsTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                panelWidthsCard
+            }
+            .padding(18)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var panelWidthsCard: some View {
+        settingsSection("Panel widths") {
+            ForEach(PanelKind.allCases) { kind in
+                panelWidthRow(kind)
+            }
+            Text("Widen any panel up to its maximum width.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func panelWidthRow(_ kind: PanelKind) -> some View {
+        HStack {
+            Text(kind.title)
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 100, alignment: .leading)
+            Slider(
+                value: panelWidthBinding(for: kind),
+                in: Double(kind.minimumWidth)...Double(kind.maximumWidth),
+                step: 10
+            )
+            .tint(accent)
+            sliderValueLabel("\(Int(panelWidths[kind] ?? kind.defaultWidth)) pt")
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: - Tab 5: Advanced
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private var advancedTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                runningIndicatorCard
+                clickBehaviorCard
+                contextMenuCard
+                privacyCard
+                iconSizeCard
+                trashPlacementCard
+            }
+            .padding(18)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var runningIndicatorCard: some View {
+        settingsSection("Running indicator") {
+            Text("Style")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                ForEach(RunningIndicatorStyle.allCases) { style in
+                    Button { runningIndicatorStyle = style } label: {
+                        Text(style.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                runningIndicatorStyle == style ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Text("Size")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                ForEach(RunningIndicatorSize.allCases) { size in
+                    Button { runningIndicatorSize = size } label: {
+                        Text(size.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.vertical, 9)
+                            .padding(.horizontal, 12)
+                            .background(
+                                runningIndicatorSize == size ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer(minLength: 8)
+                ColorPicker("Colour", selection: $runningIndicatorColor, supportsOpacity: false)
+                    .font(.system(size: 12, weight: .medium))
+            }
+        }
+    }
+
+    private var clickBehaviorCard: some View {
+        settingsSection("Click focused app") {
+            HStack(spacing: 8) {
+                ForEach(AppMinimizeMode.allCases) { mode in
+                    Button { minimizeMode = mode } label: {
+                        Text(mode.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                minimizeMode == mode ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Text("Minimize needs Accessibility (prompted on first use). Hide needs nothing.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var contextMenuCard: some View {
+        settingsSection("Right-click menu") {
+            HStack(spacing: 8) {
+                ForEach(ContextMenuStyle.allCases) { style in
+                    Button { contextMenuStyle = style } label: {
+                        Text(style.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                contextMenuStyle == style ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var privacyCard: some View {
+        settingsSection("Features & Privacy") {
+            Toggle(isOn: $showWindowPreviews) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Window previews")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Live thumbnails on icon hover. Needs Screen Recording; falls back to icon otherwise.")
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-
-            settingsSection("Panel widths") {
-                ForEach(PanelKind.allCases) { kind in
-                    panelWidthRow(kind)
-                }
-                Text("Windows 11-style narrow defaults; widen any panel back toward its previous width.")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-            }
-
-            settingsSection("Surface style") {
-                ForEach(SurfaceStyle.allCases) { style in
-                    surfaceStyleRow(style)
+            .toggleStyle(.switch)
+            Toggle(isOn: $showWifiName) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Show Wi-Fi network name")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Needs Location — macOS prompts once on first read.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
             }
+            .toggleStyle(.switch)
+            Toggle(isOn: $showBluetoothDevices) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Bluetooth devices")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Lists paired devices with tap-to-connect.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            Toggle(isOn: $ddcBrightnessEnabled) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("External display brightness (DDC)")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Uses a private display API, isolated and probed at runtime.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+        }
+    }
 
-            settingsSection("Corners") {
-                HStack(spacing: 8) {
-                    ForEach(CornerStyle.allCases) { style in
-                        cornerStyleButton(style, selected: cornerStyle == style) {
-                            cornerStyle = style
+    private var iconSizeCard: some View {
+        settingsSection("Taskbar icons") {
+            HStack(spacing: 8) {
+                ForEach(Array(TaskbarIconSize.allCases.enumerated()), id: \.element) { index, size in
+                    Button { taskbarIconSize = size } label: {
+                        VStack(spacing: 7) {
+                            Image(systemName: "app.fill")
+                                .font(.system(size: 10 + CGFloat(index) * 4, weight: .medium))
+                                .foregroundStyle(accent)
+                                .frame(height: 26)
+                            Text(size.title)
+                                .font(.system(size: 10, weight: .semibold))
                         }
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            taskbarIconSize == size ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                            in: RoundedRectangle(cornerRadius: 10)
+                        )
                     }
-                }
-                HStack {
-                    Text("Apply to")
-                        .font(.system(size: 10, weight: .medium))
-                    Spacer()
-                    Picker("", selection: $cornerScope) {
-                        ForEach(CornerScope.allCases) { scope in
-                            Text(scope.title).tag(scope)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 190)
-                }
-                if cornerScope == .perSurface {
-                    cornerSurfaceRow("Taskbar", selection: $cornerTaskbar)
-                    cornerSurfaceRow("Widgets", selection: $cornerWidgets)
-                    cornerSurfaceRow("Flyouts", selection: $cornerFlyouts)
-                }
-                Text("Pill rounds shells fully (capped on tall panels); Sharp floors at 2 pt so beveled themes keep reading.")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-            }
-
-            settingsSection("Desktop wallpaper") {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                    ForEach(WallpaperPreset.allCases) { preset in
-                        wallpaperPresetButton(preset)
-                    }
-                }
-                Text("Choose a preset or pick Custom to tune the gradient colours.")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                if wallpaperPreset == .custom {
-                    HStack {
-                        ColorPicker("Start colour", selection: $pastelTint, supportsOpacity: false)
-                        ColorPicker("End colour", selection: $gradientEndTint, supportsOpacity: false)
-                    }
-                    .font(.system(size: 10, weight: .medium))
-                }
-                HStack {
-                    Text("Gradient angle")
-                        .font(.system(size: 10, weight: .medium))
-                    Slider(value: $gradientAngle, in: 0...360, step: 1)
-                        .tint(accent)
-                    sliderValueLabel("\(Int(gradientAngle))°")
+                    .buttonStyle(.plain)
                 }
             }
+        }
+    }
 
-            settingsSection("Taskbar gradient") {
-                Toggle("Use custom taskbar gradient", isOn: $usesTaskbarGradient)
-                    .toggleStyle(.switch)
-                    .font(.system(size: 11, weight: .medium))
-                HStack {
-                    ColorPicker("Start", selection: $taskbarGradientStart, supportsOpacity: false)
-                    ColorPicker("End", selection: $taskbarGradientEnd, supportsOpacity: false)
+    private var trashPlacementCard: some View {
+        settingsSection("Trash placement — \(taskbarMode.title)") {
+            HStack(spacing: 8) {
+                ForEach(TrashPlacement.allCases) { placement in
+                    Button {
+                        trashAnchors[taskbarMode.rawValue] = placement.rawValue
+                    } label: {
+                        Text(placement.title)
+                            .font(.system(size: 10, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                effectiveTrashPlacement == placement ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .font(.system(size: 10, weight: .medium))
             }
-
-            Spacer(minLength: 0)
+            HStack(spacing: 12) {
+                Button {
+                    trashPlacement = effectiveTrashPlacement
+                    for mode in TaskbarMode.allCases {
+                        trashAnchors[mode.rawValue] = effectiveTrashPlacement.rawValue
+                    }
+                } label: {
+                    Label("Use in every mode", systemImage: "arrow.left.arrow.right")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(accent)
+                if trashAnchors[taskbarMode.rawValue] != nil {
+                    Button {
+                        trashAnchors[taskbarMode.rawValue] = nil
+                    } label: {
+                        Label("Reset \(taskbarMode.title)", systemImage: "arrow.uturn.backward")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(accent)
+                }
+            }
         }
-        .padding(22)
-        }
-        .scrollIndicators(.hidden)
-        .background(panelBackground(style: currentStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .background(surfaceWash(style: currentStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(currentStyle == .classic98 ? Color.white : Color.white.opacity(0.76), lineWidth: currentStyle == .classic98 ? 2 : 1)
-        }
-        .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
     }
 }
 

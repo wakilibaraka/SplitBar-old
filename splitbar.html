@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SplitBar — Design Preview</title>
+<style>
+  :root{
+    --tb-h:46px;
+    --shell-r:18px;
+    --accent:#ef7a97;
+    --text:#1c1c1e;
+    --text-sec:rgba(60,60,67,.62);
+    --card:rgba(255,255,255,.72);
+    --bar-bg:rgba(255,255,255,.78);
+    --win-bg:#e9e9ee;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;color:var(--text)}
+  #desktop{position:fixed;inset:0;transition:background .6s;display:flex;align-items:flex-start;justify-content:flex-start;padding:56px 0 0 64px}
+  #desktop-title{color:rgba(255,255,255,.92);font-size:13px;letter-spacing:.34em;font-weight:600;text-shadow:0 1px 8px rgba(0,0,0,.25)}
+  #desktop-title b{display:block;letter-spacing:.05em;font-size:44px;font-weight:700;margin-top:14px;max-width:520px;line-height:1.12}
+  #desktop-title span{display:block;margin-top:10px;font-size:15px;letter-spacing:0;color:rgba(255,255,255,.8)}
+
+  /* ---------- taskbar ---------- */
+  #taskbar-host{position:fixed;left:0;right:0;bottom:0;height:var(--tb-h);pointer-events:none;display:flex;align-items:stretch}
+  .tb-bar{position:relative;pointer-events:auto;display:flex;align-items:center;height:var(--tb-h);background:var(--bar-bg);backdrop-filter:blur(28px) saturate(1.6);-webkit-backdrop-filter:blur(28px) saturate(1.6);border-top:1px solid rgba(255,255,255,.55);box-shadow:0 -1px 24px rgba(30,40,70,.12)}
+  .tb-bar.float{border:1px solid rgba(255,255,255,.5);box-shadow:0 10px 40px rgba(30,40,70,.18);height:calc(var(--tb-h) - 6px);margin-top:3px}
+  #mode-windows{flex:1;padding:0 10px}
+  #mode-macos,#mode-centered{justify-content:center;gap:0;background:transparent}
+  #mode-macos .inner,#mode-centered .inner{display:flex;align-items:center;width:min(var(--centered-w),96vw);padding:0 16px;height:100%}
+  #mode-split{background:transparent;gap:var(--island-gap);padding:0 14px}
+  #mode-split .island{height:calc(var(--tb-h) - 6px);margin-top:3px;border-radius:var(--shell-r);background:var(--bar-bg);backdrop-filter:blur(28px) saturate(1.6);-webkit-backdrop-filter:blur(28px) saturate(1.6);border:1px solid rgba(255,255,255,.5);box-shadow:0 8px 30px rgba(30,40,70,.14);display:flex;align-items:center;padding:0 10px}
+
+  .tb-weather{display:flex;align-items:center;gap:9px;padding-left:10px;width:172px;flex:none;cursor:pointer;border-radius:10px}
+  .tb-weather:hover{background:rgba(255,255,255,.5)}
+  .tb-weather .t{font-size:13px;font-weight:600}
+  .tb-weather .c{font-size:10px;color:var(--text-sec);white-space:nowrap}
+  .tb-spacer{flex:1}
+  .tb-apps{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:4px}
+  #mode-macos .tb-apps,#mode-centered .tb-apps{position:static;transform:none}
+  #mode-split .tb-apps{position:static;transform:none}
+  .tb-cluster{display:flex;align-items:center;gap:4px;padding-right:8px}
+  .tb-clock{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;min-width:88px;cursor:pointer;border-radius:10px;padding:0 8px;height:calc(var(--tb-h) - 10px)}
+  .tb-clock:hover{background:rgba(255,255,255,.5)}
+  .tb-clock .h{font-size:12.5px;font-weight:600;line-height:1.15}
+  .tb-clock .d{font-size:10px;color:var(--text-sec)}
+
+  .tile{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;cursor:pointer;position:relative;transition:transform .15s,background .15s}
+  .tile:hover{background:rgba(255,255,255,.65);transform:translateY(-3px)}
+  .tile.active{background:rgba(255,255,255,.8)}
+  .tile .dot{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--accent)}
+  .tile .dash{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:12px;height:4px;border-radius:2px;background:var(--accent)}
+  .tile .bar-v{position:absolute;bottom:2px;left:0;right:0;height:4px;border-radius:2px;background:var(--accent);opacity:.85}
+  .appicon{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:#fff;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.35),0 2px 6px rgba(0,0,0,.18)}
+  .appicon svg{width:17px;height:17px;fill:#fff}
+  .divider{width:1px;height:26px;background:rgba(60,60,67,.25);margin:0 6px;border-radius:1px}
+
+  /* ---------- flyouts ---------- */
+  .flyout{position:fixed;bottom:calc(var(--tb-h) + 10px);background:var(--win-bg);backdrop-filter:blur(40px) saturate(1.5);-webkit-backdrop-filter:blur(40px) saturate(1.5);border-radius:var(--shell-r);border:1px solid rgba(255,255,255,.6);box-shadow:0 24px 70px rgba(20,30,60,.25);padding:18px;display:none;flex-direction:column;gap:14px;max-height:calc(100vh - var(--tb-h) - 60px);overflow:auto}
+  .flyout.open{display:flex;animation:pop .18s ease}
+  @keyframes pop{from{transform:translateY(8px) scale(.97);opacity:0}to{transform:none;opacity:1}}
+  .flyout h2{font-size:17px;font-weight:700}
+  .card{background:var(--card);border-radius:16px;padding:14px;box-shadow:0 2px 10px rgba(20,30,60,.06)}
+  .fw-start{left:50%;transform:translateX(-50%);width:620px}
+  .flyout.open.fw-start{transform:translateX(-50%)}
+  .fw-widgets{left:18px;width:400px}
+  .fw-calendar{left:50%;transform:translateX(-50%);width:360px}
+  .flyout.open.fw-calendar{transform:translateX(-50%)}
+  .fw-controls{right:18px;width:320px}
+  .fw-settings{left:50%;transform:translateX(-50%);width:660px}
+  .flyout.open.fw-settings{transform:translateX(-50%)}
+
+  .search{border:none;outline:none;width:100%;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.7);font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .launcher-app{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;border-radius:14px;cursor:pointer;font-size:11px}
+  .launcher-app:hover{background:rgba(255,255,255,.65)}
+  .folders{display:flex;gap:10px;overflow-x:auto;padding-bottom:2px}
+  .folder{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;width:74px;padding:10px 4px;border-radius:14px;cursor:pointer;font-size:10.5px;text-align:center}
+  .folder:hover{background:rgba(255,255,255,.65)}
+  .folder .glyph{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:#fff}
+  .folder .glyph svg{width:18px;height:18px;fill:#fff}
+
+  .month{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:11px;text-align:center}
+  .month .dow{font-weight:700;color:var(--text-sec);padding:2px 0}
+  .month .day{aspect-ratio:1;display:grid;place-items:center;border-radius:8px;cursor:pointer}
+  .month .day:hover{background:rgba(255,255,255,.7)}
+  .month .day.today{background:var(--accent);color:#fff;font-weight:700}
+  .month .day.dim{color:var(--text-sec);opacity:.45}
+
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
+  .toggle{width:42px;height:26px;border-radius:13px;background:rgba(120,120,128,.28);position:relative;cursor:pointer;transition:.2s}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.25);transition:.2s}
+  .toggle.on{background:#34c759}
+  .toggle.on::after{left:18px}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+
+  .seg{display:flex;background:rgba(120,120,128,.16);border-radius:10px;padding:3px;gap:3px}
+  .seg button{flex:1;border:none;background:transparent;padding:6px 4px;border-radius:8px;font-size:11px;cursor:pointer;color:var(--text)}
+  .seg button.sel{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.15);font-weight:600}
+
+  .mode-pick{display:flex;gap:8px}
+  .mode-pick button{flex:1;border:1.5px solid rgba(120,120,128,.25);background:transparent;border-radius:10px;padding:6px;cursor:pointer;font-size:10px;color:var(--text)}
+  .mode-pick button.sel{border-color:var(--accent);background:rgba(239,122,151,.12)}
+  .mode-pick svg{width:100%;height:26px;display:block;margin-bottom:4px}
+  .mode-pick rect{fill:rgba(60,60,67,.28)}
+  .mode-pick button.sel rect{fill:var(--accent)}
+
+  .ctl-label{font-size:11.5px;font-weight:600;color:var(--text-sec);letter-spacing:.02em;margin-bottom:6px;text-transform:uppercase}
+  #ctxmenu{position:fixed;display:none;min-width:180px;background:rgba(250,250,252,.96);backdrop-filter:blur(30px);border:1px solid rgba(0,0,0,.08);border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.25);padding:5px;z-index:50;font-size:12.5px}
+  #ctxmenu button{display:block;width:100%;text-align:left;border:none;background:none;padding:7px 10px;border-radius:7px;cursor:pointer}
+  #ctxmenu button:hover{background:rgba(239,122,151,.15)}
+  #ctxmenu hr{border:none;border-top:1px solid rgba(0,0,0,.08);margin:4px 6px}
+
+  .np{display:flex;gap:12px;align-items:center}
+  .np .art{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,#a855f7,#3b82f6)}
+  .rings{display:flex;gap:14px;justify-content:space-around;text-align:center;font-size:10.5px;color:var(--text-sec)}
+  .ring{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;background:conic-gradient(var(--accent) var(--p),rgba(120,120,128,.2) 0);color:var(--text)}
+  .ring span{font-size:10px;display:block;color:var(--text-sec)}
+</style>
+</head>
+<body>
+<div id="desktop">
+  <div id="desktop-title">TASKBAR CONCEPT
+    <b>A calmer kind of desktop.</b>
+    <span>A Windows-inspired taskbar, thoughtfully reimagined for macOS.</span>
+  </div>
+</div>
+
+<div id="flyouts">
+  <!-- START -->
+  <section class="flyout fw-start" data-panel="start">
+    <input class="search" placeholder="Search apps, folders, and settings" disabled>
+    <div class="ctl-label">Pinned</div>
+    <div class="grid" id="pinned-grid"></div>
+    <div class="ctl-label">Folders</div>
+    <div class="folders" id="folders"></div>
+    <div class="ctl-label">Recent</div>
+    <div class="card row" style="justify-content:center;color:var(--text-sec)">No recent documents</div>
+  </section>
+
+  <!-- WIDGETS -->
+  <section class="flyout fw-widgets" data-panel="widgets">
+    <h2>Widgets</h2>
+    <div class="card">
+      <div class="row"><div style="display:flex;gap:10px;align-items:center"><svg viewBox="0 0 24 24" width="30" height="30" fill="#5ac8fa"><path d="M17 9a5 5 0 0 0-9.6-1.6A4.5 4.5 0 0 0 7 16h10a3.5 3.5 0 0 0 0-7z"/></svg><div><div style="font-size:20px;font-weight:700">17°</div><div style="font-size:11px;color:var(--text-sec)">Drizzle · London</div></div></div><div style="font-size:11px;color:var(--text-sec)">H:19° L:12°</div></div>
+    </div>
+    <div class="card"><div class="ctl-label" style="margin-bottom:8px">Now Playing</div>
+      <div class="np"><div class="art"></div><div><div style="font-size:13px;font-weight:600">Midnight City</div><div style="font-size:11px;color:var(--text-sec)">M83 — Hurry Up, We're Dreaming</div><div style="margin-top:8px;font-size:18px;letter-spacing:6px">⏮ ▶ ⏭</div></div></div>
+    </div>
+    <div class="card"><div class="ctl-label" style="margin-bottom:10px">Resources</div>
+      <div class="rings">
+        <div><div class="ring" style="--p:34%">34<span>%</span></div>CPU</div>
+        <div><div class="ring" style="--p:62%">62<span>%</span></div>Memory</div>
+        <div><div class="ring" style="--p:18%">18<span>%</span></div>GPU</div>
+      </div>
+    </div>
+    <div class="card" id="widget-calendar"></div>
+  </section>
+
+  <!-- CALENDAR -->
+  <section class="flyout fw-calendar" data-panel="calendar">
+    <h2>Calendar</h2>
+    <div class="card" id="calendar-card"></div>
+  </section>
+
+  <!-- CONTROLS -->
+  <section class="flyout fw-controls" data-panel="controls">
+    <h2>Quick controls</h2>
+    <div class="card">
+      <div class="row" style="margin-bottom:10px"><span>Wi-Fi</span><div class="toggle on" data-k="wifi"></div></div>
+      <div class="row" style="margin-bottom:10px"><span>Bluetooth</span><div class="toggle on" data-k="bt"></div></div>
+      <div class="ctl-label" style="margin-top:6px">Volume</div>
+      <input type="range" value="62" data-k="vol">
+      <div class="ctl-label" style="margin-top:10px">Brightness</div>
+      <input type="range" value="78" data-k="bri">
+    </div>
+    <div class="card row"><span>Battery</span><b>100%</b></div>
+    <div class="card row"><span>DDC brightness</span><div class="toggle" data-k="ddc"></div></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="flyout fw-settings" data-panel="settings">
+    <h2>Personalisation</h2>
+    <div class="card">
+      <div class="ctl-label">Taskbar mode</div>
+      <div class="mode-pick" id="mode-pick"></div>
+      <div style="margin-top:12px" class="row" id="mode-desc"></div>
+    </div>
+    <div class="card">
+      <div class="ctl-label">Appearance</div>
+      <div class="row" style="margin-bottom:10px"><span>Dark appearance</span><div class="toggle" data-k="dark"></div></div>
+      <div class="ctl-label">Surface style</div>
+      <div class="seg" id="surface-seg"></div>
+      <div class="ctl-label" style="margin-top:12px">Transparency — <span id="transp-val">68%</span></div>
+      <input type="range" min="0" max="100" value="68" id="transparency">
+    </div>
+    <div class="card">
+      <div class="ctl-label">Corners</div>
+      <div class="seg" id="corner-seg"></div>
+      <div class="ctl-label" style="margin-top:12px">Island gap — <span id="gap-val">10 pt</span></div>
+      <input type="range" min="0" max="40" value="10" id="island-gap">
+      <div class="ctl-label" style="margin-top:12px">Bar width — <span id="width-val">720 pt</span></div>
+      <input type="range" min="360" max="1600" step="20" value="720" id="centered-width">
+    </div>
+    <div class="card">
+      <div class="ctl-label">Trash position (this mode)</div>
+      <div class="seg" id="trash-seg"></div>
+      <div class="ctl-label" style="margin-top:12px">Cluster order</div>
+      <div id="cluster-order"></div>
+    </div>
+  </section>
+</div>
+
+<div id="taskbar-host"></div>
+<div id="ctxmenu"></div>
+
+<script>
+const APPS=[
+ {id:"com.apple.Safari",s:"safari",t:"Safari",c:"#0a84ff"},
+ {id:"com.apple.finder",s:"folder",t:"Finder",c:"#ff9f0a"},
+ {id:"com.apple.mail",s:"mail",t:"Mail",c:"#32ade6"},
+ {id:"com.apple.iCal",s:"cal",t:"Calendar",c:"#ff453a"},
+ {id:"com.apple.MobileSMS",s:"msg",t:"Messages",c:"#30d158"},
+ {id:"com.apple.Music",s:"music",t:"Music",c:"#bf5af2"},
+ {id:"com.apple.systempreferences",s:"gear",t:"System Settings",c:"#8e8e93"},
+ {id:"com.apple.Photos",s:"photo",t:"Photos",c:"#ff375f"},
+ {id:"com.apple.Terminal",s:"term",t:"Terminal",c:"#3a3a3c"},
+ {id:"com.apple.Notes",s:"note",t:"Notes",c:"#ffd60a"},
+ {id:"com.apple.TV",s:"tv",t:"TV",c:"#5e5ce6"},
+ {id:"com.apple.Maps",s:"map",t:"Maps",c:"#64d2ff"},
+ {id:"com.apple.calculator",s:"calc",t:"Calculator",c:"#0a84ff"},
+];
+const FOLDERS=[["Desktop","desktop","#0a84ff"],["Documents","doc","#5e5ce6"],["Movies","film","#bf5af2"],["Music","music","#ff375f"],["Pictures","photo","#ff9f0a"],["Downloads","dl","#64d2ff"]];
+const GLYPHS={
+ safari:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.2 5.8-2.5 6-6 2.5 2.5-6 6-2.5z',
+ folder:'M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z',
+ mail:'M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm2 1 7 5 7-5',
+ msg:'M12 3C6.5 3 2 6.9 2 12c0 2.6 1.2 4.9 3.2 6.5-.2 1.3-.7 2.6-1.7 3.5 1.9.1 3.9-.7 5.3-1.6 1 .3 2 .5 3.2.5 5.5 0 10-3.9 10-9S17.5 3 12 3z',
+ cal:'M7 2v3M17 2v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+ music:'M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
+ gear:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4-1.9.6a8 8 0 0 1-.5 1.2l1 1.7-1.4 1.4-1.7-1a8 8 0 0 1-1.2.5L14 20h-2l-.6-1.9a8 8 0 0 1-1.2-.5l-1.7 1-1.4-1.4 1-1.7a8 8 0 0 1-.5-1.2L3 14v-2l1.9-.6c.1-.4.3-.8.5-1.2l-1-1.7L5.8 7l1.7 1c.4-.2.8-.4 1.2-.5L9 5.5h2l.6 1.9c.4.1.8.3 1.2.5l1.7-1 1.4 1.4-1 1.7c.2.4.4.8.5 1.2L20 11v2z',
+ photo:'M4 5h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm4 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm14 8-5-5-3 3-3-3-7 7',
+ term:'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm3 4 4 3-4 3M11 16h6',
+ note:'M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm2 8h8M8 14h8',
+ tv:'M4 5h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm0 0 8 8 8-8',
+ map:'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zm0 0v14m6-12v14',
+ calc:'M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm2 4h8v3H8V6zm1 7h2v2H9v-2zm4 0h2v2h-2v-2zm-4 4h2v2H9v-2zm4 0h2v2h-2v-2z',
+ desktop:'M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm7 15h4',
+ doc:'M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
+ film:'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8 4v16M16 4v16M2 9h6M2 15h6M16 9h6M16 15h6',
+ dl:'M12 3v10m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2',
+ grid:'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
+ trash:'M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13',
+ wifi:'M12 18h.01M8.5 14.5a5 5 0 0 1 7 0M5 11a10 10 0 0 1 14 0M2 7.5a14.5 14.5 0 0 1 20 0',
+ spk:'M4 9v6h4l5 4V5L8 9H4zm12.5 3a3.5 3.5 0 0 0-2-3.2v6.4a3.5 3.5 0 0 0 2-3.2z',
+ batt:'M3 8h15a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zm18 4v-4',
+};
+function glyph(name,size=17){return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${GLYPHS[name]||GLYPHS.folder}"/></svg>`}
+
+const state={
+ mode:'windows', surface:'glass', dark:false, transparency:68, corners:'rounded',
+ openPanel:null, islandGap:10, centeredWidth:720, iconIndicator:'dot',
+ trashMode:{windows:'withApps',macos:'farRight',split3:'beforeTray',split4:'farRight',centered:'beforeClock'},
+ cluster:['dl','trash','batt'], running:['com.apple.Safari','com.apple.finder','com.apple.Music'],
+};
+const SURFACES={glass:['Glass','rgba(255,255,255,0.78)','#f2f2f7'],clay:['Clay','rgba(250,235,235,0.9)','#fbf3f2'],neumorphic:['Neumorphic','rgba(233,235,244,0.95)','#eef0f6'],windowsXP:['Windows XP','rgba(178,209,250,0.95)','#e6f0fd'],classic98:['Windows 98','rgba(193,193,193,0.95)','#c1c1c1'],aero:['Aero glass','rgba(107,176,224,0.65)','#d7ecf9']};
+const WALLS={
+ pastel:'linear-gradient(125deg,#4d7aa8 0%,#e8b0de 55%,#78b3db 100%)',
+ ocean:'linear-gradient(120deg,#053d61,#0c7d9e,#5cc2c7)',
+ sunset:'linear-gradient(120deg,#483366,#d45c7a,#faab69)',
+ midnight:'linear-gradient(120deg,#04060f,#141433,#0d2b38)',
+ graphite:'linear-gradient(120deg,#0e1015,#262b33,#161a1f)',
+};
+document.getElementById('desktop').style.background=WALLS.pastel;
+
+function tile(appId,opts={}){
+ const a=APPS.find(x=>x.id===appId); if(!a) return '';
+ const r=state.running.includes(appId);
+ const ind=opts.noInd?'':(r?`<span class="${state.iconIndicator==='dash'?'dash':state.iconIndicator==='bar'?'bar-v':'dot'}"></span>`:'');
+ return `<div class="tile ${r?'active':''}" data-app="${appId}" title="${a.t}"><span class="appicon" style="background:${a.c}">${glyph(a.s)}</span>${ind}</div>`;
+}
+function clusterHTML(){
+ const items={dl:{g:'dl',c:'#30b0c7',t:'Downloads'},trash:{g:'trash',c:'#8e8e93',t:'Trash'},batt:{g:'batt',c:'#30d158',t:'System status'}};
+ return `<div style="display:flex;gap:4px">${state.cluster.map(k=>`<div class="tile" data-cluster="${k}" ${k==='batt'?'data-panel-btn="controls"':''} title="${items[k].t}"><span class="appicon" style="background:${items[k].c}">${glyph(items[k].g)}</span></div>`).join('')}</div>`;
+}
+function clockHTML(){const d=new Date();return `<div class="tb-clock" data-panel-btn="calendar"><span class="h">${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span><span class="d">${d.toLocaleDateString([], {month:'numeric',day:'numeric',year:'numeric'})}</span></div>`}
+function weatherHTML(){return `<div class="tb-weather" data-panel-btn="widgets"><svg viewBox="0 0 24 24" width="26" height="26" fill="#5ac8fa"><path d="M17 9a5 5 0 0 0-9.6-1.6A4.5 4.5 0 0 0 7 16h10a3.5 3.5 0 0 0 0-7z"/></svg><div><div class="t">17°</div><div class="c">Drizzle</div></div></div>`}
+
+function appsHTML(){return `<div class="tile" data-panel-btn="start" title="Start"><span class="appicon" style="background:linear-gradient(135deg,#5ac8fa,#0a84ff)">${glyph('grid')}</span></div>${APPS.slice(0,8).map(a=>tile(a.id)).join('')}`}
+function traySideHTML(){
+ const tp=state.trashMode[state.mode];
+ const beforeClock=(tp==='beforeClock');
+ const farRight=(tp==='farRight');
+ return `<div class="tb-cluster">${tp==='beforeTray'?clusterHTML():''}${tp==='beforeClock'?clusterHTML():''}${clockHTML()}${farRight?clusterHTML():''}</div>`;
+}
+function renderTaskbar(){
+ const host=document.getElementById('taskbar-host');
+ const tp=state.trashMode[state.mode];
+ const withApps=tp==='withApps';
+ const divider=`<div class="divider"></div>`;
+ const appCluster=(withApps?divider+clusterHTML():'');
+ const mode=state.mode;
+ const shellR=state.corners==='pill'?'26px':state.corners==='sharp'?'2px':'18px';
+ host.style.setProperty('--shell-r',shellR);
+ host.style.setProperty('--island-gap',state.islandGap+'px');
+ host.style.setProperty('--centered-w',state.centeredWidth+'px');
+ document.documentElement.style.setProperty('--shell-r',shellR);
+ const surf=SURFACES[state.surface];
+ document.documentElement.style.setProperty('--bar-bg',surf[1]);
+ document.documentElement.style.setProperty('--win-bg',surf[2]);
+ document.documentElement.style.setProperty('--text',state.dark?'#f2f2f7':'#1c1c1e');
+ document.documentElement.style.setProperty('--text-sec',state.dark?'rgba(235,235,245,.6)':'rgba(60,60,67,.62)');
+ document.documentElement.style.setProperty('--card',state.dark?'rgba(44,44,52,.72)':'rgba(255,255,255,.72)');
+
+ let inner='';
+ if(mode==='windows'){
+   inner=`<div class="tb-bar" id="mode-windows" style="flex:1;border-left:none;border-right:none;border-bottom:none;border-radius:0;box-shadow:none">${weatherHTML()}${divider}<div class="tb-spacer"></div><div class="tb-apps">${appsHTML()}${appCluster}</div>${traySideHTML()}</div>`;
+ } else if(mode==='macos'||mode==='centered'){
+   inner=`<div class="tb-bar float" id="mode-${mode}" style="margin:0 auto;border-radius:var(--shell-r)"><div class="inner" style="display:flex;align-items:center;gap:8px;width:min(${state.centeredWidth}px,96vw);padding:0 10px">${weatherHTML()}<div class="tb-spacer"></div><div class="tb-apps">${appsHTML()}${appCluster}</div>${traySideHTML()}</div></div>`;
+ } else {
+   const islands=mode==='split3'
+     ?[['weather'],['apps'],['trayclock']]
+     :[['weather'],['apps'],['tray'],['clock']];
+   inner=`<div id="mode-split" style="display:flex;gap:${state.islandGap}px;padding:0 14px;align-items:stretch;flex:1">`+
+     islands.map(g=>{
+       const c=g[0];
+       if(c==='weather')return `<div class="island">${weatherHTML()}</div>`;
+       if(c==='apps')return `<div class="island" style="flex:0 1 auto"><div class="tb-apps">${appsHTML()}${appCluster}</div></div>`;
+       if(c==='tray')return `<div class="island"><div class="tb-cluster">${state.trashMode[state.mode]==='beforeTray'?clusterHTML():''}</div></div>`;
+       if(c==='trayclock')return `<div class="island">${traySideHTML()}</div>`;
+       return `<div class="island">${clockHTML()}</div>`;
+     }).join('')+`</div>`;
+ }
+ host.innerHTML=inner;
+ bindTiles();
+}
+function bindTiles(){
+ document.querySelectorAll('[data-panel-btn]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();openPanel(el.dataset.panelBtn)}));
+ document.querySelectorAll('.tile[data-app]').forEach(el=>{
+   el.addEventListener('click',e=>{e.stopPropagation();const id=el.dataset.app;state.running=state.running.includes(id)?state.running.filter(x=>x!==id):[...state.running,id];renderTaskbar();});
+   el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();showCtx(e.clientX,e.clientY,id);});
+ });
+}
+function openPanel(name){
+ state.openPanel=state.openPanel===name?null:name;
+ document.querySelectorAll('.flyout').forEach(f=>f.classList.toggle('open',f.dataset.panel===state.openPanel));
+}
+function showCtx(x,y,appId){
+ const m=document.getElementById('ctxmenu');
+ const app=APPS.find(a=>a.id===appId);
+ m.innerHTML=`<button data-a="open">${state.running.includes(appId)?'Activate':'Open'}</button><button data-a="finder">Show in Finder</button><hr><button data-a="divadd">Add divider after this app</button><button data-a="pin">${state.running.includes(appId)?'Quit':''}</button><hr><button data-a="close">Close</button>`;
+ m.style.left=Math.min(x,innerWidth-200)+'px';m.style.top=Math.min(y,innerHeight-160)+'px';m.style.display='block';
+ m.querySelectorAll('button').forEach(b=>b.onclick=()=>{m.style.display='none';if(b.dataset.a==='divadd'){const d=document.createElement('div');d.className='divider';document.querySelector('.tb-apps').appendChild(d);}});
+}
+document.addEventListener('click',e=>{document.getElementById('ctxmenu').style.display='none';if(!e.target.closest('.flyout')&&!e.target.closest('#taskbar-host')){state.openPanel=null;document.querySelectorAll('.flyout').forEach(f=>f.classList.remove('open'));}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){state.openPanel=null;document.querySelectorAll('.flyout').forEach(f=>f.classList.remove('open'));document.getElementById('ctxmenu').style.display='none';}});
+
+/* settings wiring */
+const MODE_DESCS={windows:'Full-width bar with weather, centred apps, tray and clock',macos:'Floating dock-style bar, narrower',centered:'One narrower centred bar',split3:'Weather, apps, then tray and clock',split4:'Weather, apps, tray, then clock'};
+const modePick=document.getElementById('mode-pick');
+['windows','macos','centered','split3','split4'].forEach(m=>{
+ const b=document.createElement('button');b.dataset.m=m;b.innerHTML=`<svg viewBox="0 0 60 26">${modeSVG(m)}</svg>${m==='split3'?'Split 3':m==='split4'?'Split 4':m[0].toUpperCase()+m.slice(1)}`;
+ b.onclick=()=>{state.mode=m;renderTaskbar();syncSettings();};modePick.appendChild(b);
+});
+function modeSVG(m){
+ if(m==='windows')return '<rect x="2" y="6" width="56" height="14" rx="3"/>';
+ if(m==='macos')return '<rect x="10" y="6" width="40" height="14" rx="7"/>';
+ if(m==='centered')return '<rect x="16" y="6" width="28" height="14" rx="4"/>';
+ if(m==='split3')return '<rect x="2" y="6" width="14" height="14" rx="4"/><rect x="20" y="6" width="20" height="14" rx="4"/><rect x="44" y="6" width="14" height="14" rx="4"/>';
+ return '<rect x="2" y="6" width="11" height="14" rx="4"/><rect x="17" y="6" width="16" height="14" rx="4"/><rect x="37" y="6" width="10" height="14" rx="4"/><rect x="51" y="6" width="7" height="14" rx="4"/>';
+}
+function syncSettings(){
+ document.querySelectorAll('#mode-pick button').forEach(b=>b.classList.toggle('sel',b.dataset.m===state.mode));
+ document.getElementById('mode-desc').innerHTML=`<b>${state.mode}</b> — ${MODE_DESCS[state.mode]}`;
+ document.querySelectorAll('#surface-seg button').forEach(b=>b.classList.toggle('sel',b.dataset.v===state.surface));
+ document.querySelectorAll('#corner-seg button').forEach(b=>b.classList.toggle('sel',b.dataset.v===state.corners));
+ document.querySelectorAll('#trash-seg button').forEach(b=>b.classList.toggle('sel',b.dataset.v===state.trashMode[state.mode]));
+ document.getElementById('transparency').value=state.transparency;document.getElementById('transp-val').textContent=state.transparency+'%';
+ document.getElementById('island-gap').value=state.islandGap;document.getElementById('gap-val').textContent=state.islandGap+' pt';
+ document.getElementById('centered-width').value=state.centeredWidth;document.getElementById('width-val').textContent=state.centeredWidth+' pt';
+ document.querySelector('[data-k=dark]').classList.toggle('on',state.dark);
+ renderClusterOrder();
+}
+const surfSeg=document.getElementById('surface-seg');
+Object.keys(SURFACES).forEach(k=>{const b=document.createElement('button');b.dataset.v=k;b.textContent=SURFACES[k][0];b.onclick=()=>{state.surface=k;renderTaskbar();syncSettings();};surfSeg.appendChild(b);});
+const cornerSeg=document.getElementById('corner-seg');
+[['pill','Pill'],['rounded','Rounded'],['sharp','Sharp']].forEach(([v,l])=>{const b=document.createElement('button');b.dataset.v=v;b.textContent=l;b.onclick=()=>{state.corners=v;renderTaskbar();syncSettings();};cornerSeg.appendChild(b);});
+const trashSeg=document.getElementById('trash-seg');
+[['withApps','With apps'],['beforeTray','Before tray'],['beforeClock','Before clock'],['farRight','Far right']].forEach(([v,l])=>{const b=document.createElement('button');b.dataset.v=v;b.textContent=l;b.onclick=()=>{state.trashMode[state.mode]=v;renderTaskbar();syncSettings();};trashSeg.appendChild(b);});
+document.getElementById('transparency').oninput=e=>{state.transparency=+e.target.value;document.getElementById('transp-val').textContent=state.transparency+'%';document.documentElement.style.setProperty('--bar-bg',SURFACES[state.surface][1]);renderTaskbar();};
+document.getElementById('island-gap').oninput=e=>{state.islandGap=+e.target.value;renderTaskbar();};
+document.getElementById('centered-width').oninput=e=>{state.centeredWidth=+e.target.value;renderTaskbar();};
+document.querySelectorAll('.toggle').forEach(t=>t.onclick=e=>{e.stopPropagation();t.classList.toggle('on');if(t.dataset.k==='dark'){state.dark=t.classList.contains('on');renderTaskbar();}});
+function renderClusterOrder(){
+ const labels={dl:'Downloads',trash:'Trash',batt:'System status'};
+ document.getElementById('cluster-order').innerHTML=state.cluster.map((k,i)=>`<div class="row card" style="margin-bottom:6px"><span>${labels[k]}</span><span><button onclick="moveCluster(${i},-1)" style="border:none;background:none;cursor:pointer">‹</button><button onclick="moveCluster(${i},1)" style="border:none;background:none;cursor:pointer">›</button></span></div>`).join('');
+}
+window.moveCluster=(i,d)=>{const j=i+d;if(j<0||j>=state.cluster.length)return;[state.cluster[i],state.cluster[j]]=[state.cluster[j],state.cluster[i]];renderClusterOrder();renderTaskbar();};
+
+/* launcher content */
+document.getElementById('pinned-grid').innerHTML=APPS.slice(0,8).map(a=>`<div class="launcher-app"><span class="appicon" style="background:${a.c};width:38px;height:38px">${glyph(a.s,20)}</span>${a.t}</div>`).join('');
+document.getElementById('folders').innerHTML=FOLDERS.map(f=>`<div class="folder"><span class="glyph" style="background:${f[2]}">${glyph(f[1],18)}</span>${f[0]}</div>`).join('');
+
+/* calendars */
+function monthHTML(){
+ const now=new Date(),y=now.getFullYear(),m=now.getMonth(),first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate();
+ let h=`<div class="row" style="margin-bottom:8px"><b>${now.toLocaleString([],{month:'long',year:'numeric'})}</b></div><div class="month">`;
+ ['S','M','T','W','T','F','S'].forEach(d=>h+=`<div class="dow">${d}</div>`);
+ for(let i=0;i<first;i++)h+=`<div class="day dim"></div>`;
+ for(let d=1;d<=days;d++)h+=`<div class="day ${d===now.getDate()?'today':''}">${d}</div>`;
+ return h+'</div>';
+}
+document.getElementById('calendar-card').innerHTML=monthHTML();
+document.getElementById('widget-calendar').innerHTML=monthHTML();
+
+renderTaskbar();syncSettings();
+setInterval(()=>{const c=document.querySelector('.tb-clock .h');if(c)c.textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});},1000*15);
+</script>
+</body>
+</html>
