@@ -24,6 +24,12 @@ struct OnboardingView: View {
         }
     }
 
+    /// Explicit, predictable surface and text tokens. `.secondary`/`.primary`
+/// resolve to a mid-grey that is nearly the same luminance as the translucent
+/// card, so they only looked right by accident on some wallpapers.
+    private var cardSurface: Color { Color(red: 0.02, green: 0.03, blue: 0.05).opacity(0.88) }
+    private var secondaryOnCard: Color { Color.white.opacity(0.78) }
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.35)
@@ -35,7 +41,7 @@ struct OnboardingView: View {
             }
             .padding(28)
             .frame(width: 560)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(cardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.5), lineWidth: 1)
@@ -50,7 +56,7 @@ struct OnboardingView: View {
             HStack(spacing: 6) {
                 ForEach(0..<pageCount, id: \.self) { index in
                     Circle()
-                        .fill(index == page ? accent : Color.primary.opacity(0.2))
+                        .fill(index == page ? accent : Color.white.opacity(0.2))
                         .frame(width: 7, height: 7)
                 }
             }
@@ -58,7 +64,7 @@ struct OnboardingView: View {
             if page > 0 {
                 Button("Back") { withAnimation(.spring(response: 0.42)) { page -= 1 } }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(secondaryOnCard)
             }
             Button(page == pageCount - 1 ? "Let's go" : "Continue") {
                 if page == pageCount - 1 {
@@ -101,7 +107,7 @@ struct OnboardingView: View {
                 .font(.system(size: 26, weight: .bold, design: .rounded))
             Text("A Windows-inspired taskbar, thoughtfully reimagined for macOS. This tour takes under a minute.")
                 .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(secondaryOnCard)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
         }
@@ -114,7 +120,7 @@ struct OnboardingView: View {
                 .font(.system(size: 22, weight: .bold, design: .rounded))
             Text("Fourteen themes. Switch anytime in Personalisation.")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(secondaryOnCard)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                 ForEach(SurfaceStyle.allCases.prefix(8)) { style in
                     styleSwatchButton(style)
@@ -134,7 +140,7 @@ struct OnboardingView: View {
                     .frame(height: 34)
                     .overlay {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(isSelected ? accent : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 1)
+                            .strokeBorder(isSelected ? accent : Color.white.opacity(0.18), lineWidth: isSelected ? 2 : 1)
                     }
                 Text(style.title)
                     .font(.system(size: 9, weight: .medium))
@@ -151,7 +157,7 @@ struct OnboardingView: View {
                 .font(.system(size: 22, weight: .bold, design: .rounded))
             Text("One bar or floating islands — your call.")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(secondaryOnCard)
             VStack(spacing: 8) {
                 ForEach(TaskbarMode.allCases) { mode in
                     Button { model.taskbarMode = mode } label: {
@@ -161,15 +167,15 @@ struct OnboardingView: View {
                             Spacer()
                             Text(mode.detail)
                                 .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(secondaryOnCard)
                                 .lineLimit(1)
                             Image(systemName: model.taskbarMode == mode ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(model.taskbarMode == mode ? accent : .secondary)
+                                .foregroundStyle(model.taskbarMode == mode ? accent : secondaryOnCard)
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 9)
                         .background(
-                            model.taskbarMode == mode ? accent.opacity(0.10) : Color.primary.opacity(0.04),
+                            model.taskbarMode == mode ? accent.opacity(0.10) : Color.white.opacity(0.06),
                             in: RoundedRectangle(cornerRadius: 10)
                         )
                     }
@@ -187,7 +193,7 @@ struct OnboardingView: View {
                 .font(.system(size: 22, weight: .bold, design: .rounded))
             Text("Everything is optional — SplitBar works without these, with graceful fallbacks.")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(secondaryOnCard)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 28)
             VStack(spacing: 8) {
@@ -226,7 +232,7 @@ struct OnboardingView: View {
                     .font(.system(size: 13, weight: .semibold))
                 Text(detail)
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(secondaryOnCard)
             }
             Spacer()
             Button("Grant") {
@@ -239,7 +245,7 @@ struct OnboardingView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var widgetsPage: some View {
@@ -248,7 +254,7 @@ struct OnboardingView: View {
                 .font(.system(size: 22, weight: .bold, design: .rounded))
             Text("Weather, calendar, Now Playing, and system rings live one click away.")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(secondaryOnCard)
             HStack(spacing: 10) {
                 ForEach(["Weather", "Calendar", "Music", "System"], id: \.self) { name in
                     VStack(spacing: 6) {
@@ -287,7 +293,7 @@ struct OnboardingView: View {
                 .font(.system(size: 26, weight: .bold, design: .rounded))
             Text("Right-click any taskbar icon for options. Open Personalisation anytime from the taskbar menu.")
                 .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(secondaryOnCard)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
         }

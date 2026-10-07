@@ -295,18 +295,23 @@ public struct TaskbarConceptView: View {
 
                     Spacer()
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("A calmer kind of desktop.")
-                            .font(.system(size: 42, weight: .semibold, design: .rounded))
-                            .tracking(-1.8)
-                        Text("A Windows-inspired taskbar, thoughtfully reimagined for macOS.")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.68))
+                    // The hero copy sits behind the onboarding card, so it is
+                    // suppressed while onboarding is up (R3): on top of the card
+                    // it was unreadable and ran into the card edge.
+                    if !model.showsOnboarding {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("A calmer kind of desktop.")
+                                .font(.system(size: 42, weight: .semibold, design: .rounded))
+                                .tracking(-1.8)
+                            Text("A Windows-inspired taskbar, thoughtfully reimagined for macOS.")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.68))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.leading, 72)
+                        .padding(.bottom, 180)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .foregroundStyle(.white)
-                    .padding(.leading, 72)
-                    .padding(.bottom, 180)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 if openPanel == .widgets, !showsTaskbarPanel {
