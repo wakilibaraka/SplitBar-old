@@ -793,7 +793,13 @@ public final class AppRuntimeController {
     }
 
     public func updatePreferences(_ newPreferences: AppPreferences) {
+        let previous = self.preferences
         self.preferences = newPreferences
+        // Privacy gates are forwarded immediately so turning one off takes
+        // effect without a relaunch.
+        if previous.aiAccountSwitchingEnabled != newPreferences.aiAccountSwitchingEnabled {
+            aiUsageService.accountSwitchingEnabled = newPreferences.aiAccountSwitchingEnabled
+        }
         clipboardMonitor.updateExcludedBundleIdentifiers(newPreferences.clipboardExcludedBundleIdentifiers)
         refreshSettingsWindow()
         // Açık flyout yeni temaya hemen uysun
@@ -2384,6 +2390,9 @@ public final class AppRuntimeController {
             selectedScreenIdentifier: nil,
             reduceMotion: false,
             language: .english,
+            aiAccountSwitchingEnabled: false,
+            ipGeolocationEnabled: false,
+            faviconServiceEnabled: false,
             dockIconSize: 46.0
         )
         var defaultItems: [DockItem] = [

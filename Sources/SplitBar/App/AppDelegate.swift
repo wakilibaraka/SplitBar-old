@@ -87,6 +87,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             selectedScreenIdentifier: nil,
             reduceMotion: false,
             language: .english,
+            aiAccountSwitchingEnabled: false,
+            ipGeolocationEnabled: false,
+            faviconServiceEnabled: false,
             dockIconSize: 46.0
         )
         var defaultItems: [DockItem] = []

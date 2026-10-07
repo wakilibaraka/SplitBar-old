@@ -9,6 +9,7 @@ AppRuntimeController.swift entries.count      number of clipboard entries, not c
 AIAccountStore.swift target.provider.rawValue  enum name of the provider
 AIAccountStore.swift account.provider.rawValue enum name of the provider
 AIUsageService.swift process.terminationStatus  process exit status
+AIUsageService.swift result.status         process exit status from ProcessRunner
 AIUsageService.swift status                   HTTP status code
 BluetoothService.swift status                 IOReturn status code
 BluetoothService.swift startStatus            IOReturn status code

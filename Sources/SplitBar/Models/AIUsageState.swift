@@ -113,6 +113,33 @@ public struct AIUsageState: Equatable, Sendable {
         self.lastUpdated = lastUpdated
     }
 
+    /// Drops everything that required reading another tool's credentials.
+    /// Used when account switching is switched off so no stale account data
+    /// lingers in memory or on screen.
+    public func applyingAccountAccessDisabled() -> AIUsageState {
+        AIUsageState(
+            agentSessions: agentSessions,
+            limitCards: limitCards.map { card in
+                ProviderLimitCard(
+                    provider: card.provider,
+                    activeAccount: nil,
+                    savedAccounts: [],
+                    limits: card.limits,
+                    savedAccountLimits: [:],
+                    isLimitSourceConnected: card.isLimitSourceConnected,
+                    isProviderRunning: card.isProviderRunning,
+                    loginIssue: nil,
+                    accountsNeedingLogin: []
+                )
+            },
+            dailyUsage: dailyUsage,
+            ollamaModels: ollamaModels,
+            recentActivities: recentActivities,
+            isPrivacyPreserving: isPrivacyPreserving,
+            lastUpdated: lastUpdated
+        )
+    }
+
     /// Henüz hiçbir yerel veri okunmamış başlangıç durumu.
     public static let empty = AIUsageState(
         agentSessions: [],

@@ -9,6 +9,14 @@ public struct AppPreferences: Codable, Equatable, Sendable {
     public var selectedScreenIdentifier: String?
     public var reduceMotion: Bool
     public var language: AppLanguage
+    /// Opt-in gate for reading Claude Code / Codex credentials, switching
+    /// accounts, and contacting provider OAuth endpoints. Off by default: the
+    /// Claude Code status-line bridge is the only always-available source.
+    public var aiAccountSwitchingEnabled: Bool
+    /// Opt-in for IP-based geolocation (sends the machine's IP to ipwho.is).
+    public var ipGeolocationEnabled: Bool
+    /// Opt-in for third-party favicon services (sends every pinned host to them).
+    public var faviconServiceEnabled: Bool
     public var dockIconSize: Double
 
     public init(
@@ -20,6 +28,9 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         selectedScreenIdentifier: String?,
         reduceMotion: Bool,
         language: AppLanguage,
+        aiAccountSwitchingEnabled: Bool,
+        ipGeolocationEnabled: Bool,
+        faviconServiceEnabled: Bool,
         dockIconSize: Double
     ) {
         self.placement = placement
@@ -30,6 +41,9 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         self.selectedScreenIdentifier = selectedScreenIdentifier
         self.reduceMotion = reduceMotion
         self.language = language
+        self.aiAccountSwitchingEnabled = aiAccountSwitchingEnabled
+        self.ipGeolocationEnabled = ipGeolocationEnabled
+        self.faviconServiceEnabled = faviconServiceEnabled
         self.dockIconSize = dockIconSize
     }
 
@@ -42,6 +56,9 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         case selectedScreenIdentifier
         case reduceMotion
         case language
+        case aiAccountSwitchingEnabled
+        case ipGeolocationEnabled
+        case faviconServiceEnabled
         case dockIconSize
     }
 
@@ -55,6 +72,10 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         self.selectedScreenIdentifier = try container.decodeIfPresent(String.self, forKey: .selectedScreenIdentifier)
         self.reduceMotion = try container.decode(Bool.self, forKey: .reduceMotion)
         self.language = try container.decodeIfPresent(AppLanguage.self, forKey: .language) ?? .english
+        // Privacy gates default to off for existing configurations too.
+        self.aiAccountSwitchingEnabled = try container.decodeIfPresent(Bool.self, forKey: .aiAccountSwitchingEnabled) ?? false
+        self.ipGeolocationEnabled = try container.decodeIfPresent(Bool.self, forKey: .ipGeolocationEnabled) ?? false
+        self.faviconServiceEnabled = try container.decodeIfPresent(Bool.self, forKey: .faviconServiceEnabled) ?? false
         self.dockIconSize = try container.decodeIfPresent(Double.self, forKey: .dockIconSize) ?? 46.0
     }
 
@@ -68,6 +89,9 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         try container.encodeIfPresent(selectedScreenIdentifier, forKey: .selectedScreenIdentifier)
         try container.encode(reduceMotion, forKey: .reduceMotion)
         try container.encode(language, forKey: .language)
+        try container.encode(aiAccountSwitchingEnabled, forKey: .aiAccountSwitchingEnabled)
+        try container.encode(ipGeolocationEnabled, forKey: .ipGeolocationEnabled)
+        try container.encode(faviconServiceEnabled, forKey: .faviconServiceEnabled)
         try container.encode(dockIconSize, forKey: .dockIconSize)
     }
 }

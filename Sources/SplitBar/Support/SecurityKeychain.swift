@@ -1,11 +1,17 @@
 import Foundation
 
-/// Keychain erişimi `/usr/bin/security` üzerinden yapılır. Claude Code kendi kimlik bilgisini bu araçla
-/// yazdığı için öğeye izin penceresi çıkmadan erişilebilir; ayrıca imzasız geliştirme derlemeleri her
-/// yeniden derlemede Keychain izni istemez.
+/// Compatibility shim over `SecretsStore`.
+///
+/// Historically this file shelled out to `/usr/bin/security` and passed secrets
+/// to it as hex in `argv`, where any process of the same user could read them
+/// from `ps`. Reads and deletes still work through the CLI (needed for items
+/// owned by another application, whose access-control list trusts that tool),
+/// but writes to foreign items are no longer possible, and SplitBar's own
+/// secrets go through the Security framework directly.
 public enum SecurityKeychainError: Error, CustomStringConvertible {
     case itemNotFound(service: String, account: String?)
-    case commandFailed(operation: String, service: String, status: Int32, stderr: String)
+    case writeNotSupported(service: String)
+    case commandFailed(operation: String, service: String, status: Int32)
     case launchFailed(operation: String, underlying: Error)
     case invalidAttribute(operation: String, reason: String)
 
@@ -13,8 +19,10 @@ public enum SecurityKeychainError: Error, CustomStringConvertible {
         switch self {
         case .itemNotFound(let service, let account):
             return "Keychain item not found service=\(service) account=\(account ?? "*")"
-        case .commandFailed(let operation, let service, let status, let stderr):
-            return "security \(operation) failed service=\(service) status=\(status): \(stderr)"
+        case .writeNotSupported(let service):
+            return "Writing to service=\(service) is not supported: secrets are never passed in process arguments."
+        case .commandFailed(let operation, let service, let status):
+            return "security \(operation) failed service=\(service) status=\(status)"
         case .launchFailed(let operation, let underlying):
             return "Could not launch /usr/bin/security for \(operation): \(underlying.localizedDescription)"
         case .invalidAttribute(let operation, let reason):
@@ -23,121 +31,63 @@ public enum SecurityKeychainError: Error, CustomStringConvertible {
     }
 }
 
-private struct SecurityCommandOutput {
-    let status: Int32
-    let stdout: Data
-    let stderr: String
+private func map(_ error: Error, service: String, account: String?) -> SecurityKeychainError {
+    if let storeError = error as? SecretsStoreError {
+        switch storeError {
+        case .itemNotFound:
+            return .itemNotFound(service: service, account: account)
+        case .writeNotSupported:
+            return .writeNotSupported(service: service)
+        case .status(let code, let operation):
+            return .commandFailed(operation: operation, service: service, status: code)
+        case .malformedSecret:
+            return .invalidAttribute(operation: "read", reason: "stored value is not data")
+        }
+    }
+    return .launchFailed(operation: "keychain", underlying: error)
 }
 
-/// Arka plan okumasının sonucunu taşır; `DispatchGroup.wait()` ile senkronize edildiği için yarış yoktur.
-private final class StderrBox: @unchecked Sendable {
-    var data = Data()
-}
-
-/// `security` aracının "öğe bulunamadı" çıkış kodu.
-private let securityItemNotFoundStatus: Int32 = 44
-
-private func runSecurityCommand(operation: String, arguments: [String], stdin: Data?) throws -> SecurityCommandOutput {
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-    process.arguments = arguments
-    let stdoutPipe = Pipe()
-    let stderrPipe = Pipe()
-    let stdinPipe = Pipe()
-    process.standardOutput = stdoutPipe
-    process.standardError = stderrPipe
-    process.standardInput = stdinPipe
-    do {
-        try process.run()
-    } catch {
-        throw SecurityKeychainError.launchFailed(operation: operation, underlying: error)
-    }
-    if let stdin {
-        stdinPipe.fileHandleForWriting.write(stdin)
-    }
-    do {
-        try stdinPipe.fileHandleForWriting.close()
-    } catch {
-        throw SecurityKeychainError.launchFailed(operation: operation, underlying: error)
-    }
-    // İki boru eşzamanlı boşaltılır; biri dolarsa süreç ve çağıran karşılıklı beklemede kilitlenmez
-    let stderrCollector = DispatchGroup()
-    let stderrBox = StderrBox()
-    stderrCollector.enter()
-    DispatchQueue.global(qos: .utility).async {
-        stderrBox.data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        stderrCollector.leave()
-    }
-    let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-    stderrCollector.wait()
-    let stderrData = stderrBox.data
-    process.waitUntilExit()
-    return SecurityCommandOutput(
-        status: process.terminationStatus,
-        stdout: stdoutData,
-        stderr: redactedSecrets(String(decoding: stderrData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
-    )
-}
-
-/// `security` hata çıktısı kimlik bilgisi verisini yankılayabilir; hatalar loglanmadan önce uzun
-/// onaltılık/base64 dizileri maskelenir.
-private func redactedSecrets(_ text: String) -> String {
-    text.replacingOccurrences(
-        of: "[A-Za-z0-9+/=_-]{24,}",
-        with: "<redacted>",
-        options: .regularExpression
-    )
-}
-
-private func requireSuccess(_ output: SecurityCommandOutput, operation: String, service: String, account: String?) throws {
-    if output.status == securityItemNotFoundStatus {
-        throw SecurityKeychainError.itemNotFound(service: service, account: account)
-    }
-    guard output.status == 0 else {
-        throw SecurityKeychainError.commandFailed(operation: operation, service: service, status: output.status, stderr: output.stderr)
-    }
-}
-
-/// Genel parola öğesinin değerini okur. `account` nil ise servisteki ilk öğe okunur.
+/// Reads a generic password item. Items owned by other applications must be read
+/// through the CLI store; SplitBar's own items should use `AppSecrets.store`.
 public func readKeychainPassword(service: String, account: String?) throws -> Data {
-    let operation = "find-generic-password"
-    var arguments = [operation, "-s", service]
-    if let account {
-        arguments += ["-a", account]
+    guard let account else {
+        throw SecurityKeychainError.invalidAttribute(operation: "read", reason: "an account is required")
     }
-    arguments.append("-w")
-    let output = try runSecurityCommand(operation: operation, arguments: arguments, stdin: nil)
-    try requireSuccess(output, operation: operation, service: service, account: account)
-    // `-w` çıktısının sonuna eklenen tek satır sonu parolaya ait değildir
-    var data = output.stdout
-    if data.last == UInt8(ascii: "\n") {
-        data.removeLast()
+    do {
+        return try AppSecrets.foreignItemStore.read(service: service, account: account)
+    } catch {
+        throw map(error, service: service, account: account)
     }
-    return data
 }
 
-/// Öğeyi oluşturur veya günceller. Değer, Claude Code'un kendi yazımıyla aynı biçimde `-X` ile onaltılık
-/// argüman olarak aktarılır: `security -i` girdisi uzun satırları böldüğü için kimlik bilgileri orada bozulur.
-/// Argümanlar kısa ömürlü süreç boyunca yalnızca aynı kullanıcının süreçlerince görülebilir; bu öğelerin
-/// erişim listesi `/usr/bin/security`'ye güvendiği için aynı kullanıcının süreçleri değeri zaten
-/// `security find-generic-password -w` ile okuyabilir, yani ek bir erişim yüzeyi oluşmaz.
+/// Retained for call sites that want SplitBar's own native Keychain storage.
+public func writeSplitBarKeychainPassword(service: String, account: String, password: Data) throws {
+    do {
+        try AppSecrets.store.write(password, service: service, account: account)
+    } catch {
+        throw map(error, service: service, account: account)
+    }
+}
+
+/// Writing to an item owned by another application is refused: the only way to
+/// do it through `/usr/bin/security` is to pass the secret in `argv`.
 public func writeKeychainPassword(service: String, account: String, password: Data) throws {
-    let operation = "add-generic-password"
-    let hex = password.map { String(format: "%02x", $0) }.joined()
-    let output = try runSecurityCommand(
-        operation: operation,
-        arguments: [operation, "-U", "-a", account, "-s", service, "-X", hex],
-        stdin: nil
-    )
-    try requireSuccess(output, operation: operation, service: service, account: account)
+    throw SecurityKeychainError.writeNotSupported(service: service)
 }
 
 public func deleteKeychainPassword(service: String, account: String) throws {
-    let operation = "delete-generic-password"
-    let output = try runSecurityCommand(
-        operation: operation,
-        arguments: [operation, "-s", service, "-a", account],
-        stdin: nil
-    )
-    try requireSuccess(output, operation: operation, service: service, account: account)
+    do {
+        try AppSecrets.foreignItemStore.delete(service: service, account: account)
+    } catch {
+        throw map(error, service: service, account: account)
+    }
+}
+
+/// Removes a SplitBar-owned item.
+public func deleteSplitBarKeychainPassword(service: String, account: String) throws {
+    do {
+        try AppSecrets.store.delete(service: service, account: account)
+    } catch {
+        throw map(error, service: service, account: account)
+    }
 }

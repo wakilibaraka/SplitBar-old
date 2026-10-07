@@ -17,6 +17,19 @@ public final class AIUsageService {
     private static let limitRefreshInterval: TimeInterval = 20.0
     private static let usageScanInterval: TimeInterval = 300.0
 
+    /// When false (the default) nothing reads Claude Code or Codex credentials,
+    /// nothing calls the provider OAuth endpoints, and no `auth.json` is touched.
+    /// The Claude Code status-line bridge remains available because it reports
+    /// official rate-limit data without credentials.
+    public var accountSwitchingEnabled = false {
+        didSet {
+            guard accountSwitchingEnabled != oldValue else { return }
+            if !accountSwitchingEnabled {
+                currentState = currentState.applyingAccountAccessDisabled()
+            }
+        }
+    }
+
     public init(
         initialState: AIUsageState,
         accountStore: AIAccountStore,
@@ -251,7 +264,43 @@ public final class AIUsageService {
         )
     }
 
+    /// The only always-available limit source: what Claude Code itself writes
+    /// through the status-line bridge. It carries no account identity.
+    private func statusLineOnlyLimits() async -> [ProviderLimitCard] {
+        let isBridgeInstalled: Bool
+        do {
+            isBridgeInstalled = try claudeBridge.isInstalled()
+        } catch {
+            isBridgeInstalled = false
+        }
+        var limits: ProviderLimitSnapshot?
+        do {
+            limits = try await usageScanner.latestClaudeLimits()
+        } catch {
+            Logger.general.error("Claude limit capture unreadable error=\(String(describing: error), privacy: .private)")
+        }
+        guard isBridgeInstalled || limits != nil else { return currentState.limitCards }
+        return [
+            ProviderLimitCard(
+                provider: .claude,
+                activeAccount: nil,
+                savedAccounts: [],
+                limits: limits,
+                savedAccountLimits: [:],
+                isLimitSourceConnected: isBridgeInstalled,
+                isProviderRunning: false,
+                loginIssue: nil,
+                accountsNeedingLogin: []
+            )
+        ]
+    }
+
     private func loadLimitCards(sessions: [AIAgentSession], now: Date) async -> [ProviderLimitCard] {
+        guard accountSwitchingEnabled else {
+            // Status-line data only: no credentials are read, no `auth.json`
+            // is touched, and no OAuth endpoint is contacted.
+            return await statusLineOnlyLimits()
+        }
         let accounts: AIAccountsSnapshot
         do {
             accounts = try await accountStore.synchronize()

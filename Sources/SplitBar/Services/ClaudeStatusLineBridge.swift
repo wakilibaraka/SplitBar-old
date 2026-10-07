@@ -28,12 +28,14 @@ public struct ClaudeStatusLineBridge: Sendable {
     public let captureURL: URL
     private let scriptURL: URL
     private let originalStatusLineURL: URL
+    private let installedSettingsURL: URL
     private let settingsURL: URL
 
     public init(supportDirectory: URL, homeDirectory: URL) {
         self.captureURL = supportDirectory.appendingPathComponent("claude-statusline.json")
-        self.scriptURL = supportDirectory.appendingPathComponent("splitbar-claude-statusline.sh")
         self.originalStatusLineURL = supportDirectory.appendingPathComponent("claude-statusline-original.json")
+        self.installedSettingsURL = supportDirectory.appendingPathComponent("claude-settings-original.json")
+        self.scriptURL = supportDirectory.appendingPathComponent("claude-statusline.sh")
         self.settingsURL = homeDirectory.appendingPathComponent(".claude/settings.json")
     }
 
@@ -60,6 +62,10 @@ public struct ClaudeStatusLineBridge: Sendable {
         let original = settings["statusLine"] as? [String: Any]
         let originalRecord: [String: Any] = original.map { ["statusLine": $0] } ?? [:]
         try write(try serialize(originalRecord, path: originalStatusLineURL.path), to: originalStatusLineURL, permissions: nil)
+        // Whole-file snapshot so uninstall can restore the original bytes.
+        if FileManager.default.fileExists(atPath: settingsURL.path) {
+            try? Data(contentsOf: settingsURL).write(to: installedSettingsURL, options: .atomic)
+        }
         try write(Data(bridgeScript(originalCommand: original?["command"] as? String).utf8), to: scriptURL, permissions: 0o755)
         try backupSettings()
 
@@ -76,7 +82,7 @@ public struct ClaudeStatusLineBridge: Sendable {
         guard try isInstalled() else {
             throw ClaudeStatusLineBridgeError.notInstalled
         }
-        var settings = try readSettings()
+        try backupSettings()
         let originalData: Data
         do {
             originalData = try Data(contentsOf: originalStatusLineURL)
@@ -84,9 +90,55 @@ public struct ClaudeStatusLineBridge: Sendable {
             throw ClaudeStatusLineBridgeError.settingsUnreadable(path: originalStatusLineURL.path, underlying: error)
         }
         let original = try parseObject(originalData, path: originalStatusLineURL.path)
-        try backupSettings()
-        settings["statusLine"] = original["statusLine"]
-        try write(try serialize(settings, path: settingsURL.path), to: settingsURL, permissions: nil)
+
+        // Prefer the whole-file backup taken at install time: restoring the
+        // original bytes is the only way to guarantee that keys another tool
+        // wrote while the bridge was installed are not silently dropped.
+        let snapshotBytes = try? Data(contentsOf: installedSettingsURL)
+        let snapshot = snapshotBytes.flatMap { try? parseObject($0, path: installedSettingsURL.path) }
+        let current = try readSettings()
+
+        // Fast path: the file still looks exactly like we left it apart from
+        // our own statusLine, so put the original bytes back verbatim.
+        let onlyStatusLineChanged: Bool = {
+            guard let snapshot else { return false }
+            var expected = snapshot
+            if let statusLine = original["statusLine"] {
+                expected["statusLine"] = statusLine
+            } else {
+                expected.removeValue(forKey: "statusLine")
+            }
+            return otherKeysEqual(expected, current, ignoring: "statusLine")
+        }()
+
+        if let snapshotBytes, onlyStatusLineChanged {
+            // Byte-for-byte restore: no re-serialization, no formatting drift.
+            try write(snapshotBytes, to: settingsURL, permissions: nil)
+        } else if let snapshot {
+            var restored = snapshot
+            if let statusLine = original["statusLine"] {
+                restored["statusLine"] = statusLine
+            } else {
+                restored.removeValue(forKey: "statusLine")
+            }
+            // The user edited other keys while the bridge was installed, so
+            // keep their version of those and only take our statusLine back.
+            for (key, value) in current where key != "statusLine" {
+                restored[key] = value
+            }
+            try write(try serialize(restored, path: settingsURL.path), to: settingsURL, permissions: nil)
+        } else {
+            // Fall back to merging the saved statusLine entry back in.
+            var settings = try readSettings()
+            if let statusLine = original["statusLine"] {
+                settings["statusLine"] = statusLine
+            } else {
+                settings.removeValue(forKey: "statusLine")
+            }
+            try write(try serialize(settings, path: settingsURL.path), to: settingsURL, permissions: nil)
+        }
+        try? FileManager.default.removeItem(at: originalStatusLineURL)
+        try? FileManager.default.removeItem(at: scriptURL)
         Logger.general.info("Removed Claude status line bridge")
     }
 
@@ -131,6 +183,23 @@ public struct ClaudeStatusLineBridge: Sendable {
         return dictionary
     }
 
+    /// True when both dictionaries hold the same values for every key except
+    /// the ignored one. Compared as JSON text so numeric and boolean types match.
+    private func otherKeysEqual(_ lhs: [String: Any], _ rhs: [String: Any], ignoring key: String) -> Bool {
+        func comparable(_ object: [String: Any]) -> [String: String] {
+            var result: [String: String] = [:]
+            for (name, value) in object where name != key {
+                guard JSONSerialization.isValidJSONObject(value),
+                      let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+                      let text = String(data: data, encoding: .utf8)
+                else { continue }
+                result[name] = text
+            }
+            return result
+        }
+        return comparable(lhs) == comparable(rhs)
+    }
+
     private func serialize(_ object: [String: Any], path: String) throws -> Data {
         do {
             return try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
@@ -141,8 +210,15 @@ public struct ClaudeStatusLineBridge: Sendable {
 
     private func backupSettings() throws {
         guard FileManager.default.fileExists(atPath: settingsURL.path) else { return }
+        let directory = settingsURL.deletingLastPathComponent()
         let stamp = Int(Date().timeIntervalSince1970)
-        let backupURL = settingsURL.deletingLastPathComponent().appendingPathComponent("settings.json.splitbar-backup-\(stamp)")
+        var backupURL = directory.appendingPathComponent("settings.json.splitbar-backup-\(stamp)")
+        // Two installs inside the same second must not clobber the first backup.
+        var suffix = 1
+        while FileManager.default.fileExists(atPath: backupURL.path) {
+            backupURL = directory.appendingPathComponent("settings.json.splitbar-backup-\(stamp)-\(suffix)")
+            suffix += 1
+        }
         do {
             try FileManager.default.copyItem(at: settingsURL, to: backupURL)
         } catch {
