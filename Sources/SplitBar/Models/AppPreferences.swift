@@ -21,6 +21,22 @@ public struct AppPreferences: Codable, Equatable, Sendable {
     public var faviconServiceEnabled: Bool
     public var dockIconSize: Double
 
+    public static let defaultPreferences = AppPreferences(
+        placement: DockPlacement(edge: .bottom, verticalOffsetFraction: 0, autoHide: false),
+        materialStyle: .system,
+        shortcutBindings: [],
+        clipboardRetention: ClipboardRetentionPolicy(maxEntries: 100, maxBlobBytes: 1024*1024),
+        clipboardExcludedBundleIdentifiers: [],
+        selectedScreenIdentifier: nil,
+        reduceMotion: false,
+        language: .english,
+        clipboardHistoryEnabled: false,
+        aiAccountSwitchingEnabled: false,
+        ipGeolocationEnabled: false,
+        faviconServiceEnabled: false,
+        dockIconSize: 46.0
+    )
+
     public init(
         placement: DockPlacement,
         materialStyle: DockMaterialStyle,

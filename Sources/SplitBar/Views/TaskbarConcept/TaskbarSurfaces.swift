@@ -6,6 +6,9 @@ struct TaskbarFlyoutContentView: View {
     @ObservedObject var model: TaskbarConceptState
     let onLaunchApplication: (String) -> Void
     let onClose: () -> Void
+    @Binding var preferences: AppPreferences
+    @Binding var isLaunchAtLoginEnabled: Bool
+    @Binding var isLegacyEdgeDockEnabled: Bool
 
     var body: some View {
         flyoutContent
@@ -102,6 +105,9 @@ struct TaskbarFlyoutContentView: View {
                 aiAccountSwitchingEnabled: $model.aiAccountSwitchingEnabled,
                 clipboardRetention: $model.clipboardRetention,
                 panelWidths: $model.panelWidths,
+                preferences: $preferences,
+                isLaunchAtLoginEnabled: $isLaunchAtLoginEnabled,
+                isLegacyEdgeDockEnabled: $isLegacyEdgeDockEnabled,
                 accent: model.clockTint,
                 onClose: onClose,
                 onResetPersonalisation: { model.resetPersonalisation() },
@@ -436,6 +442,9 @@ public struct TaskbarConceptView: View {
                         aiAccountSwitchingEnabled: $model.aiAccountSwitchingEnabled,
                         clipboardRetention: $model.clipboardRetention,
                         panelWidths: $model.panelWidths,
+                        preferences: .constant(AppPreferences.defaultPreferences),
+                        isLaunchAtLoginEnabled: .constant(false),
+                        isLegacyEdgeDockEnabled: .constant(false),
                         accent: clockTint,
                         onClose: { openPanel = nil },
                         onResetPersonalisation: { model.resetPersonalisation() },

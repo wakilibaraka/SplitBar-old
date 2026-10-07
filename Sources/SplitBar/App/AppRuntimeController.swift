@@ -190,7 +190,7 @@ public final class AppRuntimeController {
     private var isLegacyEdgeDockEnabled = false
     private var settingsWindow: NSWindow?
     private var detailedMonitorHostingView: NSHostingView<DetailedSystemMonitorView>?
-    private var settingsHostingView: NSHostingView<SettingsView>?
+    private var settingsHostingView: NSHostingView<AnyView>?
     private var commandPalettePanel: NSPanel?
     private var commandPaletteGlobalMonitor: Any?
     private var commandPaletteLocalMonitor: Any?
@@ -361,7 +361,7 @@ public final class AppRuntimeController {
             window = existing
             refreshSettingsWindow()
         } else {
-            let hostingView = NSHostingView(rootView: makeSettingsView())
+            let hostingView = NSHostingView(rootView: AnyView(makeSettingsView()))
             window = NSWindow(
                 contentRect: NSRect(x: 0.0, y: 0.0, width: 780.0, height: 520.0),
                 styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
@@ -599,7 +599,27 @@ public final class AppRuntimeController {
             },
             onClose: { [weak self] in
                 self?.taskbarConceptState.openPanel = nil
-            }
+            },
+            preferences: Binding(
+                get: { self.preferences },
+                set: { [weak self] in self?.updatePreferences($0) }
+            ),
+            isLaunchAtLoginEnabled: Binding(
+                get: { self.isLaunchAtLoginEnabled },
+                set: { [weak self] in self?.setLaunchAtLogin(enabled: $0) }
+            ),
+            isLegacyEdgeDockEnabled: Binding(
+                get: { self.isLegacyEdgeDockEnabled },
+                set: { [weak self] enabled in
+                    guard let self = self else { return }
+                    self.isLegacyEdgeDockEnabled = enabled
+                    if enabled {
+                        self.dispatch(action: .revealDock)
+                    } else {
+                        self.dispatch(action: .hideDock)
+                    }
+                }
+            )
         )
         if taskbarFlyoutKindShown == panel, taskbarFlyoutController.panel.isVisible {
             taskbarFlyoutController.replace(content: AnyView(content), frame: frame)
@@ -770,19 +790,89 @@ public final class AppRuntimeController {
     }
 
     private func refreshSettingsWindow() {
-        settingsHostingView?.rootView = makeSettingsView()
+        settingsHostingView?.rootView = AnyView(makeSettingsView())
     }
 
-    private func makeSettingsView() -> SettingsView {
-        SettingsView(
-            preferences: preferences,
-            isLaunchAtLoginEnabled: isLaunchAtLoginEnabled,
-            onUpdatePreferences: { [weak self] updated in
-                self?.updatePreferences(updated)
-            },
-            onToggleLaunchAtLogin: { [weak self] enabled in
-                self?.setLaunchAtLogin(enabled: enabled)
-            }
+    private func makeSettingsView() -> some View {
+        SettingsFlyout(
+            surfaceStyle: Binding(get: { self.taskbarConceptState.surfaceStyle }, set: { self.taskbarConceptState.surfaceStyle = $0 }),
+            taskbarMode: Binding(get: { self.taskbarConceptState.taskbarMode }, set: { self.taskbarConceptState.taskbarMode = $0 }),
+            islandGap: Binding(get: { self.taskbarConceptState.islandGap }, set: { self.taskbarConceptState.islandGap = $0 }),
+            userDividers: Binding(get: { self.taskbarConceptState.userDividers }, set: { self.taskbarConceptState.userDividers = $0 }),
+            trashAnchors: Binding(get: { self.taskbarConceptState.trashAnchors }, set: { self.taskbarConceptState.trashAnchors = $0 }),
+            clusterOrder: Binding(get: { self.taskbarConceptState.clusterOrder }, set: { self.taskbarConceptState.clusterOrder = $0 }),
+            centeredBarWidth: Binding(get: { self.taskbarConceptState.centeredBarWidth }, set: { self.taskbarConceptState.centeredBarWidth = $0 }),
+            pinnedAppBundleIDs: self.taskbarConceptState.pinnedAppBundleIDs,
+            isDarkMode: Binding(get: { self.taskbarConceptState.isDarkMode }, set: { self.taskbarConceptState.isDarkMode = $0 }),
+            wallpaperPreset: Binding(get: { self.taskbarConceptState.wallpaperPreset }, set: { self.taskbarConceptState.wallpaperPreset = $0 }),
+            pastelTint: Binding(get: { self.taskbarConceptState.pastelTint }, set: { self.taskbarConceptState.pastelTint = $0 }),
+            gradientEndTint: Binding(get: { self.taskbarConceptState.gradientEndTint }, set: { self.taskbarConceptState.gradientEndTint = $0 }),
+            gradientAngle: Binding(get: { self.taskbarConceptState.gradientAngle }, set: { self.taskbarConceptState.gradientAngle = $0 }),
+            interfaceTransparency: Binding(get: { self.taskbarConceptState.interfaceTransparency }, set: { self.taskbarConceptState.interfaceTransparency = $0 }),
+            usesTaskbarGradient: Binding(get: { self.taskbarConceptState.usesTaskbarGradient }, set: { self.taskbarConceptState.usesTaskbarGradient = $0 }),
+            taskbarGradientStart: Binding(get: { self.taskbarConceptState.taskbarGradientStart }, set: { self.taskbarConceptState.taskbarGradientStart = $0 }),
+            taskbarGradientEnd: Binding(get: { self.taskbarConceptState.taskbarGradientEnd }, set: { self.taskbarConceptState.taskbarGradientEnd = $0 }),
+            taskbarHeight: Binding(get: { self.taskbarConceptState.taskbarHeight }, set: { self.taskbarConceptState.taskbarHeight = $0 }),
+            showsTaskbarPanel: Binding(get: { self.taskbarConceptState.showsTaskbarPanel }, set: { self.taskbarConceptState.showsTaskbarPanel = $0 }),
+            hideMacDock: Binding(get: { self.taskbarConceptState.hideMacDock }, set: { self.taskbarConceptState.hideMacDock = $0 }),
+            showWindowPreviews: Binding(get: { self.taskbarConceptState.showWindowPreviews }, set: { self.taskbarConceptState.showWindowPreviews = $0 }),
+            runningIndicatorStyle: Binding(get: { self.taskbarConceptState.runningIndicatorStyle }, set: { self.taskbarConceptState.runningIndicatorStyle = $0 }),
+            runningIndicatorSize: Binding(get: { self.taskbarConceptState.runningIndicatorSize }, set: { self.taskbarConceptState.runningIndicatorSize = $0 }),
+            runningIndicatorColor: Binding(get: { self.taskbarConceptState.runningIndicatorColor }, set: { self.taskbarConceptState.runningIndicatorColor = $0 }),
+            indicatorColorPreset: Binding(get: { self.taskbarConceptState.indicatorColorPreset }, set: { self.taskbarConceptState.indicatorColorPreset = $0 }),
+            indicatorGradientStart: Binding(get: { self.taskbarConceptState.indicatorGradientStart }, set: { self.taskbarConceptState.indicatorGradientStart = $0 }),
+            indicatorGradientEnd: Binding(get: { self.taskbarConceptState.indicatorGradientEnd }, set: { self.taskbarConceptState.indicatorGradientEnd = $0 }),
+            minimizeMode: Binding(get: { self.taskbarConceptState.minimizeMode }, set: { self.taskbarConceptState.minimizeMode = $0 }),
+            contextMenuStyle: Binding(get: { self.taskbarConceptState.contextMenuStyle }, set: { self.taskbarConceptState.contextMenuStyle = $0 }),
+            showWifiName: Binding(get: { self.taskbarConceptState.showWifiName }, set: { self.taskbarConceptState.showWifiName = $0 }),
+            showBluetoothDevices: Binding(get: { self.taskbarConceptState.showBluetoothDevices }, set: { self.taskbarConceptState.showBluetoothDevices = $0 }),
+            ddcBrightnessEnabled: Binding(get: { self.taskbarConceptState.ddcBrightnessEnabled }, set: { self.taskbarConceptState.ddcBrightnessEnabled = $0 }),
+            cornerStyle: Binding(get: { self.taskbarConceptState.cornerStyle }, set: { self.taskbarConceptState.cornerStyle = $0 }),
+            cornerScope: Binding(get: { self.taskbarConceptState.cornerScope }, set: { self.taskbarConceptState.cornerScope = $0 }),
+            cornerTaskbar: Binding(get: { self.taskbarConceptState.cornerTaskbar }, set: { self.taskbarConceptState.cornerTaskbar = $0 }),
+            cornerWidgets: Binding(get: { self.taskbarConceptState.cornerWidgets }, set: { self.taskbarConceptState.cornerWidgets = $0 }),
+            cornerFlyouts: Binding(get: { self.taskbarConceptState.cornerFlyouts }, set: { self.taskbarConceptState.cornerFlyouts = $0 }),
+            taskbarIconSize: Binding(get: { self.taskbarConceptState.taskbarIconSize }, set: { self.taskbarConceptState.taskbarIconSize = $0 }),
+            statusIconPreset: Binding(get: { self.taskbarConceptState.statusIconPreset }, set: { self.taskbarConceptState.statusIconPreset = $0 }),
+            statusIconCustomSymbol: Binding(get: { self.taskbarConceptState.statusIconCustomSymbol }, set: { self.taskbarConceptState.statusIconCustomSymbol = $0 }),
+            widgetOutlineBorder: Binding(get: { self.taskbarConceptState.widgetOutlineBorder }, set: { self.taskbarConceptState.widgetOutlineBorder = $0 }),
+            widgetOutlineWidth: Binding(get: { self.taskbarConceptState.widgetOutlineWidth }, set: { self.taskbarConceptState.widgetOutlineWidth = $0 }),
+            iconBackgroundVisible: Binding(get: { self.taskbarConceptState.iconBackgroundVisible }, set: { self.taskbarConceptState.iconBackgroundVisible = $0 }),
+            iconBackgroundShape: Binding(get: { self.taskbarConceptState.iconBackgroundShape }, set: { self.taskbarConceptState.iconBackgroundShape = $0 }),
+            flyoutAnimation: Binding(get: { self.taskbarConceptState.flyoutAnimation }, set: { self.taskbarConceptState.flyoutAnimation = $0 }),
+            flyoutHeightPreset: Binding(get: { self.taskbarConceptState.flyoutHeightPreset }, set: { self.taskbarConceptState.flyoutHeightPreset = $0 }),
+            trashPlacement: Binding(get: { self.taskbarConceptState.trashPlacement }, set: { self.taskbarConceptState.trashPlacement = $0 }),
+            shortcutBindings: Binding(get: { self.taskbarConceptState.shortcutBindings }, set: { self.taskbarConceptState.shortcutBindings = $0 }),
+            clipboardHistoryEnabled: Binding(get: { self.taskbarConceptState.clipboardHistoryEnabled }, set: { self.taskbarConceptState.clipboardHistoryEnabled = $0 }),
+            ipGeolocationEnabled: Binding(get: { self.taskbarConceptState.ipGeolocationEnabled }, set: { self.taskbarConceptState.ipGeolocationEnabled = $0 }),
+            faviconServiceEnabled: Binding(get: { self.taskbarConceptState.faviconServiceEnabled }, set: { self.taskbarConceptState.faviconServiceEnabled = $0 }),
+            aiAccountSwitchingEnabled: Binding(get: { self.taskbarConceptState.aiAccountSwitchingEnabled }, set: { self.taskbarConceptState.aiAccountSwitchingEnabled = $0 }),
+            clipboardRetention: Binding(get: { self.taskbarConceptState.clipboardRetention }, set: { self.taskbarConceptState.clipboardRetention = $0 }),
+            panelWidths: Binding(get: { self.taskbarConceptState.panelWidths }, set: { self.taskbarConceptState.panelWidths = $0 }),
+            preferences: Binding(
+                get: { self.preferences },
+                set: { [weak self] in self?.updatePreferences($0) }
+            ),
+            isLaunchAtLoginEnabled: Binding(
+                get: { self.isLaunchAtLoginEnabled },
+                set: { [weak self] in self?.setLaunchAtLogin(enabled: $0) }
+            ),
+            isLegacyEdgeDockEnabled: Binding(
+                get: { self.isLegacyEdgeDockEnabled },
+                set: { [weak self] enabled in
+                    guard let self = self else { return }
+                    self.isLegacyEdgeDockEnabled = enabled
+                    if enabled {
+                        self.dispatch(action: .revealDock)
+                    } else {
+                        self.dispatch(action: .hideDock)
+                    }
+                }
+            ),
+            accent: self.taskbarConceptState.clockTint,
+            onClose: { [weak self] in self?.settingsWindow?.close() },
+            onResetPersonalisation: { [weak self] in self?.taskbarConceptState.resetPersonalisation() },
+            cornerRadius: 12.0
         )
     }
 

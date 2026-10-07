@@ -8,9 +8,9 @@ public enum DockEdge: String, Codable, CaseIterable, Sendable {
 }
 
 public struct DockPlacement: Codable, Equatable, Sendable {
-    public let edge: DockEdge
-    public let verticalOffsetFraction: Double
-    public let autoHide: Bool
+    public var edge: DockEdge
+    public var verticalOffsetFraction: Double
+    public var autoHide: Bool
 
     public init(
         edge: DockEdge,

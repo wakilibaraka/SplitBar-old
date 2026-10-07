@@ -1169,4 +1169,110 @@ extension SettingsFlyout {
             }
         }
     }
+
+    // MARK: - Tab: System
+    var systemTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                settingsSection("Startup") {
+                    Toggle("Launch SplitBar automatically at login", isOn: $isLaunchAtLoginEnabled)
+                        .toggleStyle(.switch)
+                        .font(.system(size: 13, weight: .medium))
+                }
+                
+                settingsSection("Legacy Edge Dock") {
+                    Text("The classic edge-dock behavior. If enabled, SplitBar will also render a dock on the specified screen edge.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    
+                    Toggle("Enable Edge Dock", isOn: $isLegacyEdgeDockEnabled)
+                        .toggleStyle(.switch)
+                        .font(.system(size: 13, weight: .medium))
+                        .padding(.bottom, 4)
+                        
+                    if isLegacyEdgeDockEnabled {
+                        Picker("Edge Placement", selection: Binding(
+                            get: { preferences.placement.edge },
+                            set: { newEdge in
+                                var updated = preferences
+                                updated.placement.edge = newEdge
+                                preferences = updated
+                            }
+                        )) {
+                            Text("Left").tag(DockEdge.left)
+                            Text("Bottom").tag(DockEdge.bottom)
+                            Text("Right").tag(DockEdge.right)
+                            Text("Top").tag(DockEdge.top)
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        HStack {
+                            Text("Icon Size")
+                                .font(.system(size: 12, weight: .medium))
+                            Spacer()
+                            Slider(value: Binding(
+                                get: { preferences.dockIconSize },
+                                set: { preferences.dockIconSize = $0 }
+                            ), in: 32...80)
+                            .frame(width: 140)
+                        }
+                    }
+                }
+                
+                settingsSection("Motion & Accessibility") {
+                    Toggle("Reduce Motion (disables spring overshoot)", isOn: Binding(
+                        get: { preferences.reduceMotion },
+                        set: { preferences.reduceMotion = $0 }
+                    ))
+                    .toggleStyle(.switch)
+                    .font(.system(size: 13, weight: .medium))
+                }
+            }
+            .padding(18)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    // MARK: - Tab: Shortcuts
+    var shortcutsTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                hotkeysCard
+                
+                settingsSection("Clipboard Exclusions") {
+                    Text("Bundle identifiers excluded from clipboard history.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    
+                    if preferences.clipboardExcludedBundleIdentifiers.isEmpty {
+                        Text("No excluded applications")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(Array(preferences.clipboardExcludedBundleIdentifiers).sorted(), id: \.self) { bundleID in
+                            HStack {
+                                Text(bundleID)
+                                    .font(.system(size: 12, design: .monospaced))
+                                Spacer()
+                                Button {
+                                    var updated = preferences
+                                    updated.clipboardExcludedBundleIdentifiers.remove(bundleID)
+                                    preferences = updated
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                        .foregroundStyle(.red)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+            .padding(18)
+        }
+        .scrollIndicators(.hidden)
+    }
 }

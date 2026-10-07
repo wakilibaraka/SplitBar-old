@@ -57,6 +57,9 @@ struct SettingsFlyout: View {
     @Binding var aiAccountSwitchingEnabled: Bool
     @Binding var clipboardRetention: ClipboardRetentionPolicy
     @Binding var panelWidths: [PanelKind: CGFloat]
+    @Binding var preferences: AppPreferences
+    @Binding var isLaunchAtLoginEnabled: Bool
+    @Binding var isLegacyEdgeDockEnabled: Bool
     let accent: Color
     let onClose: () -> Void
     let onResetPersonalisation: () -> Void
@@ -76,20 +79,24 @@ struct SettingsFlyout: View {
 
     // MARK: - Tab definition
     enum SFTab: String, CaseIterable {
+        case system   = "System"
         case taskbar  = "Taskbar"
         case themes   = "Themes"
         case widgets  = "Widgets"
         case flyouts  = "Flyouts"
+        case shortcuts = "Shortcuts"
         case advanced = "Advanced"
         case privacy  = "Privacy"
 
         var icon: String {
             switch self {
+            case .system:   "gearshape.fill"
             case .taskbar:  "square.3.layers.3d.bottom.filled"
             case .themes:   "paintbrush.fill"
             case .widgets:  "square.grid.2x2.fill"
             case .flyouts:  "sidebar.right"
-            case .advanced: "gearshape.2.fill"
+            case .shortcuts: "command"
+            case .advanced: "slider.horizontal.3"
             case .privacy:  "hand.raised.fill"
             }
         }
@@ -276,10 +283,12 @@ struct SettingsFlyout: View {
     @ViewBuilder
     var tabContent: some View {
         switch selectedTab {
+        case .system:   systemTab
         case .taskbar:  taskbarTab
         case .themes:   themesTab
         case .widgets:  widgetsTab
         case .flyouts:  flyoutsTab
+        case .shortcuts: shortcutsTab
         case .advanced: advancedTab
         case .privacy:  privacyTab
         }
