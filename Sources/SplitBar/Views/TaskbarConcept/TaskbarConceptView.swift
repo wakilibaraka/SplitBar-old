@@ -344,6 +344,7 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
 
 private func panelBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
     let opacity = 1 - transparency * 0.68
+    let tokens = ThemeTokens.resolve(style: style, darkMode: darkMode)
     switch style {
     case .glassmorphism:
         return AnyShapeStyle((transparency > 0.55 ? Material.ultraThin : Material.regular).opacity(opacity))
@@ -353,16 +354,17 @@ private func panelBackground(style: SurfaceStyle, darkMode: Bool, transparency: 
         return AnyShapeStyle(Material.ultraThin.opacity(opacity))
     case .neobrutalism:
         // Neobrutalism = full opacity, bold and graphic
-        return AnyShapeStyle(style.panelFill(darkMode: darkMode))
+        return AnyShapeStyle(tokens.surface)
     case .minimalism:
-        return AnyShapeStyle(style.panelFill(darkMode: darkMode).opacity(min(1.0, opacity * 1.1)))
+        return AnyShapeStyle(tokens.surface.opacity(min(1.0, opacity * 1.1)))
     default:
-        return AnyShapeStyle(style.panelFill(darkMode: darkMode).opacity(opacity))
+        return AnyShapeStyle(tokens.surface.opacity(opacity))
     }
 }
 
 private func cardBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
     let opacity = 1 - transparency * 0.42
+    let tokens = ThemeTokens.resolve(style: style, darkMode: darkMode)
     switch style {
     case .glassmorphism:
         return AnyShapeStyle((transparency > 0.55 ? Material.ultraThin : Material.regular).opacity(opacity))
@@ -371,15 +373,15 @@ private func cardBackground(style: SurfaceStyle, darkMode: Bool, transparency: D
     case .windowsAero:
         return AnyShapeStyle(Material.ultraThin.opacity(opacity))
     case .neobrutalism:
-        return AnyShapeStyle(style.cardFill(darkMode: darkMode))
+        return AnyShapeStyle(tokens.card)
     case .minimalism:
-        return AnyShapeStyle(style.cardFill(darkMode: darkMode).opacity(min(1.0, opacity * 1.1)))
+        return AnyShapeStyle(tokens.card.opacity(min(1.0, opacity * 1.1)))
     default:
-        return AnyShapeStyle(style.cardFill(darkMode: darkMode).opacity(opacity))
+        return AnyShapeStyle(tokens.card.opacity(opacity))
     }
 }
 
-private func surfaceWash(style: SurfaceStyle, darkMode: Bool) -> Color {
+func surfaceWash(style: SurfaceStyle, darkMode: Bool) -> Color {
     if darkMode {
         switch style {
         case .windowsAero:   return Color(red: 0.08, green: 0.20, blue: 0.31).opacity(0.45)
@@ -1570,6 +1572,9 @@ final class TaskbarConceptState: ObservableObject {
     @Published var flyoutHeightPreset = FlyoutHeightPreset.tall {
         didSet { UserDefaults.standard.set(flyoutHeightPreset.rawValue, forKey: "flyouts.heightPreset") }
     }
+    @Published var reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        didSet { UserDefaults.standard.set(reduceMotion, forKey: "motion.reduced") }
+    }
     @Published var showsOnboarding = !UserDefaults.standard.bool(forKey: "onboarding.v1.complete")
 
     func completeOnboarding() {
@@ -1832,6 +1837,9 @@ final class TaskbarConceptState: ObservableObject {
         }
         if let savedHeightPreset = defaults.string(forKey: "flyouts.heightPreset").flatMap(FlyoutHeightPreset.init(rawValue:)) {
             flyoutHeightPreset = savedHeightPreset
+        }
+        if defaults.object(forKey: "motion.reduced") != nil {
+            reduceMotion = defaults.bool(forKey: "motion.reduced")
         }
         showWindowPreviews = defaults.bool(forKey: "taskbar.windowPreviews")
         hideMacDock = defaults.bool(forKey: "dock.hidden")
@@ -2352,7 +2360,7 @@ public struct TaskbarConceptView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(.leading, 14)
                         .padding(.top, 14)
-                        .transition(model.flyoutAnimation.asTransition())
+                        .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
                         .environment(\.surfaceStyle, surfaceStyle)
                         .zIndex(2)
                 }
@@ -2378,7 +2386,7 @@ public struct TaskbarConceptView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .padding(.trailing, 14)
                     .padding(.top, 14)
-                    .transition(model.flyoutAnimation.asTransition())
+                    .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
                     .environment(\.surfaceStyle, surfaceStyle)
                     .zIndex(2)
                 }
@@ -2389,7 +2397,7 @@ public struct TaskbarConceptView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         .padding(.trailing, 14)
                         .padding(.top, 14)
-                        .transition(model.flyoutAnimation.asTransition())
+                        .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
                         .environment(\.surfaceStyle, surfaceStyle)
                         .zIndex(2)
                 }
@@ -2404,7 +2412,7 @@ public struct TaskbarConceptView: View {
                         .frame(width: panelFrameWidth(.start, available: geometry.size.width - 48), height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 36))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .padding(.bottom, taskbarHeight + 12)
-                        .transition(model.flyoutAnimation.asTransition())
+                        .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
                         .environment(\.surfaceStyle, surfaceStyle)
                         .zIndex(2)
                 }
@@ -2467,7 +2475,7 @@ public struct TaskbarConceptView: View {
                     .frame(width: panelFrameWidth(.settings, available: geometry.size.width - 40), height: max(560, model.flyoutHeight(available: geometry.size.height - taskbarHeight - 40)))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .padding(.bottom, taskbarHeight)
-                    .transition(model.flyoutAnimation.asTransition())
+                    .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
                     .environment(\.surfaceStyle, surfaceStyle)
                         .zIndex(2)
                 }
@@ -2491,8 +2499,8 @@ public struct TaskbarConceptView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
-            .animation(.spring(response: 0.38, dampingFraction: 0.86), value: openPanel)
-            .animation(.spring(response: 0.35), value: model.flyoutHeightPreset)
+            .animation(MotionTokens.spring(response: 0.38, dampingFraction: 0.86, reduceMotion: model.reduceMotion), value: openPanel)
+            .animation(MotionTokens.spring(response: 0.35, reduceMotion: model.reduceMotion), value: model.flyoutHeightPreset)
             .environment(\.surfaceTransparency, interfaceTransparency)
             .environment(\.widgetOutline, model.widgetOutline)
             .environment(\.iconBackground, model.iconBackground)

@@ -127,6 +127,17 @@ struct TaskbarStripTests {
             #expect(style.accentGradient(darkMode: true).count >= 2)
             #expect(style.cornerRadius >= 0)
         }
+        for style in SurfaceStyle.allCases {
+            for darkMode in [false, true] {
+                let tokens = ThemeTokens.resolve(style: style, darkMode: darkMode)
+                let _ = tokens
+                let border = BorderSpec.surfaceBorder(for: style, darkMode: darkMode)
+                #expect(border.width >= 0)
+                #expect(!border.colors.isEmpty)
+                let shadow = ShadowSpec.surfaceShadow(for: style, darkMode: darkMode)
+                #expect(shadow.radius >= 0)
+            }
+        }
     }
 
     @Test func indicatorAutoColor() {
