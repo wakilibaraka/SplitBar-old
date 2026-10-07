@@ -2,6 +2,7 @@ import Testing
 
 @testable import SplitBar
 import CoreGraphics
+import Foundation
 
 struct TaskbarStripTests {
     @Test func pinsBeforeRunning() {
