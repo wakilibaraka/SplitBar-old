@@ -481,13 +481,6 @@ struct StartFlyout: View {
             launcherFooter
         }
         .padding(25)
-        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: shellRadius, style: .continuous))
-        .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: shellRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: shellRadius, style: .continuous)
-                .strokeBorder(surfaceStyle == .classic98 ? Color.white : Color.white.opacity(0.76), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
-        }
-        .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
+        .flyoutSurface(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency, cornerRadius: shellRadius)
     }
 }

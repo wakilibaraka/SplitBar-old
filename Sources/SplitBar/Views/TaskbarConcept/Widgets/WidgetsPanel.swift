@@ -109,14 +109,7 @@ struct WidgetsPanel: View {
             }
             .scrollIndicators(.hidden)
         }
-        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: shellRadius, style: .continuous))
-        .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: shellRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: shellRadius, style: .continuous)
-                .strokeBorder(surfaceStyle == .classic98 ? Color.white.opacity(0.95) : Color.white.opacity(0.72), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
-        }
-        .shadow(color: .black.opacity(surfaceStyle == .classic98 ? 0.12 : 0.18), radius: surfaceStyle == .glassmorphism ? 22 : 14, x: 0, y: surfaceStyle == .classic98 ? 3 : 8)
+        .flyoutSurface(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency, cornerRadius: shellRadius)
         .aeroSheen(cornerRadius: shellRadius)
     }
 

@@ -119,7 +119,7 @@ struct SettingsFlyout: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(sectionFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .widgetCard(style: currentStyle, darkMode: colorScheme == .dark, transparency: transparency, showsBorder: false)
     }
 
     func sliderValueLabel(_ text: String) -> some View {
@@ -183,26 +183,7 @@ struct SettingsFlyout: View {
             Divider().opacity(0.35)
             tabContent
         }
-        .background(
-            panelBackground(style: currentStyle, darkMode: colorScheme == .dark, transparency: transparency),
-            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        )
-        .background(surfaceWash(style: currentStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(
-                    currentStyle == .classic98 ? Color.white :
-                    currentStyle == .neobrutalism ? Color.black : Color.white.opacity(0.76),
-                    lineWidth: currentStyle == .classic98 ? 2 : currentStyle == .neobrutalism ? 3 : 1
-                )
-        }
-        .shadow(
-            color: currentStyle == .neobrutalism ? .black.opacity(0.85) : .black.opacity(0.16),
-            radius: currentStyle == .neobrutalism ? 0 : 22,
-            x: currentStyle == .neobrutalism ? 6 : 0,
-            y: currentStyle == .neobrutalism ? 6 : 10
-        )
+        .flyoutSurface(style: currentStyle, darkMode: colorScheme == .dark, transparency: transparency, cornerRadius: cornerRadius)
     }
 
     // MARK: - Header bar

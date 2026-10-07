@@ -95,14 +95,7 @@ struct ClockFlyout: View {
             .scrollIndicators(.hidden)
             .frame(maxHeight: .infinity, alignment: .top)
         }
-        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.76), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
+        .flyoutSurface(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency, cornerRadius: cornerRadius)
         .animation(.easeInOut(duration: 0.22), value: showsClockSettings)
     }
 

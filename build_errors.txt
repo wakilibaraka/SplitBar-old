@@ -1,8 +1,11 @@
 Building for debugging...
-[2 / 5] SplitBar-product
-[6 / 9] SplitBar-product
-[13 / 17] SplitBar-product
-[14 / 17] SplitBar-product
-[15 / 19] SplitBar-product
-[17 / 19] SplitBar-product
-Build complete! (10.00 sec)
+[Planning deferred tasks]
+[5 / 10] SplitBar-product
+[12 / 17] SplitBar-product
+[15 / 25] SplitBar-product
+[18 / 25] SplitBar-product
+[19 / 25] SplitBar-product
+[20 / 25] SplitBar-product
+[21 / 25] SplitBar-product
+[23 / 25] SplitBar-product
+Build complete! (7.89 sec)
