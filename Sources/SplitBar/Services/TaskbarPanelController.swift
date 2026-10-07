@@ -7,6 +7,19 @@ final class NonActivatingTaskbarPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+/// The create/update/remove split between what the layout asks for and what is
+/// actually on screen. Keeping it pure is what makes the panel lifecycle
+/// testable, because deciding which panels to leave alone versus remove is the
+/// whole bug.
+struct PanelPlan {
+    static func transition(wanted: Set<String>, existing: Set<String>) -> (create: [String], update: [String], remove: [String]) {
+        let create = wanted.subtracting(existing)
+        let remove = existing.subtracting(wanted)
+        let update = wanted.intersection(existing)
+        return (create.sorted(), update.sorted(), remove.sorted())
+    }
+}
+
 struct TaskbarPanelRequest {
     var strip: AnyView
     var islands: TaskbarStrip.IslandLayout?
@@ -26,6 +39,7 @@ struct TaskbarPanelRequest {
 @MainActor
 public final class TaskbarPanelController {
     private var panels: [String: NonActivatingTaskbarPanel] = [:]
+    private var activeKeys: Set<String> = []
     private var hostingViews: [String: NSHostingView<AnyView>] = [:]
     private var panelFrames: [String: CGRect] = [:]
     private var enabledDisplayIDs: Set<String> = []
@@ -98,10 +112,15 @@ public final class TaskbarPanelController {
                 )
             }
         }
-        for key in panels.keys where !wantedKeys.contains(key) {
+        let plan = PanelPlan.transition(wanted: wantedKeys, existing: Set(panels.keys))
+        for key in plan.remove {
             panels[key]?.orderOut(nil)
-            panelFrames[key] = nil
+            panels[key]?.close()
+            panels.removeValue(forKey: key)
+            hostingViews.removeValue(forKey: key)
+            panelFrames.removeValue(forKey: key)
         }
+        activeKeys = wantedKeys
         startObservingChanges()
         refreshFullscreenVisibility()
     }
@@ -114,15 +133,20 @@ public final class TaskbarPanelController {
     public func hide() {
         stopObservingChanges()
         enabledDisplayIDs = []
+        activeKeys = []
         panelFrames = [:]
         for panel in panels.values {
             panel.orderOut(nil)
+            panel.close()
         }
+        panels.removeAll()
+        hostingViews.removeAll()
     }
 
     public func refreshFullscreenVisibility() {
         let fullscreenIDs = fullscreenMonitor.fullscreenDisplayIdentifiers()
-        for (key, panel) in panels {
+        for key in activeKeys {
+            guard let panel = panels[key] else { continue }
             guard enabledDisplayIDs.contains(displayID(forKey: key)) else {
                 panel.orderOut(nil)
                 continue
@@ -163,6 +187,7 @@ public final class TaskbarPanelController {
             panel.isOpaque = false
             panel.backgroundColor = .clear
             panel.hasShadow = false
+            panel.isReleasedWhenClosed = false
             panel.hidesOnDeactivate = false
             panel.acceptsMouseMovedEvents = true
             let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
