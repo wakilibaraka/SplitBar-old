@@ -1546,6 +1546,28 @@ final class TaskbarConceptState: ObservableObject {
     }
     @Published var showsOnboarding = !UserDefaults.standard.bool(forKey: "onboarding.v1.complete")
 
+    // Privacy gates, mirrored from AppPreferences so the taskbar settings UI can
+    // bind them. Changes are forwarded to the runtime, which persists them.
+    @Published var clipboardHistoryEnabled = false {
+        didSet { onPrivacyGateChanged?("clipboardHistoryEnabled", clipboardHistoryEnabled) }
+    }
+    @Published var ipGeolocationEnabled = false {
+        didSet { onPrivacyGateChanged?("ipGeolocationEnabled", ipGeolocationEnabled) }
+    }
+    @Published var faviconServiceEnabled = false {
+        didSet { onPrivacyGateChanged?("faviconServiceEnabled", faviconServiceEnabled) }
+    }
+    @Published var aiAccountSwitchingEnabled = false {
+        didSet { onPrivacyGateChanged?("aiAccountSwitchingEnabled", aiAccountSwitchingEnabled) }
+    }
+    @Published var clipboardRetention = ClipboardRetentionPolicy(maxEntries: 100, maxBlobBytes: 10 * 1024 * 1024) {
+        didSet { onClipboardRetentionChanged?(clipboardRetention) }
+    }
+
+    /// Set by the runtime: forwards a gate change into AppPreferences.
+    var onPrivacyGateChanged: ((String, Bool) -> Void)?
+    var onClipboardRetentionChanged: ((ClipboardRetentionPolicy) -> Void)?
+
     nonisolated static var defaultShortcutBindings: [ShortcutBinding] {
         [
             ShortcutBinding(id: UUID(), chord: ShortcutChord(carbonKeyCode: 0x02, carbonModifiers: 0x0800), action: .toggleDock),
@@ -2151,6 +2173,11 @@ struct TaskbarFlyoutContentView: View {
                 flyoutHeightPreset: $model.flyoutHeightPreset,
                 trashPlacement: $model.trashPlacement,
                 shortcutBindings: $model.shortcutBindings,
+                clipboardHistoryEnabled: $model.clipboardHistoryEnabled,
+                ipGeolocationEnabled: $model.ipGeolocationEnabled,
+                faviconServiceEnabled: $model.faviconServiceEnabled,
+                aiAccountSwitchingEnabled: $model.aiAccountSwitchingEnabled,
+                clipboardRetention: $model.clipboardRetention,
                 panelWidths: $model.panelWidths,
                 accent: model.clockTint,
                 onClose: onClose,
@@ -2472,6 +2499,11 @@ public struct TaskbarConceptView: View {
                         flyoutHeightPreset: $model.flyoutHeightPreset,
                         trashPlacement: $model.trashPlacement,
                         shortcutBindings: $model.shortcutBindings,
+                        clipboardHistoryEnabled: $model.clipboardHistoryEnabled,
+                        ipGeolocationEnabled: $model.ipGeolocationEnabled,
+                        faviconServiceEnabled: $model.faviconServiceEnabled,
+                        aiAccountSwitchingEnabled: $model.aiAccountSwitchingEnabled,
+                        clipboardRetention: $model.clipboardRetention,
                         panelWidths: $model.panelWidths,
                         accent: clockTint,
                         onClose: { openPanel = nil },
@@ -5793,6 +5825,11 @@ private struct SettingsFlyout: View {
     @Binding var flyoutHeightPreset: FlyoutHeightPreset
     @Binding var trashPlacement: TrashPlacement
     @Binding var shortcutBindings: [ShortcutBinding]
+    @Binding var clipboardHistoryEnabled: Bool
+    @Binding var ipGeolocationEnabled: Bool
+    @Binding var faviconServiceEnabled: Bool
+    @Binding var aiAccountSwitchingEnabled: Bool
+    @Binding var clipboardRetention: ClipboardRetentionPolicy
     @Binding var panelWidths: [PanelKind: CGFloat]
     let accent: Color
     let onClose: () -> Void
@@ -5818,6 +5855,7 @@ private struct SettingsFlyout: View {
         case widgets  = "Widgets"
         case flyouts  = "Flyouts"
         case advanced = "Advanced"
+        case privacy  = "Privacy"
 
         var icon: String {
             switch self {
@@ -5826,6 +5864,7 @@ private struct SettingsFlyout: View {
             case .widgets:  "square.grid.2x2.fill"
             case .flyouts:  "sidebar.right"
             case .advanced: "gearshape.2.fill"
+            case .privacy:  "hand.raised.fill"
             }
         }
     }
@@ -6016,6 +6055,7 @@ private struct SettingsFlyout: View {
         case .widgets:  widgetsTab
         case .flyouts:  flyoutsTab
         case .advanced: advancedTab
+        case .privacy:  privacyTab
         }
     }
 
@@ -6630,6 +6670,199 @@ private struct SettingsFlyout: View {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // MARK: - Tab 5: Advanced
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: - Tab 6: Privacy
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private var privacyTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                capabilitiesCard
+                dataGatesCard
+            }
+            .padding(18)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var capabilities: [PrivacyCapability] {
+        [
+            PrivacyCapability(
+                id: "clipboard",
+                title: "Clipboard history",
+                purpose: "Records what you copy so you can paste it again.",
+                leavesTheMac: "Nothing leaves the Mac. Entries are written to your home folder, readable only by you.",
+                settingsPane: nil,
+                status: clipboardHistoryEnabled ? .granted : .notRequested
+            ),
+            PrivacyCapability(
+                id: "previews",
+                title: "Window previews",
+                purpose: "Shows live thumbnails when you hover a taskbar icon.",
+                leavesTheMac: "Nothing leaves the Mac. Icons are used instead if you decline.",
+                settingsPane: PrivacyStatusReader.panes.screenRecording,
+                status: PrivacyStatusReader.screenRecording
+            ),
+            PrivacyCapability(
+                id: "accessibility",
+                title: "Minimize windows",
+                purpose: "Lets a taskbar click send the frontmost window to the Dock.",
+                leavesTheMac: "Nothing leaves the Mac.",
+                settingsPane: PrivacyStatusReader.panes.accessibility,
+                status: PrivacyStatusReader.accessibility
+            ),
+            PrivacyCapability(
+                id: "wifi",
+                title: "Wi-Fi network name",
+                purpose: "Shows which network you are on in Quick Settings.",
+                leavesTheMac: "Nothing leaves the Mac, but macOS requires Location before it will show the name.",
+                settingsPane: PrivacyStatusReader.panes.location,
+                status: PrivacyStatusReader.location
+            ),
+            PrivacyCapability(
+                id: "bluetooth",
+                title: "Bluetooth devices",
+                purpose: "Lists paired devices so you can reconnect them.",
+                leavesTheMac: "Nothing leaves the Mac.",
+                settingsPane: PrivacyStatusReader.panes.bluetooth,
+                status: PrivacyStatusReader.bluetooth
+            ),
+            PrivacyCapability(
+                id: "automation",
+                title: "Control other apps",
+                purpose: "Reveals files in Finder, closes windows, reads now-playing status.",
+                leavesTheMac: "Nothing leaves the Mac. macOS asks the first time you use one of these.",
+                settingsPane: PrivacyStatusReader.panes.automation,
+                status: .notRequested
+            ),
+        ]
+    }
+
+    private var capabilitiesCard: some View {
+        settingsSection("What this app can access") {
+            VStack(spacing: 8) {
+                ForEach(capabilities) { capability in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Image(systemName: capability.status.symbolName)
+                                .foregroundStyle(capability.status == .granted ? accent : .secondary)
+                            Text(capability.title)
+                                .font(.system(size: 12, weight: .semibold))
+                            Spacer(minLength: 6)
+                            // Never colour alone: text plus a distinct symbol.
+                            Text(capability.status.title)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(capability.purpose)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(capability.leavesTheMac)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
+                }
+            }
+            HStack(spacing: 14) {
+                Button("Open System Settings") {
+                    PrivacyStatusReader.openPane(PrivacyStatusReader.panes.accessibility)
+                }
+                Button("Login Items") {
+                    PrivacyStatusReader.openPane(PrivacyStatusReader.panes.loginItems)
+                }
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(accent)
+        }
+    }
+
+    private var dataGatesCard: some View {
+        settingsSection("Optional data access") {
+            Toggle(isOn: $clipboardHistoryEnabled) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Record clipboard history")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Off by default. Pasteboards an app marks as private are never recorded.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+
+            Toggle(isOn: $ipGeolocationEnabled) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Weather location from IP address")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Your IP address is sent to ipwho.is. Off by default.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+
+            Toggle(isOn: $faviconServiceEnabled) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Third-party favicon fallback")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Tells DuckDuckGo and Google which sites you pinned. Off by default.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+
+            Toggle(isOn: $aiAccountSwitchingEnabled) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Read Claude Code and Codex credentials")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Reads the \"Claude Code-credentials\" Keychain item and ~/.codex/auth.json, and contacts provider OAuth endpoints. Off by default; Claude usage still comes from the Claude Code status line.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+
+            Text("Clipboard retention")
+                .font(.system(size: 12, weight: .medium))
+            HStack(spacing: 8) {
+                ForEach(ClipboardRetentionWindow.allCases) { window in
+                    Button {
+                        clipboardRetention = ClipboardRetentionPolicy(
+                            maxEntries: clipboardRetention.maxEntries,
+                            maxBlobBytes: clipboardRetention.maxBlobBytes,
+                            window: window
+                        )
+                    } label: {
+                        Text(window.title)
+                            .font(.system(size: 10, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                clipboardRetention.window == window ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Text("Hosts contacted with these defaults: api.open-meteo.com for weather, plus the sites you pinned for their own icon. See NETWORK.md.")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private var advancedTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {

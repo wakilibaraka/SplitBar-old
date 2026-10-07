@@ -333,6 +333,7 @@ public final class AppRuntimeController {
         self.setupTaskbarPanel()
         self.setupRunningState()
         self.setupWeatherForwarding()
+        self.installPrivacyGateBridge()
         self.setupClipboardMonitoring()
         self.setupLiveStreaming()
         Logger.lifecycle.info("AppRuntimeController initialized")
@@ -790,6 +791,35 @@ public final class AppRuntimeController {
             dispatch(action: .hideDock)
         } else {
             dispatch(action: .revealDock)
+        }
+    }
+
+    /// Connects the taskbar settings UI's privacy gates to AppPreferences so a
+    /// change there is persisted and applied like any other setting.
+    private func installPrivacyGateBridge() {
+        taskbarConceptState.clipboardHistoryEnabled = preferences.clipboardHistoryEnabled
+        taskbarConceptState.ipGeolocationEnabled = preferences.ipGeolocationEnabled
+        taskbarConceptState.faviconServiceEnabled = preferences.faviconServiceEnabled
+        taskbarConceptState.aiAccountSwitchingEnabled = preferences.aiAccountSwitchingEnabled
+        taskbarConceptState.clipboardRetention = preferences.clipboardRetention
+
+        taskbarConceptState.onPrivacyGateChanged = { [weak self] key, value in
+            guard let self else { return }
+            var updated = self.preferences
+            switch key {
+            case "clipboardHistoryEnabled": updated.clipboardHistoryEnabled = value
+            case "ipGeolocationEnabled": updated.ipGeolocationEnabled = value
+            case "faviconServiceEnabled": updated.faviconServiceEnabled = value
+            case "aiAccountSwitchingEnabled": updated.aiAccountSwitchingEnabled = value
+            default: return
+            }
+            self.updatePreferences(updated)
+        }
+        taskbarConceptState.onClipboardRetentionChanged = { [weak self] policy in
+            guard let self else { return }
+            var updated = self.preferences
+            updated.clipboardRetention = policy
+            self.updatePreferences(updated)
         }
     }
 
