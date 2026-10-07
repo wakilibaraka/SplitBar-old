@@ -298,7 +298,7 @@ tested.
   per-mode move/remove controls, and a divider context menu for removal.
   Trash anchors are per-mode in settings, the Downloads/Trash/Status cluster
   has an orderable list, and the legacy `usesDockPresentation` flag is gone.
-- [ ] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
+- [x] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.
 - Establish panel focus policy: taskbar must not steal focus from frontmost apps;
@@ -311,11 +311,10 @@ tested.
 **Gate:** taskbar positions correctly on all supported edges and survives Space
 switches without focus theft.
 
-The taskbar is still hosted in the preview window. The shared pin wiring is the
-first functional slice toward a dock; the next implementation should move only
-the taskbar surface into a non-activating bottom-edge panel, retain the preview
-as a fallback, and validate multi-display and Space behavior before changing
-the app's default presentation.
+The taskbar is hosted in a non-activating bottom-edge panel (single strip or
+per-island panels); the full-screen preview window remains available
+independently. Multi-display and Space behavior are validated single-display
+first, with the limitations documented below.
 
 #### Dock-like floating behavior (committed)
 
