@@ -486,3 +486,7 @@ extension EnvironmentValues {
         set { self[IconBackgroundKey.self] = newValue }
     }
 }
+
+func taskbarBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
+    GlassProviders.current.taskbarBackground(style: style, darkMode: darkMode, transparency: transparency)
+}

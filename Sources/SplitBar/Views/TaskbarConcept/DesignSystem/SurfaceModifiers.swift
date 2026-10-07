@@ -175,3 +175,58 @@ public extension View {
         self.modifier(WidgetCardModifier(style: style, darkMode: darkMode, transparency: transparency, showsBorder: showsBorder))
     }
 }
+
+public struct TaskbarSurfaceModifier: ViewModifier {
+    let style: SurfaceStyle
+    let darkMode: Bool
+    let transparency: Double
+    let cornerRadius: CGFloat
+
+    public func body(content: Content) -> some View {
+        content
+            .background(
+                taskbarBackground(style: style, darkMode: darkMode, transparency: transparency),
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .background(surfaceWash(style: style, darkMode: darkMode))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(
+                        borderColor,
+                        lineWidth: borderWidth
+                    )
+            }
+    }
+
+    private var borderColor: Color {
+        switch style {
+        case .classic98:
+            return Color.white
+        case .neobrutalism, .cyberdeck:
+            return Color.black
+        case .windowsXP:
+            return Color.white.opacity(0.8)
+        case .visionOS:
+            return Color.white.opacity(0.4)
+        case .glassmorphism, .liquidGlass:
+            return Color.white.opacity(0.38)
+        default:
+            return Color.white.opacity(0.2)
+        }
+    }
+
+    private var borderWidth: CGFloat {
+        switch style {
+        case .classic98, .cyberdeck: return 2
+        case .neobrutalism: return 3
+        default: return 1
+        }
+    }
+}
+
+public extension View {
+    func taskbarSurface(style: SurfaceStyle, darkMode: Bool, transparency: Double, cornerRadius: CGFloat) -> some View {
+        self.modifier(TaskbarSurfaceModifier(style: style, darkMode: darkMode, transparency: transparency, cornerRadius: cornerRadius))
+    }
+}

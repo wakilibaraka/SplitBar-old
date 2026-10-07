@@ -826,15 +826,7 @@ struct TaskbarSplitRow: View {
         )
         .padding(.horizontal, 10)
         .frame(width: frame.width, height: frame.height)
-        .background {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.38), lineWidth: 1)
-                }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        .taskbarSurface(style: model.surfaceStyle, darkMode: model.isDarkMode, transparency: model.interfaceTransparency, cornerRadius: radius)
     }
 }
 

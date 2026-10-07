@@ -9,6 +9,7 @@ import SwiftUI
 protocol GlassProviding {
     func panelBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle
     func cardBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle
+    func taskbarBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle
 }
 
 /// Current behavior: system materials with per-theme opacity curves.
@@ -25,9 +26,7 @@ struct SystemMaterialGlass: GlassProviding {
             return AnyShapeStyle(Material.ultraThin.opacity(opacity))
         case .visionOS:
             return AnyShapeStyle(Material.ultraThick.opacity(opacity))
-        case .cyberdeck:
-            return AnyShapeStyle(tokens.surface)
-        case .neobrutalism:
+        case .cyberdeck, .neobrutalism:
             return AnyShapeStyle(tokens.surface)
         case .minimalism:
             return AnyShapeStyle(tokens.surface.opacity(min(1.0, opacity * 1.1)))
@@ -43,19 +42,37 @@ struct SystemMaterialGlass: GlassProviding {
         case .glassmorphism:
             return AnyShapeStyle((transparency > 0.55 ? Material.ultraThin : Material.regular).opacity(opacity))
         case .liquidGlass:
-            return AnyShapeStyle(Material.ultraThinMaterial.opacity(opacity))
+            return AnyShapeStyle(Material.ultraThin.opacity(opacity))
         case .windowsAero:
             return AnyShapeStyle(Material.ultraThin.opacity(opacity))
         case .visionOS:
             return AnyShapeStyle(Material.thick.opacity(opacity))
-        case .cyberdeck:
-            return AnyShapeStyle(tokens.card)
-        case .neobrutalism:
+        case .cyberdeck, .neobrutalism:
             return AnyShapeStyle(tokens.card)
         case .minimalism:
             return AnyShapeStyle(tokens.card.opacity(min(1.0, opacity * 1.1)))
         default:
             return AnyShapeStyle(tokens.card.opacity(opacity))
+        }
+    }
+
+    func taskbarBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
+        let opacity = 1 - transparency * 0.45
+        switch style {
+        case .glassmorphism:
+            return AnyShapeStyle((transparency > 0.55 ? Material.ultraThin : Material.regular).opacity(opacity))
+        case .liquidGlass:
+            return AnyShapeStyle(Material.regular.opacity(opacity))
+        case .windowsAero:
+            return AnyShapeStyle(Material.ultraThin.opacity(opacity))
+        case .visionOS:
+            return AnyShapeStyle(Material.ultraThick.opacity(opacity))
+        case .cyberdeck, .neobrutalism, .windowsXP, .aqua, .frutigerAero, .y2k:
+            return AnyShapeStyle(style.taskbarFill(darkMode: darkMode))
+        case .minimalism:
+            return AnyShapeStyle(style.taskbarFill(darkMode: darkMode).opacity(min(1.0, opacity * 1.1)))
+        default:
+            return AnyShapeStyle(style.taskbarFill(darkMode: darkMode).opacity(opacity))
         }
     }
 }
@@ -68,6 +85,10 @@ struct SolidFillGlass: GlassProviding {
 
     func cardBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
         AnyShapeStyle(ThemeTokens.resolve(style: style, darkMode: darkMode).card)
+    }
+
+    func taskbarBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
+        AnyShapeStyle(style.taskbarFill(darkMode: darkMode))
     }
 }
 
