@@ -29,9 +29,9 @@ public final class TaskbarPanelController {
     private var hostingViews: [String: NSHostingView<AnyView>] = [:]
     private var panelFrames: [String: CGRect] = [:]
     private var enabledDisplayIDs: Set<String> = []
-    private var screenObserver: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
     private let screenService = ScreenService()
+    private let displayCoordinator = DisplayCoordinator()
     private let fullscreenMonitor = FullscreenMonitor()
     private var lastHeight: CGFloat = 46
     private var lastRequest: TaskbarPanelRequest?
@@ -73,9 +73,7 @@ public final class TaskbarPanelController {
     }
 
     func show(_ request: TaskbarPanelRequest) {
-        enabledDisplayIDs = Set(
-            screenService.primaryScreen().map { [$0.identifier] } ?? []
-        )
+        enabledDisplayIDs = Set(displayCoordinator.panelScreens().map(\.identifier))
         var wantedKeys = Set<String>()
         for identifier in enabledDisplayIDs {
             if let islands = request.islands, !islands.islands.isEmpty {
@@ -203,16 +201,12 @@ public final class TaskbarPanelController {
     }
 
     private func startObservingChanges() {
-        guard screenObserver == nil else { return }
-        screenObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.didChangeScreenParametersNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
+        displayCoordinator.onScreensChanged = { [weak self] in
             Task { @MainActor in
                 self?.refresh()
             }
         }
+        displayCoordinator.startObserving()
         let workspaceCenter = NSWorkspace.shared.notificationCenter
         workspaceObservers = [
             workspaceCenter.addObserver(
@@ -237,10 +231,8 @@ public final class TaskbarPanelController {
     }
 
     private func stopObservingChanges() {
-        if let screenObserver {
-            NotificationCenter.default.removeObserver(screenObserver)
-            self.screenObserver = nil
-        }
+        displayCoordinator.onScreensChanged = nil
+        displayCoordinator.stopObserving()
         for observer in workspaceObservers {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }

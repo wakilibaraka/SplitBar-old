@@ -343,42 +343,11 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
 }
 
 private func panelBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
-    let opacity = 1 - transparency * 0.68
-    let tokens = ThemeTokens.resolve(style: style, darkMode: darkMode)
-    switch style {
-    case .glassmorphism:
-        return AnyShapeStyle((transparency > 0.55 ? Material.ultraThin : Material.regular).opacity(opacity))
-    case .liquidGlass:
-        return AnyShapeStyle(Material.regular.opacity(opacity))
-    case .windowsAero:
-        return AnyShapeStyle(Material.ultraThin.opacity(opacity))
-    case .neobrutalism:
-        // Neobrutalism = full opacity, bold and graphic
-        return AnyShapeStyle(tokens.surface)
-    case .minimalism:
-        return AnyShapeStyle(tokens.surface.opacity(min(1.0, opacity * 1.1)))
-    default:
-        return AnyShapeStyle(tokens.surface.opacity(opacity))
-    }
+    GlassProviders.current.panelBackground(style: style, darkMode: darkMode, transparency: transparency)
 }
 
 private func cardBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
-    let opacity = 1 - transparency * 0.42
-    let tokens = ThemeTokens.resolve(style: style, darkMode: darkMode)
-    switch style {
-    case .glassmorphism:
-        return AnyShapeStyle((transparency > 0.55 ? Material.ultraThin : Material.regular).opacity(opacity))
-    case .liquidGlass:
-        return AnyShapeStyle(Material.ultraThinMaterial.opacity(opacity))
-    case .windowsAero:
-        return AnyShapeStyle(Material.ultraThin.opacity(opacity))
-    case .neobrutalism:
-        return AnyShapeStyle(tokens.card)
-    case .minimalism:
-        return AnyShapeStyle(tokens.card.opacity(min(1.0, opacity * 1.1)))
-    default:
-        return AnyShapeStyle(tokens.card.opacity(opacity))
-    }
+    GlassProviders.current.cardBackground(style: style, darkMode: darkMode, transparency: transparency)
 }
 
 func surfaceWash(style: SurfaceStyle, darkMode: Bool) -> Color {

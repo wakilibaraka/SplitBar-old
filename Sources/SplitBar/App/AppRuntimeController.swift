@@ -183,6 +183,7 @@ public final class AppRuntimeController {
     private var taskbarConceptWindow: NSWindow?
     private let taskbarConceptState = TaskbarConceptState()
     private let taskbarPanelController = TaskbarPanelController()
+    private let displayCoordinator = DisplayCoordinator()
     private let taskbarFlyoutController = FlyoutPanelController()
     private let windowPreviewController = FlyoutPanelController()
     private var taskbarFlyoutKindShown: OpenPanel?
@@ -471,7 +472,7 @@ public final class AppRuntimeController {
             }
         )
         let mode = taskbarConceptState.taskbarMode
-        let screenWidth = screenService.primaryScreen()?.visibleFrame.width ?? 1440
+        let screenWidth = displayCoordinator.panelScreenWidth()
         let appCount = taskbarConceptState.pinnedAppBundleIDs.count
             + taskbarConceptState.runningAppOrder
                 .filter({ !taskbarConceptState.pinnedAppBundleIDs.contains($0) }).count
