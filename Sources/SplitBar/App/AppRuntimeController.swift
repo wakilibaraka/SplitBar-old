@@ -801,6 +801,12 @@ public final class AppRuntimeController {
         if previous.aiAccountSwitchingEnabled != newPreferences.aiAccountSwitchingEnabled {
             aiUsageService.accountSwitchingEnabled = newPreferences.aiAccountSwitchingEnabled
         }
+        if previous.ipGeolocationEnabled != newPreferences.ipGeolocationEnabled {
+            WeatherService.ipGeolocationEnabled = newPreferences.ipGeolocationEnabled
+        }
+        if previous.faviconServiceEnabled != newPreferences.faviconServiceEnabled {
+            FaviconService.usesThirdPartyService = newPreferences.faviconServiceEnabled
+        }
         if previous.clipboardHistoryEnabled != newPreferences.clipboardHistoryEnabled {
             if newPreferences.clipboardHistoryEnabled {
                 setupClipboardMonitoring()

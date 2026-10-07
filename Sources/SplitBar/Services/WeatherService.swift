@@ -26,6 +26,11 @@ public struct OpenMeteoResponse: Decodable {
 
 @MainActor
 public final class WeatherService {
+    /// Off by default: enabling it reveals the machine's IP address to ipwho.is.
+    /// `false` keeps the last known or default coordinates and never contacts
+    /// the geolocation host.
+    public static var ipGeolocationEnabled = false
+
     public private(set) var currentState: WeatherState
     public var onUpdate: ((WeatherState) -> Void)?
     private var refreshTimer: Timer?
@@ -64,8 +69,10 @@ public final class WeatherService {
         var longitude = 28.9784
         var city = currentState.cityName
 
-        // 1. IP tabanlı konum (HTTPS; düz HTTP istekleri App Transport Security tarafından engellenir)
-        if let geoURL = URL(string: "https://ipwho.is/?fields=success,city,latitude,longitude") {
+        // 1. IP tabanlı konum — yalnızca kullanıcı açıkça izin verirse.
+        //    Bu istek makinenin IP adresini üçüncü tarafa gönderir.
+        if WeatherService.ipGeolocationEnabled,
+           let geoURL = URL(string: "https://ipwho.is/?fields=success,city,latitude,longitude") {
             struct GeoResponse: Decodable {
                 let success: Bool
                 let city: String?

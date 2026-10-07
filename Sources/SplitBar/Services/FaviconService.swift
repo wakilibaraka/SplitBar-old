@@ -10,6 +10,10 @@ public final class FaviconService {
     private var inFlight: Set<String> = []
     private let cacheDirectory: URL
 
+    /// Off by default. When enabled, DuckDuckGo and Google learn every host the
+    /// user has pinned.
+    public static var usesThirdPartyService = false
+
     private init() {
         let fileManager = FileManager.default
         let caches = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
@@ -50,12 +54,19 @@ public final class FaviconService {
 
         inFlight.insert(cleanHost)
 
+        // The site's own icon is fetched first so a pinned host is not revealed
+        // to a third party. The fallback services are used only when the user
+        // opts in, because each request tells that service which sites you keep.
+        let useFallbackServices = FaviconService.usesThirdPartyService
+
         Task.detached(priority: .background) { [cleanHost, cacheDirectory] in
-            let candidates: [URL?] = [
-                URL(string: "https://icons.duckduckgo.com/ip3/\(cleanHost).ico"),
-                URL(string: "https://www.google.com/s2/favicons?domain=\(cleanHost)&sz=128"),
-                URL(string: "https://\(cleanHost)/favicon.ico")
-            ]
+            var candidates: [URL?] = [URL(string: "https://\(cleanHost)/favicon.ico")]
+            if useFallbackServices {
+                candidates.append(contentsOf: [
+                    URL(string: "https://icons.duckduckgo.com/ip3/\(cleanHost).ico"),
+                    URL(string: "https://www.google.com/s2/favicons?domain=\(cleanHost)&sz=128"),
+                ])
+            }
 
             var downloadedImage: NSImage? = nil
 

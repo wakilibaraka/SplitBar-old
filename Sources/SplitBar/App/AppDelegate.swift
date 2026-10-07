@@ -325,6 +325,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         let launchAtLoginService = LaunchAtLoginService()
         let quickNotesService = QuickNotesService(baseURL: appSupport)
+        // Privacy gates are process-wide defaults; flip them before any service
+        // can act on them.
+        WeatherService.ipGeolocationEnabled = loadedSnapshot.preferences.ipGeolocationEnabled
+        FaviconService.usesThirdPartyService = loadedSnapshot.preferences.faviconServiceEnabled
+
         let dockController = DockController(
             stateFileURL: appSupport.appendingPathComponent("dock-prior-state.json")
         )
