@@ -120,6 +120,29 @@ struct TaskbarStripTests {
         #expect(FlyoutAnimation.allCases.count == 9)
     }
 
+    @Test func themeTokensComplete() {
+        #expect(SurfaceStyle.allCases.count == 14)
+        for style in SurfaceStyle.allCases {
+            #expect(style.accentGradient(darkMode: false).count >= 2)
+            #expect(style.accentGradient(darkMode: true).count >= 2)
+            #expect(style.cornerRadius >= 0)
+        }
+    }
+
+    @Test func indicatorAutoColor() {
+        for style in SurfaceStyle.allCases {
+            let fill = IndicatorFill(kind: .solid(IndicatorColorPreset.auto.color(surfaceStyle: style, darkMode: false)!))
+            #expect(fill == .solid(style.accent(darkMode: false)))
+        }
+        let gradient = IndicatorFill(kind: .gradient(.blue, .purple))
+        if case .gradient = gradient.kind {
+        } else {
+            Issue.record("expected gradient kind")
+        }
+        #expect(IndicatorColorPreset.allCases.count == 9)
+        #expect(ClockColorPreset.allCases.count == 7)
+    }
+
     @Test func weatherBackdropMapping() {
         func weather(symbol: String, text: String) -> WeatherState {
             WeatherState(

@@ -976,6 +976,113 @@ enum RunningIndicatorSize: String, CaseIterable, Identifiable {
     }
 }
 
+/// Resolved fill for the running indicator: a flat colour or a two-stop gradient.
+struct IndicatorFill: Equatable {
+    enum Kind: Equatable {
+        case solid(Color)
+        case gradient(Color, Color)
+    }
+
+    var kind: Kind
+
+    static func solid(_ color: Color) -> IndicatorFill {
+        IndicatorFill(kind: .solid(color))
+    }
+
+    func style(opacity: Double) -> AnyShapeStyle {
+        switch kind {
+        case .solid(let color):
+            AnyShapeStyle(color.opacity(opacity))
+        case .gradient(let start, let end):
+            AnyShapeStyle(LinearGradient(
+                colors: [start.opacity(opacity), end.opacity(opacity)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ))
+        }
+    }
+}
+
+enum IndicatorColorPreset: String, CaseIterable, Identifiable {
+    case auto
+    case blue
+    case green
+    case red
+    case orange
+    case purple
+    case pink
+    case white
+    case gradient
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .auto: "Auto"
+        case .blue: "Blue"
+        case .green: "Green"
+        case .red: "Red"
+        case .orange: "Orange"
+        case .purple: "Purple"
+        case .pink: "Pink"
+        case .white: "White"
+        case .gradient: "Gradient"
+        }
+    }
+
+    func color(surfaceStyle: SurfaceStyle, darkMode: Bool) -> Color? {
+        switch self {
+        case .auto:
+            surfaceStyle.accent(darkMode: darkMode)
+        case .blue: .blue
+        case .green: .green
+        case .red: .red
+        case .orange: .orange
+        case .purple: .purple
+        case .pink: .pink
+        case .white: .white
+        case .gradient: nil
+        }
+    }
+}
+
+enum ClockColorPreset: String, CaseIterable, Identifiable {
+    case auto
+    case white
+    case primary
+    case blue
+    case pink
+    case orange
+    case gradient
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .auto: "Auto"
+        case .white: "White"
+        case .primary: "Primary"
+        case .blue: "Blue"
+        case .pink: "Pink"
+        case .orange: "Orange"
+        case .gradient: "Gradient"
+        }
+    }
+
+    func color(surfaceStyle: SurfaceStyle, darkMode: Bool) -> Color? {
+        switch self {
+        case .auto:
+            surfaceStyle.accent(darkMode: darkMode)
+        case .white: .white
+        case .primary: .primary
+        case .blue: .blue
+        case .pink: .pink
+        case .orange: .orange
+        case .gradient: nil
+        }
+    }
+}
+
 enum AppMinimizeMode: String, CaseIterable, Identifiable {
     case hide
     case minimize
@@ -1410,6 +1517,47 @@ final class TaskbarConceptState: ObservableObject {
     @Published var runningIndicatorColor = Color.blue {
         didSet { UserDefaults.standard.set(runningIndicatorColor.storedRGBA, forKey: "taskbar.indicatorColor") }
     }
+    @Published var indicatorColorPreset = IndicatorColorPreset.auto {
+        didSet { UserDefaults.standard.set(indicatorColorPreset.rawValue, forKey: "taskbar.indicatorPreset") }
+    }
+    @Published var indicatorGradientStart = Color.blue {
+        didSet { UserDefaults.standard.set(indicatorGradientStart.storedRGBA, forKey: "taskbar.indicatorGradientStart") }
+    }
+    @Published var indicatorGradientEnd = Color.purple {
+        didSet { UserDefaults.standard.set(indicatorGradientEnd.storedRGBA, forKey: "taskbar.indicatorGradientEnd") }
+    }
+    @Published var clockColorPreset = ClockColorPreset.auto {
+        didSet { UserDefaults.standard.set(clockColorPreset.rawValue, forKey: "clock.colorPreset") }
+    }
+    @Published var clockGradientEnabled = false {
+        didSet { UserDefaults.standard.set(clockGradientEnabled, forKey: "clock.gradientEnabled") }
+    }
+    @Published var clockGradientStart = Color.roseAccent {
+        didSet { UserDefaults.standard.set(clockGradientStart.storedRGBA, forKey: "clock.gradientStart") }
+    }
+    @Published var clockGradientEnd = Color.orange {
+        didSet { UserDefaults.standard.set(clockGradientEnd.storedRGBA, forKey: "clock.gradientEnd") }
+    }
+
+    var resolvedIndicatorFill: IndicatorFill {
+        if indicatorColorPreset == .gradient {
+            return IndicatorFill(kind: .gradient(indicatorGradientStart, indicatorGradientEnd))
+        }
+        return .solid(indicatorColorPreset.color(surfaceStyle: surfaceStyle, darkMode: isDarkMode) ?? runningIndicatorColor)
+    }
+
+    var resolvedClockTint: Color {
+        clockColorPreset.color(surfaceStyle: surfaceStyle, darkMode: isDarkMode) ?? clockTint
+    }
+
+    var clockTintGradient: LinearGradient? {
+        guard clockGradientEnabled || clockColorPreset == .gradient else { return nil }
+        return LinearGradient(
+            colors: [clockGradientStart, clockGradientEnd],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
     @Published var minimizeMode = AppMinimizeMode.hide {
         didSet { UserDefaults.standard.set(minimizeMode.rawValue, forKey: "taskbar.minimizeMode") }
     }
@@ -1650,6 +1798,29 @@ final class TaskbarConceptState: ObservableObject {
            let color = Color.fromStoredRGBA(values) {
             runningIndicatorColor = color
         }
+        if let savedIndicatorPreset = defaults.string(forKey: "taskbar.indicatorPreset").flatMap(IndicatorColorPreset.init(rawValue:)) {
+            indicatorColorPreset = savedIndicatorPreset
+        }
+        if let values = defaults.array(forKey: "taskbar.indicatorGradientStart") as? [Double],
+           let color = Color.fromStoredRGBA(values) {
+            indicatorGradientStart = color
+        }
+        if let values = defaults.array(forKey: "taskbar.indicatorGradientEnd") as? [Double],
+           let color = Color.fromStoredRGBA(values) {
+            indicatorGradientEnd = color
+        }
+        if let savedClockPreset = defaults.string(forKey: "clock.colorPreset").flatMap(ClockColorPreset.init(rawValue:)) {
+            clockColorPreset = savedClockPreset
+        }
+        clockGradientEnabled = defaults.bool(forKey: "clock.gradientEnabled")
+        if let values = defaults.array(forKey: "clock.gradientStart") as? [Double],
+           let color = Color.fromStoredRGBA(values) {
+            clockGradientStart = color
+        }
+        if let values = defaults.array(forKey: "clock.gradientEnd") as? [Double],
+           let color = Color.fromStoredRGBA(values) {
+            clockGradientEnd = color
+        }
         if let savedMinimizeMode = defaults.string(forKey: "taskbar.minimizeMode").flatMap(AppMinimizeMode.init(rawValue:)) {
             minimizeMode = savedMinimizeMode
         }
@@ -1855,6 +2026,13 @@ final class TaskbarConceptState: ObservableObject {
         taskbarIconSize = .medium
         flyoutAnimation = .spring
         flyoutHeightPreset = .tall
+        indicatorColorPreset = .auto
+        indicatorGradientStart = .blue
+        indicatorGradientEnd = .purple
+        clockColorPreset = .auto
+        clockGradientEnabled = false
+        clockGradientStart = Color.roseAccent
+        clockGradientEnd = .orange
         statusIconPreset = .batteryOnly
         statusIconCustomSymbol = "battery.75percent"
         widgetOutlineBorder = true
@@ -1895,6 +2073,10 @@ struct TaskbarFlyoutContentView: View {
                 dateStyle: $model.dateStyle,
                 clockDisplayStyle: $model.clockDisplayStyle,
                 clockTint: $model.clockTint,
+                clockColorPreset: $model.clockColorPreset,
+                clockGradientEnabled: $model.clockGradientEnabled,
+                clockGradientStart: $model.clockGradientStart,
+                clockGradientEnd: $model.clockGradientEnd,
                 accent: model.clockTint,
                 cornerRadius: model.shellRadius(for: .flyouts)
             )
@@ -1933,6 +2115,9 @@ struct TaskbarFlyoutContentView: View {
                 runningIndicatorStyle: $model.runningIndicatorStyle,
                 runningIndicatorSize: $model.runningIndicatorSize,
                 runningIndicatorColor: $model.runningIndicatorColor,
+                indicatorColorPreset: $model.indicatorColorPreset,
+                indicatorGradientStart: $model.indicatorGradientStart,
+                indicatorGradientEnd: $model.indicatorGradientEnd,
                 minimizeMode: $model.minimizeMode,
                 contextMenuStyle: $model.contextMenuStyle,
                 showWifiName: $model.showWifiName,
@@ -2182,6 +2367,10 @@ public struct TaskbarConceptView: View {
                         dateStyle: $model.dateStyle,
                         clockDisplayStyle: $model.clockDisplayStyle,
                         clockTint: $model.clockTint,
+                        clockColorPreset: $model.clockColorPreset,
+                        clockGradientEnabled: $model.clockGradientEnabled,
+                        clockGradientStart: $model.clockGradientStart,
+                        clockGradientEnd: $model.clockGradientEnd,
                         accent: clockTint,
                         cornerRadius: model.shellRadius(for: .flyouts)
                     )
@@ -2246,6 +2435,9 @@ public struct TaskbarConceptView: View {
                         runningIndicatorStyle: $model.runningIndicatorStyle,
                         runningIndicatorSize: $model.runningIndicatorSize,
                         runningIndicatorColor: $model.runningIndicatorColor,
+                        indicatorColorPreset: $model.indicatorColorPreset,
+                        indicatorGradientStart: $model.indicatorGradientStart,
+                        indicatorGradientEnd: $model.indicatorGradientEnd,
                         minimizeMode: $model.minimizeMode,
                         contextMenuStyle: $model.contextMenuStyle,
                         showWifiName: $model.showWifiName,
@@ -2459,8 +2651,9 @@ private struct TaskbarClockSection: View {
                     dateStyle: model.dateStyle,
                     uses24HourTime: model.uses24HourTime,
                     showsSeconds: model.showsSeconds,
-                    tint: model.clockTint,
-                    height: model.taskbarHeight
+                    tint: model.resolvedClockTint,
+                    height: model.taskbarHeight,
+                    tintGradient: model.clockTintGradient
                 )
                 .frame(minWidth: 88, minHeight: model.taskbarHeight - 8, alignment: .trailing)
                 .contentShape(Rectangle())
@@ -2499,7 +2692,7 @@ struct TaskbarIslandContent: View {
             frontmostBundleID: model.frontmostBundleID,
             indicatorStyle: model.runningIndicatorStyle,
             indicatorSize: model.runningIndicatorSize,
-            indicatorColor: model.runningIndicatorColor,
+            indicatorFill: model.resolvedIndicatorFill,
             menuStyle: model.contextMenuStyle,
             isDarkMode: model.isDarkMode,
             systemStatus: model.systemStatus,
@@ -2643,7 +2836,7 @@ private struct TaskbarTiles {
     let frontmostBundleID: String?
     let indicatorStyle: RunningIndicatorStyle
     let indicatorSize: RunningIndicatorSize
-    let indicatorColor: Color
+    let indicatorFill: IndicatorFill
     let menuStyle: ContextMenuStyle
     let isDarkMode: Bool
     let systemStatus: SystemStatusSnapshot
@@ -2674,7 +2867,7 @@ private struct TaskbarTiles {
                 size: glyphSize
             )
             .frame(width: tileSide, height: tileSide)
-            .taskbarTile(highlighted: isRunning && indicatorStyle == .highlight, highlightColor: indicatorColor),
+            .taskbarTile(highlighted: isRunning && indicatorStyle == .highlight, highlightFill: indicatorFill),
             indicator: Group {
                 if isRunning, indicatorStyle != .highlight {
                     runningIndicator(isFrontmost: isFrontmost)
@@ -2688,15 +2881,16 @@ private struct TaskbarTiles {
     }
 
     private func runningIndicator(isFrontmost: Bool) -> some View {
-        Group {
+        let opacity = isFrontmost ? 1.0 : 0.55
+        return Group {
             switch indicatorStyle {
             case .dot:
-                Circle()
-                    .fill(indicatorColor.opacity(isFrontmost ? 1 : 0.55))
-                    .frame(width: indicatorSize.dotDiameter, height: indicatorSize.dotDiameter)
+                Capsule()
+                    .fill(indicatorFill.style(opacity: opacity))
+                    .frame(width: max(indicatorSize.dotDiameter, 8), height: 4)
             case .dash:
                 Capsule()
-                    .fill(indicatorColor.opacity(isFrontmost ? 1 : 0.55))
+                    .fill(indicatorFill.style(opacity: opacity))
                     .frame(width: indicatorSize.dashWidth, height: indicatorSize.dashHeight)
             case .highlight:
                 EmptyView()
@@ -2886,7 +3080,7 @@ private struct Taskbar: View {
             frontmostBundleID: model.frontmostBundleID,
             indicatorStyle: model.runningIndicatorStyle,
             indicatorSize: model.runningIndicatorSize,
-            indicatorColor: model.runningIndicatorColor,
+            indicatorFill: model.resolvedIndicatorFill,
             menuStyle: model.contextMenuStyle,
             isDarkMode: model.isDarkMode,
             systemStatus: model.systemStatus,
@@ -3176,9 +3370,17 @@ private struct TaskbarClockDisplay: View {
     let showsSeconds: Bool
     let tint: Color
     let height: CGFloat
+    var tintGradient: LinearGradient? = nil
 
     private var time: String {
         clockTime(date, uses24HourTime: uses24HourTime, showsSeconds: showsSeconds)
+    }
+
+    private var textStyle: AnyShapeStyle {
+        if let tintGradient {
+            return AnyShapeStyle(tintGradient)
+        }
+        return AnyShapeStyle(tint)
     }
 
     var body: some View {
@@ -3194,6 +3396,7 @@ private struct TaskbarClockDisplay: View {
                     timeLabel
                     Text(dateStyle.string(from: date))
                         .font(.system(size: height * 0.19, weight: .medium))
+                        .foregroundStyle(textStyle)
                         .lineLimit(1)
                 }
             case .digital:
@@ -3208,19 +3411,20 @@ private struct TaskbarClockDisplay: View {
                 }
             }
         }
-        .foregroundStyle(tint)
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     private var timeLabel: some View {
         Text(time)
             .font(.system(size: height * (style == .digital ? 0.32 : 0.27), weight: .semibold, design: .rounded))
+            .foregroundStyle(textStyle)
             .lineLimit(1)
     }
 
     private var dateLabel: some View {
         Text(dateStyle.string(from: date))
             .font(.system(size: height * 0.20, weight: .medium))
+            .foregroundStyle(textStyle)
             .lineLimit(1)
     }
 }
@@ -3540,7 +3744,7 @@ private struct AppTile<Icon: View, Indicator: View>: View {
 
 private struct TaskbarTileStyle: ViewModifier {
     var highlighted = false
-    var highlightColor = Color.blue
+    var highlightFill = IndicatorFill.solid(.blue)
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.iconBackground) private var iconBackground
@@ -3565,18 +3769,18 @@ private struct TaskbarTileStyle: ViewModifier {
         }
     }
 
-    private var tileFill: Color {
+    private var tileFill: AnyShapeStyle {
         if highlighted {
-            return highlightColor.opacity(0.22)
+            return highlightFill.style(opacity: 0.22)
         }
-        return Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10)
+        return AnyShapeStyle(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10))
     }
 
-    private var tileStroke: Color {
+    private var tileStroke: AnyShapeStyle {
         if highlighted {
-            return highlightColor.opacity(0.55)
+            return highlightFill.style(opacity: 0.55)
         }
-        return Color.white.opacity(colorScheme == .dark ? 0.14 : 0.5)
+        return AnyShapeStyle(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.5))
     }
 
     private var tileBackground: some View {
@@ -3600,8 +3804,8 @@ private struct TaskbarTileStyle: ViewModifier {
 }
 
 private extension View {
-    func taskbarTile(highlighted: Bool = false, highlightColor: Color = .blue) -> some View {
-        modifier(TaskbarTileStyle(highlighted: highlighted, highlightColor: highlightColor))
+    func taskbarTile(highlighted: Bool = false, highlightFill: IndicatorFill = .solid(.blue)) -> some View {
+        modifier(TaskbarTileStyle(highlighted: highlighted, highlightFill: highlightFill))
     }
 }
 
@@ -4976,6 +5180,10 @@ private struct ClockFlyout: View {
     @Binding var dateStyle: ClockDateStyle
     @Binding var clockDisplayStyle: ClockDisplayStyle
     @Binding var clockTint: Color
+    @Binding var clockColorPreset: ClockColorPreset
+    @Binding var clockGradientEnabled: Bool
+    @Binding var clockGradientStart: Color
+    @Binding var clockGradientEnd: Color
     let accent: Color
     let cornerRadius: CGFloat
     @Environment(\.surfaceStyle) private var surfaceStyle
@@ -5043,7 +5251,11 @@ private struct ClockFlyout: View {
                         showsSeconds: $showsSeconds,
                         dateStyle: $dateStyle,
                         clockDisplayStyle: $clockDisplayStyle,
-                        clockTint: $clockTint
+                        clockTint: $clockTint,
+                        clockColorPreset: $clockColorPreset,
+                        clockGradientEnabled: $clockGradientEnabled,
+                        clockGradientStart: $clockGradientStart,
+                        clockGradientEnd: $clockGradientEnd
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -5270,6 +5482,10 @@ private struct ClockStyleSettings: View {
     @Binding var dateStyle: ClockDateStyle
     @Binding var clockDisplayStyle: ClockDisplayStyle
     @Binding var clockTint: Color
+    @Binding var clockColorPreset: ClockColorPreset
+    @Binding var clockGradientEnabled: Bool
+    @Binding var clockGradientStart: Color
+    @Binding var clockGradientEnd: Color
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
@@ -5283,6 +5499,27 @@ private struct ClockStyleSettings: View {
                 ColorPicker("Text colour", selection: $clockTint, supportsOpacity: false)
                     .labelsHidden()
                     .help("Choose clock and date text colour")
+            }
+
+            HStack(spacing: 6) {
+                ForEach(ClockColorPreset.allCases) { preset in
+                    styleChip(preset.title, isSelected: clockColorPreset == preset) {
+                        clockColorPreset = preset
+                    }
+                }
+            }
+
+            Toggle(isOn: $clockGradientEnabled) {
+                Text("Gradient text")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .toggleStyle(.switch)
+            if clockGradientEnabled || clockColorPreset == .gradient {
+                HStack(spacing: 16) {
+                    ColorPicker("Start", selection: $clockGradientStart, supportsOpacity: false)
+                    ColorPicker("End", selection: $clockGradientEnd, supportsOpacity: false)
+                }
+                .font(.system(size: 11, weight: .medium))
             }
 
             HStack(spacing: 8) {
@@ -5394,6 +5631,9 @@ private struct SettingsFlyout: View {
     @Binding var runningIndicatorStyle: RunningIndicatorStyle
     @Binding var runningIndicatorSize: RunningIndicatorSize
     @Binding var runningIndicatorColor: Color
+    @Binding var indicatorColorPreset: IndicatorColorPreset
+    @Binding var indicatorGradientStart: Color
+    @Binding var indicatorGradientEnd: Color
     @Binding var minimizeMode: AppMinimizeMode
     @Binding var contextMenuStyle: ContextMenuStyle
     @Binding var showWifiName: Bool
@@ -6301,8 +6541,31 @@ private struct SettingsFlyout: View {
                     .buttonStyle(.plain)
                 }
                 Spacer(minLength: 8)
-                ColorPicker("Colour", selection: $runningIndicatorColor, supportsOpacity: false)
-                    .font(.system(size: 12, weight: .medium))
+            }
+            Text("Colour")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                ForEach(IndicatorColorPreset.allCases) { preset in
+                    Button { indicatorColorPreset = preset } label: {
+                        Text(preset.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                indicatorColorPreset == preset ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            if indicatorColorPreset == .gradient {
+                HStack(spacing: 16) {
+                    ColorPicker("Start", selection: $indicatorGradientStart, supportsOpacity: false)
+                    ColorPicker("End", selection: $indicatorGradientEnd, supportsOpacity: false)
+                }
+                .font(.system(size: 12, weight: .medium))
             }
         }
     }
