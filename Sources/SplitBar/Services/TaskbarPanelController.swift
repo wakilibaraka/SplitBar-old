@@ -161,7 +161,7 @@ public final class TaskbarPanelController {
                     panel.setFrame(frame, display: false, animate: false)
                 }
                 panel.orderFrontRegardless()
-                hostingViews[key]?.rootView = content
+                hostingViews[key]?.rootView = AnyView(content.environment(\.controlActiveState, .key))
             }
         }
     }
@@ -196,7 +196,7 @@ public final class TaskbarPanelController {
             hostingViews[key] = hostingView
             panels[key] = panel
         }
-        hostingViews[key]?.rootView = content
+        hostingViews[key]?.rootView = AnyView(content.environment(\.controlActiveState, .key))
         if panelFrames[key] != frame {
             panel.setFrame(frame, display: true, animate: true)
             panelFrames[key] = frame
