@@ -109,6 +109,16 @@ struct TaskbarStripTests {
         #expect(IconShape.allCases.count == 3)
     }
 
+    @Test func flyoutHeightPresetTall() {
+        #expect(FlyoutHeightPreset.tall.points == 720)
+        #expect(FlyoutHeightPreset.allCases.count == 5)
+        #expect(FlyoutHeightPreset.fullScreen.points == nil)
+    }
+
+    @Test func flyoutAnimationCases() {
+        #expect(FlyoutAnimation.allCases.count == 9)
+    }
+
     @Test func singleIslandModesProduceNoIslands() {
         let layout = TaskbarStrip.layoutIslands(
             screenWidth: 1728,

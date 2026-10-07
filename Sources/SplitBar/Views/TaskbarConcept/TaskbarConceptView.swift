@@ -970,6 +970,98 @@ enum ContextMenuStyle: String, CaseIterable, Identifiable {
     }
 }
 
+enum FlyoutAnimation: String, CaseIterable, Identifiable {
+    case dissolve
+    case slideUp
+    case slideDown
+    case sideLeft
+    case sideRight
+    case spring
+    case flip
+    case zoom
+    case none
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .dissolve: "Dissolve"
+        case .slideUp: "Slide up"
+        case .slideDown: "Slide down"
+        case .sideLeft: "Slide left"
+        case .sideRight: "Slide right"
+        case .spring: "Spring"
+        case .flip: "Flip"
+        case .zoom: "Zoom"
+        case .none: "None"
+        }
+    }
+
+    func asTransition() -> AnyTransition {
+        switch self {
+        case .dissolve:
+            return .opacity
+        case .slideUp:
+            return .move(edge: .bottom).combined(with: .opacity)
+        case .slideDown:
+            return .move(edge: .top).combined(with: .opacity)
+        case .sideLeft:
+            return .move(edge: .trailing).combined(with: .opacity)
+        case .sideRight:
+            return .move(edge: .leading).combined(with: .opacity)
+        case .spring:
+            return .scale(scale: 0.94).combined(with: .opacity)
+        case .flip:
+            return AnyTransition.modifier(
+                active: FlipTransitionModifier(angle: 90),
+                identity: FlipTransitionModifier(angle: 0)
+            ).combined(with: .opacity)
+        case .zoom:
+            return AnyTransition.scale(scale: 0.7).combined(with: .opacity)
+        case .none:
+            return .identity
+        }
+    }
+}
+
+private struct FlipTransitionModifier: ViewModifier {
+    var angle: Double
+
+    func body(content: Content) -> some View {
+        content.rotation3DEffect(.degrees(angle), axis: (x: 1, y: 0, z: 0))
+    }
+}
+
+enum FlyoutHeightPreset: String, CaseIterable, Identifiable {
+    case compact
+    case regular
+    case tall
+    case extraTall
+    case fullScreen
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .compact: "Compact"
+        case .regular: "Regular"
+        case .tall: "Tall"
+        case .extraTall: "Extra tall"
+        case .fullScreen: "Full screen"
+        }
+    }
+
+    var points: CGFloat? {
+        switch self {
+        case .compact: 320
+        case .regular: 520
+        case .tall: 720
+        case .extraTall: 900
+        case .fullScreen: nil
+        }
+    }
+}
+
 enum TaskbarTileAction {
     case revealInFinder(bundleID: String)
     case hideApp(bundleID: String)
@@ -1282,6 +1374,12 @@ final class TaskbarConceptState: ObservableObject {
     @Published var contextMenuStyle = ContextMenuStyle.native {
         didSet { UserDefaults.standard.set(contextMenuStyle.rawValue, forKey: "taskbar.menuStyle") }
     }
+    @Published var flyoutAnimation = FlyoutAnimation.spring {
+        didSet { UserDefaults.standard.set(flyoutAnimation.rawValue, forKey: "flyouts.animation") }
+    }
+    @Published var flyoutHeightPreset = FlyoutHeightPreset.tall {
+        didSet { UserDefaults.standard.set(flyoutHeightPreset.rawValue, forKey: "flyouts.heightPreset") }
+    }
     @Published var showWindowPreviews = false {
         didSet { UserDefaults.standard.set(showWindowPreviews, forKey: "taskbar.windowPreviews") }
     }
@@ -1510,6 +1608,12 @@ final class TaskbarConceptState: ObservableObject {
         if let savedMenuStyle = defaults.string(forKey: "taskbar.menuStyle").flatMap(ContextMenuStyle.init(rawValue:)) {
             contextMenuStyle = savedMenuStyle
         }
+        if let savedFlyoutAnimation = defaults.string(forKey: "flyouts.animation").flatMap(FlyoutAnimation.init(rawValue:)) {
+            flyoutAnimation = savedFlyoutAnimation
+        }
+        if let savedHeightPreset = defaults.string(forKey: "flyouts.heightPreset").flatMap(FlyoutHeightPreset.init(rawValue:)) {
+            flyoutHeightPreset = savedHeightPreset
+        }
         showWindowPreviews = defaults.bool(forKey: "taskbar.windowPreviews")
         hideMacDock = defaults.bool(forKey: "dock.hidden")
         showWifiName = defaults.bool(forKey: "status.showWifiName")
@@ -1592,6 +1696,13 @@ final class TaskbarConceptState: ObservableObject {
 
     func panelWidth(for kind: PanelKind) -> CGFloat {
         panelWidths[kind] ?? kind.defaultWidth
+    }
+
+    func flyoutHeight(available: CGFloat) -> CGFloat {
+        guard let target = flyoutHeightPreset.points else {
+            return max(300, available)
+        }
+        return max(300, min(target, available))
     }
 
     fileprivate func setPanelWidth(_ width: CGFloat, for kind: PanelKind) {
@@ -1694,6 +1805,8 @@ final class TaskbarConceptState: ObservableObject {
         taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)
         taskbarHeight = 46
         taskbarIconSize = .medium
+        flyoutAnimation = .spring
+        flyoutHeightPreset = .tall
         statusIconPreset = .batteryOnly
         statusIconCustomSymbol = "battery.75percent"
         widgetOutlineBorder = true
@@ -1789,6 +1902,8 @@ struct TaskbarFlyoutContentView: View {
                 widgetOutlineWidth: $model.widgetOutlineWidth,
                 iconBackgroundVisible: $model.iconBackgroundVisible,
                 iconBackgroundShape: $model.iconBackgroundShape,
+                flyoutAnimation: $model.flyoutAnimation,
+                flyoutHeightPreset: $model.flyoutHeightPreset,
                 trashPlacement: $model.trashPlacement,
                 panelWidths: $model.panelWidths,
                 accent: model.clockTint,
@@ -1997,12 +2112,12 @@ public struct TaskbarConceptView: View {
                     WidgetsPanel(onClose: { openPanel = nil }, accent: clockTint, model: model)
                         .frame(
                             width: panelFrameWidth(.widgets, available: geometry.size.width - 36),
-                            height: max(300, geometry.size.height - taskbarHeight - 28)
+                            height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 28)
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(.leading, 14)
                         .padding(.top, 14)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
+                        .transition(model.flyoutAnimation.asTransition())
                         .environment(\.surfaceStyle, surfaceStyle)
                         .zIndex(2)
                 }
@@ -2020,22 +2135,22 @@ public struct TaskbarConceptView: View {
                         accent: clockTint,
                         cornerRadius: model.shellRadius(for: .flyouts)
                     )
-                    .frame(width: min(520, geometry.size.width - 36), height: max(300, geometry.size.height - taskbarHeight - 28))
+                    .frame(width: min(520, geometry.size.width - 36), height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 28))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .padding(.trailing, 14)
                     .padding(.top, 14)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .transition(model.flyoutAnimation.asTransition())
                     .environment(\.surfaceStyle, surfaceStyle)
                     .zIndex(2)
                 }
 
                 if openPanel == .controls, !showsTaskbarPanel {
                     ControlsFlyout(accent: clockTint, model: model)
-                        .frame(width: panelFrameWidth(.controls, available: geometry.size.width - 36), height: max(300, geometry.size.height - taskbarHeight - 28))
+                        .frame(width: panelFrameWidth(.controls, available: geometry.size.width - 36), height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 28))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         .padding(.trailing, 14)
                         .padding(.top, 14)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                        .transition(model.flyoutAnimation.asTransition())
                         .environment(\.surfaceStyle, surfaceStyle)
                         .zIndex(2)
                 }
@@ -2047,10 +2162,10 @@ public struct TaskbarConceptView: View {
                         model: model,
                         onLaunchApplication: onLaunchApplication
                     )
-                        .frame(width: panelFrameWidth(.start, available: geometry.size.width - 48), height: min(700, geometry.size.height - taskbarHeight - 36))
+                        .frame(width: panelFrameWidth(.start, available: geometry.size.width - 48), height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 36))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .padding(.bottom, taskbarHeight + 12)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .transition(model.flyoutAnimation.asTransition())
                         .environment(\.surfaceStyle, surfaceStyle)
                         .zIndex(2)
                 }
@@ -2098,6 +2213,8 @@ public struct TaskbarConceptView: View {
                         widgetOutlineWidth: $model.widgetOutlineWidth,
                         iconBackgroundVisible: $model.iconBackgroundVisible,
                         iconBackgroundShape: $model.iconBackgroundShape,
+                        flyoutAnimation: $model.flyoutAnimation,
+                        flyoutHeightPreset: $model.flyoutHeightPreset,
                         trashPlacement: $model.trashPlacement,
                         panelWidths: $model.panelWidths,
                         accent: clockTint,
@@ -2105,10 +2222,10 @@ public struct TaskbarConceptView: View {
                         onResetPersonalisation: { model.resetPersonalisation() },
                         cornerRadius: model.shellRadius(for: .flyouts)
                     )
-                    .frame(width: panelFrameWidth(.settings, available: geometry.size.width - 40), height: max(560, min(geometry.size.height * 0.88, geometry.size.height - taskbarHeight - 40)))
+                    .frame(width: panelFrameWidth(.settings, available: geometry.size.width - 40), height: max(560, model.flyoutHeight(available: geometry.size.height - taskbarHeight - 40)))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .padding(.bottom, taskbarHeight)
-                    .transition(.scale(scale: 0.94).combined(with: .opacity))
+                    .transition(model.flyoutAnimation.asTransition())
                     .environment(\.surfaceStyle, surfaceStyle)
                         .zIndex(2)
                 }
@@ -2125,6 +2242,7 @@ public struct TaskbarConceptView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
             .animation(.spring(response: 0.38, dampingFraction: 0.86), value: openPanel)
+            .animation(.spring(response: 0.35), value: model.flyoutHeightPreset)
             .environment(\.surfaceTransparency, interfaceTransparency)
             .environment(\.widgetOutline, model.widgetOutline)
             .environment(\.iconBackground, model.iconBackground)
@@ -5211,6 +5329,8 @@ private struct SettingsFlyout: View {
     @Binding var widgetOutlineWidth: CGFloat
     @Binding var iconBackgroundVisible: Bool
     @Binding var iconBackgroundShape: IconShape
+    @Binding var flyoutAnimation: FlyoutAnimation
+    @Binding var flyoutHeightPreset: FlyoutHeightPreset
     @Binding var trashPlacement: TrashPlacement
     @Binding var panelWidths: [PanelKind: CGFloat]
     let accent: Color
@@ -5966,11 +6086,55 @@ private struct SettingsFlyout: View {
     private var flyoutsTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                flyoutMotionCard
                 panelWidthsCard
             }
             .padding(18)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private var flyoutMotionCard: some View {
+        settingsSection("Animation & height") {
+            Text("Open animation")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                ForEach(FlyoutAnimation.allCases) { animation in
+                    Button { flyoutAnimation = animation } label: {
+                        Text(animation.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                flyoutAnimation == animation ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Text("Height")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                ForEach(FlyoutHeightPreset.allCases) { preset in
+                    Button { flyoutHeightPreset = preset } label: {
+                        Text(preset.title)
+                            .font(.system(size: 10, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                flyoutHeightPreset == preset ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 
     private var panelWidthsCard: some View {

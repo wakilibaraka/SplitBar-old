@@ -417,6 +417,13 @@ public final class AppRuntimeController {
                 self?.taskbarPanelController.refresh()
             }
             .store(in: &taskbarPanelSubscriptions)
+        taskbarConceptState.$flyoutHeightPreset
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                guard let self, self.taskbarConceptState.openPanel != nil else { return }
+                self.syncTaskbarFlyout(self.taskbarConceptState.openPanel)
+            }
+            .store(in: &taskbarPanelSubscriptions)
         taskbarConceptState.$openPanel
             .removeDuplicates()
             .sink { [weak self] panel in
@@ -598,7 +605,7 @@ public final class AppRuntimeController {
         let kind = panel.panelKind
         let width = min(taskbarConceptState.panelWidth(for: kind), screen.visibleFrame.width - 32)
         let stripHeight = taskbarPanelController.currentFrame?.height ?? taskbarConceptState.taskbarHeight
-        let height = min(720, screen.visibleFrame.height - stripHeight - 48)
+        let height = taskbarConceptState.flyoutHeight(available: screen.visibleFrame.height - stripHeight - 48)
         let stripFrame = taskbarPanelController.currentFrame ?? edgeActivationFrame(
             screen: screen,
             edge: .bottom,
