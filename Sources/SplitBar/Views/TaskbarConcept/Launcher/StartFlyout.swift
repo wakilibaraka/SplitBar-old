@@ -78,14 +78,13 @@ struct StartFlyout: View {
                     size: 30
                 )
                 .frame(width: 46, height: 46)
-                .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 13))
                 Text(recentAppTitle(bundleID))
                     .font(.system(size: 9, weight: .medium))
                     .lineLimit(1)
             }
             .frame(width: 60)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ThemeButtonStyle(cornerRadius: 13, isIcon: true))
         .help(recentAppTitle(bundleID))
     }
 
@@ -138,7 +137,6 @@ struct StartFlyout: View {
                     size: 34
                 )
                 .frame(width: 54, height: 54)
-                .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 15))
                 Text(app.title).font(.system(size: 10, weight: .medium))
             }
             .frame(maxWidth: .infinity)
@@ -222,7 +220,6 @@ struct StartFlyout: View {
                     size: 34
                 )
                 .frame(width: 54, height: 54)
-                .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 15))
                 Text(app.displayName)
                     .font(.system(size: 10, weight: .medium))
                     .lineLimit(2)
@@ -231,7 +228,7 @@ struct StartFlyout: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ThemeButtonStyle(cornerRadius: 15, isIcon: true))
         .help(app.displayName)
     }
 

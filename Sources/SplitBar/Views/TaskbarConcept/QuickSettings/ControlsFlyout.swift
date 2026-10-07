@@ -268,17 +268,9 @@ struct ControlsFlyout: View {
                     .minimumScaleFactor(0.75)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(isOn ? Color.white : Color.primary.opacity(0.82))
-            .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity, minHeight: 56, maxHeight: 56, alignment: .leading)
-            .background(
-                isOn
-                    ? AnyShapeStyle(Color(red: 1, green: 0.27, blue: 0.02))
-                    : cardBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency),
-                in: RoundedRectangle(cornerRadius: surfaceStyle == .classic98 ? 3 : 11)
-            )
+            .frame(maxWidth: .infinity, minHeight: 40, maxHeight: 40, alignment: .leading)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ThemeButtonStyle(isPrimary: isOn, cornerRadius: surfaceStyle == .classic98 ? 3 : 11))
         .accessibilityLabel(setting.title)
         .accessibilityValue(isOn ? "On" : "Off")
     }
@@ -318,7 +310,7 @@ struct ControlsFlyout: View {
             Text(title)
                 .font(.system(size: 10, weight: .medium))
                 .frame(width: 66, alignment: .leading)
-            Slider(value: value)
+            ThemeSlider(value: value)
                 .tint(accent)
                 .controlSize(.small)
         }

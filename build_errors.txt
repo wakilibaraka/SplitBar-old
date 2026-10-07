@@ -1,7 +1,6 @@
 Building for debugging...
-[2 / 5] SplitBar-product
-[5 / 8] SplitBar-product
-[13 / 16] SplitBar-product
+[2 / 7] SplitBar-product
+[11 / 16] SplitBar-product
+[12 / 16] SplitBar-product
 [14 / 16] SplitBar-product
-[16 / 18] SplitBar-product
-Build complete! (7.60 sec)
+Build complete! (3.08 sec)

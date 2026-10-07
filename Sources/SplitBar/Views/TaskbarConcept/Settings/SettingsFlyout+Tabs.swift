@@ -50,7 +50,7 @@ extension SettingsFlyout {
                         Spacer()
                         sliderValueLabel("\(Int(islandGap)) pt")
                     }
-                    Slider(value: $islandGap, in: 0...40, step: 1).tint(accent)
+                    ThemeSlider(value: $islandGap, in: 0...40, step: 1).tint(accent)
                 }
             }
             VStack(alignment: .leading, spacing: 8) {
@@ -76,7 +76,7 @@ extension SettingsFlyout {
                     }
                 }
                 HStack {
-                    Slider(value: $taskbarHeight, in: 32...56, step: 2).tint(accent)
+                    ThemeSlider(value: $taskbarHeight, in: 32...56, step: 2).tint(accent)
                     sliderValueLabel("\(Int(taskbarHeight)) pt")
                 }
             }
@@ -90,7 +90,7 @@ extension SettingsFlyout {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .toggleStyle(.switch)
+                .toggleStyle(ThemeToggleStyle())
                 Toggle(isOn: $hideMacDock) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Hide macOS Dock")
@@ -101,7 +101,7 @@ extension SettingsFlyout {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .toggleStyle(.switch)
+                .toggleStyle(ThemeToggleStyle())
             }
         }
     }
@@ -114,7 +114,7 @@ extension SettingsFlyout {
                 Spacer()
                 sliderValueLabel("\(Int(centeredBarWidth)) pt")
             }
-            Slider(value: $centeredBarWidth, in: 360...1600, step: 20).tint(accent)
+            ThemeSlider(value: $centeredBarWidth, in: 360...1600, step: 20).tint(accent)
             Text("Narrower bars leave more desktop visible.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
@@ -303,7 +303,7 @@ extension SettingsFlyout {
                 )
                 .font(.system(size: 13, weight: .medium))
             }
-            .toggleStyle(.switch)
+            .toggleStyle(ThemeToggleStyle())
         }
     }
 
@@ -316,8 +316,8 @@ extension SettingsFlyout {
                 Text("Enable transparency")
                     .font(.system(size: 13, weight: .medium))
             }
-            .toggleStyle(.switch)
-            Slider(value: $interfaceTransparency, in: 0...0.9, step: 0.01)
+            .toggleStyle(ThemeToggleStyle())
+            ThemeSlider(value: $interfaceTransparency, in: 0...0.9, step: 0.01)
                 .tint(accent)
                 .disabled(interfaceTransparency == 0)
             HStack {
@@ -390,7 +390,7 @@ extension SettingsFlyout {
     var taskbarGradientCard: some View {
         settingsSection("Taskbar gradient") {
             Toggle("Use custom gradient", isOn: $usesTaskbarGradient)
-                .toggleStyle(.switch)
+                .toggleStyle(ThemeToggleStyle())
                 .font(.system(size: 13, weight: .medium))
             if usesTaskbarGradient {
                 HStack(spacing: 16) {
@@ -423,11 +423,11 @@ extension SettingsFlyout {
                 Text("Card outline")
                     .font(.system(size: 13, weight: .medium))
             }
-            .toggleStyle(.switch)
+            .toggleStyle(ThemeToggleStyle())
             HStack {
                 Text("Outline width")
                     .font(.system(size: 12, weight: .medium))
-                Slider(value: $widgetOutlineWidth, in: 0.5...3, step: 0.5).tint(accent)
+                ThemeSlider(value: $widgetOutlineWidth, in: 0.5...3, step: 0.5).tint(accent)
                 sliderValueLabel("\(String(format: "%.1f", widgetOutlineWidth)) pt")
             }
             .disabled(!widgetOutlineBorder)
@@ -435,7 +435,7 @@ extension SettingsFlyout {
                 Text("Icon tile background")
                     .font(.system(size: 13, weight: .medium))
             }
-            .toggleStyle(.switch)
+            .toggleStyle(ThemeToggleStyle())
             HStack(spacing: 8) {
                 ForEach(IconShape.allCases) { shape in
                     Button { iconBackgroundShape = shape } label: {
@@ -524,7 +524,7 @@ extension SettingsFlyout {
             HStack {
                 Text("Angle")
                     .font(.system(size: 13, weight: .medium))
-                Slider(value: $gradientAngle, in: 0...360, step: 1).tint(accent)
+                ThemeSlider(value: $gradientAngle, in: 0...360, step: 1).tint(accent)
                 sliderValueLabel("\(Int(gradientAngle))°")
             }
         }
@@ -739,7 +739,7 @@ extension SettingsFlyout {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .toggleStyle(.switch)
+            .toggleStyle(ThemeToggleStyle())
 
             Toggle(isOn: $ipGeolocationEnabled) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -751,7 +751,7 @@ extension SettingsFlyout {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .toggleStyle(.switch)
+            .toggleStyle(ThemeToggleStyle())
 
             Toggle(isOn: $faviconServiceEnabled) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -763,7 +763,7 @@ extension SettingsFlyout {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .toggleStyle(.switch)
+            .toggleStyle(ThemeToggleStyle())
 
             Toggle(isOn: $aiAccountSwitchingEnabled) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -775,7 +775,7 @@ extension SettingsFlyout {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .toggleStyle(.switch)
+            .toggleStyle(ThemeToggleStyle())
 
             Text("Clipboard retention")
                 .font(.system(size: 12, weight: .medium))
@@ -947,7 +947,7 @@ extension SettingsFlyout {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .toggleStyle(.switch)
+            .toggleStyle(ThemeToggleStyle())
             Toggle(isOn: $showWifiName) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Show Wi-Fi network name")
@@ -957,7 +957,7 @@ extension SettingsFlyout {
                         .foregroundStyle(.secondary)
                 }
             }
-            .toggleStyle(.switch)
+            .toggleStyle(ThemeToggleStyle())
             Toggle(isOn: $showBluetoothDevices) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Bluetooth devices")
@@ -967,7 +967,7 @@ extension SettingsFlyout {
                         .foregroundStyle(.secondary)
                 }
             }
-            .toggleStyle(.switch)
+            .toggleStyle(ThemeToggleStyle())
             Toggle(isOn: $ddcBrightnessEnabled) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("External display brightness (DDC)")
@@ -977,7 +977,7 @@ extension SettingsFlyout {
                         .foregroundStyle(.secondary)
                 }
             }
-            .toggleStyle(.switch)
+            .toggleStyle(ThemeToggleStyle())
         }
     }
 
@@ -1176,7 +1176,7 @@ extension SettingsFlyout {
             VStack(alignment: .leading, spacing: 14) {
                 settingsSection("Startup") {
                     Toggle("Launch SplitBar automatically at login", isOn: $isLaunchAtLoginEnabled)
-                        .toggleStyle(.switch)
+                        .toggleStyle(ThemeToggleStyle())
                         .font(.system(size: 13, weight: .medium))
                 }
                 
@@ -1186,7 +1186,7 @@ extension SettingsFlyout {
                         .foregroundStyle(.secondary)
                     
                     Toggle("Enable Edge Dock", isOn: $isLegacyEdgeDockEnabled)
-                        .toggleStyle(.switch)
+                        .toggleStyle(ThemeToggleStyle())
                         .font(.system(size: 13, weight: .medium))
                         .padding(.bottom, 4)
                         
@@ -1225,7 +1225,7 @@ extension SettingsFlyout {
                                 preferences = updated
                             }
                         ))
-                        .toggleStyle(.switch)
+                        .toggleStyle(ThemeToggleStyle())
                         .font(.system(size: 12, weight: .medium))
                     }
                 }
@@ -1235,7 +1235,7 @@ extension SettingsFlyout {
                         get: { preferences.reduceMotion },
                         set: { preferences.reduceMotion = $0 }
                     ))
-                    .toggleStyle(.switch)
+                    .toggleStyle(ThemeToggleStyle())
                     .font(.system(size: 13, weight: .medium))
                 }
             }
