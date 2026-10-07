@@ -340,7 +340,7 @@ public final class AppRuntimeController {
         self.clipboardCoordinator.refreshMonitoring(for: preferences.clipboardSettings)
         self.setupLiveStreaming()
         Logger.lifecycle.info("AppRuntimeController initialized")
-        openTaskbarConceptWindow()
+        if taskbarConceptState.showsOnboarding { openTaskbarConceptWindow() }
     }
 
     public var isLaunchAtLoginEnabled: Bool {

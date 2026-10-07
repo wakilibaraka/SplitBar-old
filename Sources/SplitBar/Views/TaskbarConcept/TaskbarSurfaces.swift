@@ -444,14 +444,25 @@ public struct TaskbarConceptView: View {
                         .zIndex(2)
                 }
 
-                Taskbar(
-                    model: model,
-                    height: $model.taskbarHeight,
-                    onLaunchApplication: onLaunchApplication,
-                    onTaskbarIconClick: onTaskbarIconClick,
-                    onTaskbarTileAction: onTaskbarTileAction
-                )
-                .zIndex(3)
+                if showsTaskbarPanel {
+                    Text("The live bar is running on your screen")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.thinMaterial, in: Capsule())
+                        .padding(.bottom, 18)
+                        .zIndex(3)
+                } else {
+                    Taskbar(
+                        model: model,
+                        height: $model.taskbarHeight,
+                        onLaunchApplication: onLaunchApplication,
+                        onTaskbarIconClick: onTaskbarIconClick,
+                        onTaskbarTileAction: onTaskbarTileAction
+                    )
+                    .zIndex(3)
+                }
 
                 if model.showsOnboarding {
                     OnboardingView(model: model, accent: model.clockTint, isDarkMode: model.isDarkMode) {
