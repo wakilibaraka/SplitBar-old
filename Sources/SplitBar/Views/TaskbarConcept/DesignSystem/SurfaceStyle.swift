@@ -490,3 +490,14 @@ extension EnvironmentValues {
 func taskbarBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
     GlassProviders.current.taskbarBackground(style: style, darkMode: darkMode, transparency: transparency)
 }
+
+extension SurfaceStyle {
+    var usesMaterial: Bool {
+        switch self {
+        case .glassmorphism, .liquidGlass, .windowsAero, .visionOS:
+            return true
+        default:
+            return false
+        }
+    }
+}

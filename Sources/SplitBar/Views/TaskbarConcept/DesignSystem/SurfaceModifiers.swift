@@ -7,12 +7,32 @@ public struct FlyoutSurfaceModifier: ViewModifier {
     let cornerRadius: CGFloat
 
     public func body(content: Content) -> some View {
+        let tokens = ThemeTokens.resolve(style: style, darkMode: darkMode)
+        
         content
+            .background(
+                style.usesMaterial ? tokens.surface : Color.clear,
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
             .background(
                 panelBackground(style: style, darkMode: darkMode, transparency: transparency),
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
-            .background(surfaceWash(style: style, darkMode: darkMode))
+            .overlay {
+                if style == .windowsAero {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.4),
+                            Color.white.opacity(0.0),
+                            Color.white.opacity(0.0),
+                            Color.white.opacity(0.15)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -91,11 +111,31 @@ public struct WidgetCardModifier: ViewModifier {
     let showsBorder: Bool
 
     public func body(content: Content) -> some View {
+        let tokens = ThemeTokens.resolve(style: style, darkMode: darkMode)
+        
         content
+            .background(
+                style.usesMaterial ? tokens.card : Color.clear,
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
             .background(
                 cardBackground(style: style, darkMode: darkMode, transparency: transparency),
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
+            .overlay {
+                if style == .windowsAero {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.3),
+                            Color.white.opacity(0.0),
+                            Color.white.opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
                 if showsBorder {
@@ -185,10 +225,28 @@ public struct TaskbarSurfaceModifier: ViewModifier {
     public func body(content: Content) -> some View {
         content
             .background(
+                style.usesMaterial ? style.taskbarFill(darkMode: darkMode) : Color.clear,
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .background(
                 taskbarBackground(style: style, darkMode: darkMode, transparency: transparency),
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
-            .background(surfaceWash(style: style, darkMode: darkMode))
+            .overlay {
+                if style == .windowsAero {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.5),
+                            Color.white.opacity(0.0),
+                            Color.white.opacity(0.0),
+                            Color.white.opacity(0.2)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
