@@ -4,12 +4,13 @@ import UniformTypeIdentifiers
 
 public struct EdgeDockView: View {
     public let viewState: DockViewState
-    public let materialStyle: DockMaterialStyle
+    @Environment(\.surfaceStyle) var surfaceStyle
+    @Environment(\.surfaceTransparency) var surfaceTransparency
+    @Environment(\.colorScheme) var colorScheme
     public let reduceMotion: Bool
     public let autoHide: Bool
     public let onAction: (AppAction) -> Void
     public let onOpenAddPanel: () -> Void
-    public let onSelectTheme: (DockMaterialStyle) -> Void
     public let onToggleAutoHide: () -> Void
     public let onShowAppWindows: (String, String, URL?) -> Void
     public let iconBaseSize: CGFloat
@@ -27,13 +28,11 @@ public struct EdgeDockView: View {
         onAction: @escaping (AppAction) -> Void
     ) {
         self.viewState = viewState
-        self.materialStyle = .system
         self.reduceMotion = false
         self.autoHide = false
         self.iconBaseSize = 46.0
         self.onAction = onAction
         self.onOpenAddPanel = {}
-        self.onSelectTheme = { _ in }
         self.onToggleAutoHide = {}
         self.onShowAppWindows = { _, _, _ in }
         self.onUpdateIconSize = { _ in }
@@ -41,19 +40,16 @@ public struct EdgeDockView: View {
 
     public init(
         viewState: DockViewState,
-        materialStyle: DockMaterialStyle,
         reduceMotion: Bool,
         onAction: @escaping (AppAction) -> Void,
         onOpenAddPanel: @escaping () -> Void
     ) {
         self.viewState = viewState
-        self.materialStyle = materialStyle
         self.reduceMotion = reduceMotion
         self.autoHide = false
         self.iconBaseSize = 46.0
         self.onAction = onAction
         self.onOpenAddPanel = onOpenAddPanel
-        self.onSelectTheme = { _ in }
         self.onToggleAutoHide = {}
         self.onShowAppWindows = { _, _, _ in }
         self.onUpdateIconSize = { _ in }
@@ -61,34 +57,34 @@ public struct EdgeDockView: View {
 
     public init(
         viewState: DockViewState,
-        materialStyle: DockMaterialStyle,
         reduceMotion: Bool,
         autoHide: Bool,
         iconBaseSize: CGFloat,
         onAction: @escaping (AppAction) -> Void,
         onOpenAddPanel: @escaping () -> Void,
-        onSelectTheme: @escaping (DockMaterialStyle) -> Void,
         onToggleAutoHide: @escaping () -> Void,
         onShowAppWindows: @escaping (String, String, URL?) -> Void,
         onUpdateIconSize: @escaping (Double) -> Void
     ) {
         self.viewState = viewState
-        self.materialStyle = materialStyle
         self.reduceMotion = reduceMotion
         self.autoHide = autoHide
         self.iconBaseSize = iconBaseSize
         self.onAction = onAction
         self.onOpenAddPanel = onOpenAddPanel
-        self.onSelectTheme = onSelectTheme
         self.onToggleAutoHide = onToggleAutoHide
         self.onShowAppWindows = onShowAppWindows
         self.onUpdateIconSize = onUpdateIconSize
     }
 
-    @Environment(\.colorScheme) private var colorScheme
 
     private var dockBackground: some View {
-        ThemedGlassBackground(style: materialStyle, cornerRadius: 22.0)
+        RoundedRectangle(cornerRadius: 22.0, style: .continuous)
+            .fill(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: surfaceTransparency))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22.0, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+            }
     }
 
     private func animationPolicy(reduceMotion: Bool) -> DockAnimationPolicy {
@@ -321,16 +317,6 @@ public struct EdgeDockView: View {
                 }
             }
 
-            Menu("Liquid Glass Theme") {
-                ForEach(DockMaterialStyle.presets, id: \.self) { theme in
-                    Button { onSelectTheme(theme) } label: {
-                        HStack {
-                            Text(theme.displayName)
-                            if materialStyle == theme { Image(systemName: "checkmark") }
-                        }
-                    }
-                }
-            }
 
             Menu("Icon Size") {
                 Button { onUpdateIconSize(38.0) } label: {

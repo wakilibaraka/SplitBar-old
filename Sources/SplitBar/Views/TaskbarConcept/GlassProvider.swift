@@ -23,6 +23,10 @@ struct SystemMaterialGlass: GlassProviding {
             return AnyShapeStyle(Material.regular.opacity(opacity))
         case .windowsAero:
             return AnyShapeStyle(Material.ultraThin.opacity(opacity))
+        case .visionOS:
+            return AnyShapeStyle(Material.ultraThick.opacity(opacity))
+        case .cyberdeck:
+            return AnyShapeStyle(tokens.surface)
         case .neobrutalism:
             return AnyShapeStyle(tokens.surface)
         case .minimalism:
@@ -42,6 +46,10 @@ struct SystemMaterialGlass: GlassProviding {
             return AnyShapeStyle(Material.ultraThinMaterial.opacity(opacity))
         case .windowsAero:
             return AnyShapeStyle(Material.ultraThin.opacity(opacity))
+        case .visionOS:
+            return AnyShapeStyle(Material.thick.opacity(opacity))
+        case .cyberdeck:
+            return AnyShapeStyle(tokens.card)
         case .neobrutalism:
             return AnyShapeStyle(tokens.card)
         case .minimalism:

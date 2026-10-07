@@ -55,7 +55,6 @@ private struct DockInteractiveContainerView: View {
     let nowPlayingState: NowPlayingState?
     let onAction: (AppAction) -> Void
     let onOpenAddPanel: () -> Void
-    let onSelectTheme: (DockMaterialStyle) -> Void
     let onToggleAutoHide: () -> Void
     let onShowAppWindows: (String, String, URL?) -> Void
     let onHoverItem: (DockItemViewState?, CGPoint?) -> Void
@@ -77,13 +76,11 @@ private struct DockInteractiveContainerView: View {
         )
         EdgeDockView(
             viewState: viewState,
-            materialStyle: preferences.materialStyle,
             reduceMotion: preferences.reduceMotion,
             autoHide: preferences.placement.autoHide,
             iconBaseSize: CGFloat(preferences.dockIconSize),
             onAction: onAction,
             onOpenAddPanel: onOpenAddPanel,
-            onSelectTheme: onSelectTheme,
             onToggleAutoHide: onToggleAutoHide,
             onShowAppWindows: onShowAppWindows,
             onUpdateIconSize: onUpdateIconSize
@@ -218,6 +215,49 @@ public final class AppRuntimeController {
     ) {
         self.state = initialState
         self.preferences = preferences
+
+        // Migrate legacy themes
+        if let legacy = self.preferences.legacyMaterialStyle {
+            self.preferences.legacyMaterialStyle = nil
+            var usesGrad = false
+            var gStart: SwiftUI.Color = .purple
+            var gEnd: SwiftUI.Color = .blue
+            let newStyle: SurfaceStyle
+            
+            switch legacy {
+            case "system", "obsidianDark":
+                newStyle = .liquidGlass
+                self.taskbarConceptState.isDarkMode = (legacy == "obsidianDark")
+            case "translucent", "titaniumFrost":
+                newStyle = .glassmorphism
+
+            case "crystalClear":
+                newStyle = .glassmorphism
+                self.taskbarConceptState.interfaceTransparency = 0.2
+            case "monochrome":
+                newStyle = .minimalism
+            case "auroraGlow":
+                newStyle = .glassmorphism; usesGrad = true; gStart = .teal; gEnd = .purple
+            case "deepOcean":
+                newStyle = .glassmorphism; usesGrad = true; gStart = .indigo; gEnd = .cyan
+            case "forestMoss":
+                newStyle = .glassmorphism; usesGrad = true; gStart = .green; gEnd = .teal
+            case "cyberpunkGlass":
+                newStyle = .glassmorphism; usesGrad = true; gStart = .pink; gEnd = .cyan
+            case "emberSunset":
+                newStyle = .glassmorphism; usesGrad = true; gStart = .orange; gEnd = .red
+            case "roseQuartz":
+                newStyle = .glassmorphism; usesGrad = true; gStart = .pink; gEnd = .orange
+            default:
+                newStyle = .glassmorphism
+            }
+            self.taskbarConceptState.surfaceStyle = newStyle
+            if usesGrad {
+                self.taskbarConceptState.usesTaskbarGradient = true
+                self.taskbarConceptState.taskbarGradientStart = gStart
+                self.taskbarConceptState.taskbarGradientEnd = gEnd
+            }
+        }
         self.screenService = screenService
         self.launchService = launchService
         self.catalogService = catalogService
@@ -290,12 +330,6 @@ public final class AppRuntimeController {
                 )
                 self.dispatch(action: .updatePlacement(newPlacement))
             },
-            onSelectTheme: { [weak self] newTheme in
-                guard let self = self else { return }
-                var updated = self.preferences
-                updated.materialStyle = newTheme
-                self.updatePreferences(updated)
-            },
             onExportBackup: {
                 statusSelf?.promptExportConfiguration()
             },
@@ -361,7 +395,7 @@ public final class AppRuntimeController {
             window = existing
             refreshSettingsWindow()
         } else {
-            let hostingView = NSHostingView(rootView: AnyView(makeSettingsView()))
+            let hostingView = NSHostingView(rootView: AnyView(makeSettingsView().preferredColorScheme(taskbarConceptState.isDarkMode ? .dark : .light)))
             window = NSWindow(
                 contentRect: NSRect(x: 0.0, y: 0.0, width: 780.0, height: 520.0),
                 styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
@@ -790,7 +824,7 @@ public final class AppRuntimeController {
     }
 
     private func refreshSettingsWindow() {
-        settingsHostingView?.rootView = AnyView(makeSettingsView())
+        settingsHostingView?.rootView = AnyView(makeSettingsView().preferredColorScheme(taskbarConceptState.isDarkMode ? .dark : .light))
     }
 
     private func makeSettingsView() -> some View {
@@ -872,7 +906,7 @@ public final class AppRuntimeController {
             accent: self.taskbarConceptState.clockTint,
             onClose: { [weak self] in self?.settingsWindow?.close() },
             onResetPersonalisation: { [weak self] in self?.taskbarConceptState.resetPersonalisation() },
-            cornerRadius: 12.0
+            cornerRadius: taskbarConceptState.shellRadius(for: .flyouts)
         )
     }
 
@@ -1598,9 +1632,9 @@ public final class AppRuntimeController {
         }
 
         if flyoutController.panel.isVisible {
-            flyoutController.replace(content: AnyView(contentView.dockTheme(preferences.materialStyle)), frame: frame)
+            flyoutController.replace(content: AnyView(contentView), frame: frame)
         } else {
-            flyoutController.show(content: AnyView(contentView.dockTheme(preferences.materialStyle)), frame: frame)
+            flyoutController.show(content: AnyView(contentView), frame: frame)
         }
 
         setupFlyoutMonitors()
@@ -1643,7 +1677,7 @@ public final class AppRuntimeController {
             }
         )
 
-        flyoutController.show(content: AnyView(previewsView.dockTheme(preferences.materialStyle)), frame: frame)
+        flyoutController.show(content: AnyView(previewsView), frame: frame)
         setupFlyoutMonitors()
     }
 
@@ -1907,72 +1941,6 @@ public final class AppRuntimeController {
         )
         items.append(
             CommandPaletteItem(
-                id: "act-theme-system",
-                title: "Theme: System Liquid Glass",
-                subtitle: "Switch to adaptive Apple Liquid Glass material",
-                iconSystemName: "sparkles",
-                iconColor: .indigo,
-                category: .quickActions,
-                action: { [weak self] in
-                    guard let self = self else { return }
-                    var updated = self.preferences
-                    updated.materialStyle = .system
-                    self.updatePreferences(updated)
-                }
-            )
-        )
-        items.append(
-            CommandPaletteItem(
-                id: "act-theme-crystal",
-                title: "Theme: Crystal Clear",
-                subtitle: "Ultra-transparent high-refraction diamond glass",
-                iconSystemName: "diamond",
-                iconColor: .cyan,
-                category: .quickActions,
-                action: { [weak self] in
-                    guard let self = self else { return }
-                    var updated = self.preferences
-                    updated.materialStyle = .crystalClear
-                    self.updatePreferences(updated)
-                }
-            )
-        )
-        items.append(
-            CommandPaletteItem(
-                id: "act-theme-aurora",
-                title: "Theme: Aurora Borealis",
-                subtitle: "Northern lights emerald and cyan fluid gradient with ambient glow",
-                iconSystemName: "waveform.path",
-                iconColor: .green,
-                category: .quickActions,
-                action: { [weak self] in
-                    guard let self = self else { return }
-                    var updated = self.preferences
-                    updated.materialStyle = .auroraGlow
-                    self.updatePreferences(updated)
-                }
-            )
-        )
-        items.append(
-            CommandPaletteItem(
-                id: "act-theme-cyberpunk",
-                title: "Theme: Cyberpunk Neon",
-                subtitle: "Electric cyan and neon magenta glowing glass",
-                iconSystemName: "bolt.fill",
-                iconColor: .pink,
-                category: .quickActions,
-                action: { [weak self] in
-                    guard let self = self else { return }
-                    var updated = self.preferences
-                    updated.materialStyle = .cyberpunkGlass
-                    self.updatePreferences(updated)
-                }
-            )
-        )
-
-        // 2. Window Management (Tiling)
-        items.append(
-            CommandPaletteItem(
                 id: "win-left",
                 title: "Tile Window Left",
                 subtitle: "Snap active window to the left half of the display",
@@ -2215,7 +2183,7 @@ public final class AppRuntimeController {
             }
         )
 
-        panel.contentView = NSHostingView(rootView: paletteView.dockTheme(preferences.materialStyle))
+        panel.contentView = NSHostingView(rootView: paletteView)
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         self.commandPalettePanel = panel
@@ -2342,7 +2310,6 @@ public final class AppRuntimeController {
         ]
         let defaultPrefs = AppPreferences(
             placement: defaultPlacement,
-            materialStyle: .system,
             shortcutBindings: defaultShortcuts,
             clipboardRetention: ClipboardRetentionPolicy(maxEntries: 100, maxBlobBytes: 10 * 1024 * 1024),
             clipboardExcludedBundleIdentifiers: ClipboardPrivacyFilter.defaultExcludedBundleIdentifiers,
@@ -2465,7 +2432,7 @@ public final class AppRuntimeController {
             }
         )
 
-        panel.contentView = NSHostingView(rootView: addView.dockTheme(preferences.materialStyle))
+        panel.contentView = NSHostingView(rootView: addView)
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         self.addItemPanel = panel
@@ -2535,12 +2502,6 @@ public final class AppRuntimeController {
             onOpenAddPanel: { [weak self] in
                 self?.openAddPanel()
             },
-            onSelectTheme: { [weak self] newTheme in
-                guard let self = self else { return }
-                var updated = self.preferences
-                updated.materialStyle = newTheme
-                self.updatePreferences(updated)
-            },
             onToggleAutoHide: { [weak self] in
                 guard let self = self else { return }
                 let current = self.preferences.placement.autoHide
@@ -2599,7 +2560,7 @@ public final class AppRuntimeController {
                 enabled: false,
                 handleFrame: .zero,
                 edge: state.placement.edge,
-                style: preferences.materialStyle
+                style: taskbarConceptState.surfaceStyle
             )
             if panelController.dockPanel.isVisible {
                 panelController.hide(edge: state.placement.edge)
@@ -2640,9 +2601,9 @@ public final class AppRuntimeController {
                 length: 92.0,
                 thickness: 16.0
             )
-            panelController.setAutoHide(enabled: true, handleFrame: handleFrame, edge: state.placement.edge, style: preferences.materialStyle)
+            panelController.setAutoHide(enabled: true, handleFrame: handleFrame, edge: state.placement.edge, style: taskbarConceptState.surfaceStyle)
         } else {
-            panelController.setAutoHide(enabled: false, handleFrame: .zero, edge: state.placement.edge, style: preferences.materialStyle)
+            panelController.setAutoHide(enabled: false, handleFrame: .zero, edge: state.placement.edge, style: taskbarConceptState.surfaceStyle)
         }
 
         if state.isDockRevealed {

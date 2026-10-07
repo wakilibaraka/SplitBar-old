@@ -15,7 +15,6 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
     private let onOpenSettings: () -> Void
     private let onChangeEdge: (DockEdge) -> Void
     private let onToggleAutoHide: () -> Void
-    private let onSelectTheme: (DockMaterialStyle) -> Void
     private let onExportBackup: () -> Void
     private let onImportBackup: () -> Void
     private let onQuitAndRestore: () -> Void
@@ -31,7 +30,6 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         onOpenSettings: @escaping () -> Void,
         onChangeEdge: @escaping (DockEdge) -> Void,
         onToggleAutoHide: @escaping () -> Void,
-        onSelectTheme: @escaping (DockMaterialStyle) -> Void,
         onExportBackup: @escaping () -> Void,
         onImportBackup: @escaping () -> Void,
         onQuitAndRestore: @escaping () -> Void,
@@ -46,7 +44,6 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         self.onOpenSettings = onOpenSettings
         self.onChangeEdge = onChangeEdge
         self.onToggleAutoHide = onToggleAutoHide
-        self.onSelectTheme = onSelectTheme
         self.onExportBackup = onExportBackup
         self.onImportBackup = onImportBackup
         self.onQuitAndRestore = onQuitAndRestore
@@ -161,18 +158,6 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         positionMenuItem.submenu = positionSubmenu
         menu.addItem(positionMenuItem)
 
-        // Material Themes Submenu
-        let themeSubmenu = NSMenu()
-        let themes: [(String, DockMaterialStyle)] = DockMaterialStyle.presets.map { ($0.displayName, $0) }
-        for (themeTitle, themeStyle) in themes {
-            let item = NSMenuItem(title: themeTitle, action: #selector(handleSelectTheme(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = themeStyle
-            themeSubmenu.addItem(item)
-        }
-        let themeMenuItem = NSMenuItem(title: "Liquid Glass Theme", action: nil, keyEquivalent: "")
-        themeMenuItem.submenu = themeSubmenu
-        menu.addItem(themeMenuItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -267,12 +252,6 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func handleSetBottomEdge() {
         onChangeEdge(.bottom)
-    }
-
-    @objc private func handleSelectTheme(_ sender: NSMenuItem) {
-        if let style = sender.representedObject as? DockMaterialStyle {
-            onSelectTheme(style)
-        }
     }
 
     @objc private func handleOpenSettings() {

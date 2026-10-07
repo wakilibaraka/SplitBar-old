@@ -40,36 +40,13 @@ public struct AddItemView: View {
         filterApplications(applications: applications, query: state.searchQuery)
     }
 
-    @Environment(\.dockMaterialStyle) private var dockMaterialStyle
 
     /// Koyu dock temalarında panel temanın yüzeyini kullanır; metinler beyaz olduğundan açık temalarda noir zemin korunur.
     @ViewBuilder
     private var panelBackground: some View {
-        if dockMaterialStyle.prefersDarkContent {
-            ThemedGlassBackground(style: dockMaterialStyle, cornerRadius: 24.0)
-        } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 24.0, style: .continuous)
-                        .fill(.ultraThinMaterial)
-
-                    RoundedRectangle(cornerRadius: 24.0, style: .continuous)
-                        .fill(Color(white: 0.05).opacity(0.92))
-
-                    RoundedRectangle(cornerRadius: 24.0, style: .continuous)
-                        .strokeBorder(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: Color.white.opacity(0.55), location: 0.0),
-                                    .init(color: Color.white.opacity(0.18), location: 0.35),
-                                    .init(color: Color.white.opacity(0.05), location: 0.70),
-                                    .init(color: Color.white.opacity(0.30), location: 1.0)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1.0
-                        )
-                }
+        ZStack {
+            RoundedRectangle(cornerRadius: 24.0, style: .continuous).fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 24.0, style: .continuous).fill(Color(white: 0.1).opacity(0.6))
         }
     }
 

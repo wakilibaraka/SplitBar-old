@@ -80,7 +80,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let defaultPreferences = AppPreferences(
             placement: defaultPlacement,
-            materialStyle: .system,
             shortcutBindings: defaultShortcuts,
             clipboardRetention: ClipboardRetentionPolicy(maxEntries: 100, maxBlobBytes: 10 * 1024 * 1024),
             clipboardExcludedBundleIdentifiers: ClipboardPrivacyFilter.defaultExcludedBundleIdentifiers,

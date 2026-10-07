@@ -20,7 +20,7 @@ enum OpenPanel: Equatable {
 
 
 // MARK: - SurfaceStyle — 14 named design-language themes
-enum SurfaceStyle: String, CaseIterable, Identifiable {
+public enum SurfaceStyle: String, CaseIterable, Identifiable {
 
     // Glassmorphism family
     case glassmorphism   // was "glass" — frosted, thin light edge
@@ -45,10 +45,12 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
     // Legacy Windows
     case windowsXP       // Luna blue gradient bars
     case classic98       // grey beveled panels
+    case visionOS        // spatial volumetric frosted glass
+    case cyberdeck       // high contrast neon borders and grid
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var title: String {
+    public var title: String {
         switch self {
         case .glassmorphism: "Glassmorphism"
         case .liquidGlass:   "Liquid Glass"
@@ -64,10 +66,12 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
         case .y2k:           "Y2K"
         case .windowsXP:     "Windows XP"
         case .classic98:     "Windows 98"
+        case .visionOS:      "VisionOS"
+        case .cyberdeck:     "Cyberdeck"
         }
     }
 
-    var subtitle: String {
+    public var subtitle: String {
         switch self {
         case .glassmorphism: "Frosted translucent layers"
         case .liquidGlass:   "Apple's adaptive water-drop glass"
@@ -83,6 +87,8 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
         case .y2k:           "Chrome bubblegum millennium"
         case .windowsXP:     "Blue Luna bars and soft corners"
         case .classic98:     "Classic grey beveled panels"
+        case .visionOS:      "Spatial volumetric frosted glass with deep highlights"
+        case .cyberdeck:     "High contrast neon wireframe with pure black surfaces"
         }
     }
 
@@ -104,6 +110,8 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
             case .y2k:           Color(red: 0.12, green: 0.14, blue: 0.22)
             case .windowsXP:     Color(red: 0.07, green: 0.14, blue: 0.29)
             case .classic98:     Color(red: 0.16, green: 0.16, blue: 0.17)
+            case .visionOS:      Color(white: 0.1).opacity(0.65)
+            case .cyberdeck:     Color.black
             }
         } else {
             switch self {
@@ -121,6 +129,8 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
             case .y2k:           Color(red: 0.82, green: 0.88, blue: 1.0)
             case .windowsXP:     Color(red: 0.86, green: 0.91, blue: 0.98)
             case .classic98:     Color(red: 0.77, green: 0.77, blue: 0.77)
+            case .visionOS:      Color.white.opacity(0.85)
+            case .cyberdeck:     Color.black
             }
         }
     }
@@ -143,6 +153,8 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
             case .y2k:           Color(red: 0.16, green: 0.18, blue: 0.28)
             case .windowsXP:     Color(red: 0.12, green: 0.23, blue: 0.40)
             case .classic98:     Color(red: 0.23, green: 0.23, blue: 0.25)
+            case .visionOS:      Color(white: 0.2).opacity(0.55)
+            case .cyberdeck:     Color(red: 0.05, green: 0.05, blue: 0.05)
             }
         } else {
             switch self {
@@ -160,6 +172,8 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
             case .y2k:           Color(red: 0.88, green: 0.92, blue: 1.0)
             case .windowsXP:     Color(red: 0.96, green: 0.97, blue: 0.99)
             case .classic98:     Color(red: 0.82, green: 0.82, blue: 0.82)
+            case .visionOS:      Color(white: 0.95).opacity(0.65)
+            case .cyberdeck:     Color(red: 0.05, green: 0.05, blue: 0.05)
             }
         }
     }
@@ -181,6 +195,8 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
         case .y2k:           12
         case .windowsXP:     10
         case .classic98:     2
+        case .visionOS:      32
+        case .cyberdeck:     0
         }
     }
 
@@ -214,6 +230,10 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
                 Color(red: 0.04, green: 0.13, blue: 0.30)
             case .classic98:
                 Color(red: 0.21, green: 0.21, blue: 0.22)
+            case .visionOS:
+                Color(white: 0.1).opacity(0.85)
+            case .cyberdeck:
+                Color.black.opacity(0.95)
             }
         } else {
             switch self {
@@ -243,6 +263,10 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
                 Color(red: 0.70, green: 0.82, blue: 0.98)
             case .classic98:
                 Color(red: 0.76, green: 0.76, blue: 0.76)
+            case .visionOS:
+                Color.white.opacity(0.85)
+            case .cyberdeck:
+                Color.black.opacity(0.95)
             }
         }
     }
@@ -275,6 +299,10 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
                 Color(red: 0.50, green: 0.80, blue: 1.0)
             case .classic98:
                 Color(red: 0.68, green: 0.75, blue: 1.0)
+            case .visionOS:
+                Color.white
+            case .cyberdeck:
+                Color(red: 0.0, green: 1.0, blue: 0.5)
             }
         } else {
             switch self {
@@ -302,6 +330,10 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
                 Color(red: 0.26, green: 0.52, blue: 0.96)
             case .classic98:
                 Color(red: 0.12, green: 0.22, blue: 0.52)
+            case .visionOS:
+                Color.black
+            case .cyberdeck:
+                Color(red: 0.0, green: 1.0, blue: 0.5)
             }
         }
     }
@@ -337,6 +369,10 @@ enum SurfaceStyle: String, CaseIterable, Identifiable {
             [Color(red: 0.15, green: 0.35, blue: 0.75), Color(red: 0.36, green: 0.62, blue: 0.95), Color(red: 0.10, green: 0.25, blue: 0.60)]
         case .classic98:
             [Color(red: 0.55, green: 0.55, blue: 0.58), Color(red: 0.75, green: 0.75, blue: 0.78), Color(red: 0.45, green: 0.45, blue: 0.48)]
+        case .visionOS:
+            [Color.white.opacity(0.8), Color.white.opacity(0.2), Color.clear]
+        case .cyberdeck:
+            [Color(red: 0.0, green: 1.0, blue: 0.5), Color.purple, Color.cyan]
         }
     }
 }

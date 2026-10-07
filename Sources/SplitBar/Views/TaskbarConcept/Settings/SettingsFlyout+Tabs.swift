@@ -1216,6 +1216,17 @@ extension SettingsFlyout {
                             ), in: 32...80)
                             .frame(width: 140)
                         }
+                        
+                        Toggle("Auto-hide Dock", isOn: Binding(
+                            get: { preferences.placement.autoHide },
+                            set: { newAutoHide in
+                                var updated = preferences
+                                updated.placement.autoHide = newAutoHide
+                                preferences = updated
+                            }
+                        ))
+                        .toggleStyle(.switch)
+                        .font(.system(size: 12, weight: .medium))
                     }
                 }
                 

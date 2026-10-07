@@ -39,13 +39,15 @@ private final class EdgeActivationTrackingView: NSView {
 
 /// Dock gizliyken kenarda görünen cam tutamaç; seçili temayı izler.
 struct EdgeHandleView: View {
+    @Environment(\.colorScheme) var colorScheme
     let edge: DockEdge
-    let style: DockMaterialStyle
+    let style: SurfaceStyle
 
     var body: some View {
         let isVertical = edge == .left || edge == .right
         ZStack {
-            ThemedGlassBackground(style: style, cornerRadius: 8.0)
+            RoundedRectangle(cornerRadius: 8.0, style: .continuous)
+                .fill(panelBackground(style: style, darkMode: colorScheme == .dark, transparency: 0.2))
             Group {
                 if isVertical {
                     VStack(spacing: 5.0) { dots }
@@ -54,7 +56,6 @@ struct EdgeHandleView: View {
                 }
             }
         }
-        .dockTheme(style)
     }
 
     private var dots: some View {
@@ -80,7 +81,7 @@ public final class EdgePanelController {
 
     public init(onReveal: @escaping () -> Void) {
         self.onReveal = onReveal
-        self.handleHostingView = NSHostingView(rootView: EdgeHandleView(edge: .right, style: .system))
+        self.handleHostingView = NSHostingView(rootView: EdgeHandleView(edge: .right, style: .glassmorphism))
 
         let collectionBehavior = edgePanelCollectionBehavior()
 
@@ -208,7 +209,7 @@ public final class EdgePanelController {
     }
 
     /// Auto-hide açıkken kenardaki tutamacı konumlandırır; dock görünürken tutamaç sönük ve tıklanamaz kalır.
-    public func setAutoHide(enabled: Bool, handleFrame: CGRect, edge: DockEdge, style: DockMaterialStyle) {
+    public func setAutoHide(enabled: Bool, handleFrame: CGRect, edge: DockEdge, style: SurfaceStyle) {
         guard enabled else {
             if activationPanel.isVisible {
                 activationPanel.orderOut(nil)

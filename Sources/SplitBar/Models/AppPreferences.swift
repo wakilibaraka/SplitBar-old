@@ -2,7 +2,7 @@ import Foundation
 
 public struct AppPreferences: Codable, Equatable, Sendable {
     public var placement: DockPlacement
-    public var materialStyle: DockMaterialStyle
+    public var legacyMaterialStyle: String?
     public var shortcutBindings: [ShortcutBinding]
     public var clipboardRetention: ClipboardRetentionPolicy
     public var clipboardExcludedBundleIdentifiers: Set<String>
@@ -23,7 +23,6 @@ public struct AppPreferences: Codable, Equatable, Sendable {
 
     public static let defaultPreferences = AppPreferences(
         placement: DockPlacement(edge: .bottom, verticalOffsetFraction: 0, autoHide: false),
-        materialStyle: .system,
         shortcutBindings: [],
         clipboardRetention: ClipboardRetentionPolicy(maxEntries: 100, maxBlobBytes: 1024*1024),
         clipboardExcludedBundleIdentifiers: [],
@@ -39,7 +38,6 @@ public struct AppPreferences: Codable, Equatable, Sendable {
 
     public init(
         placement: DockPlacement,
-        materialStyle: DockMaterialStyle,
         shortcutBindings: [ShortcutBinding],
         clipboardRetention: ClipboardRetentionPolicy,
         clipboardExcludedBundleIdentifiers: Set<String>,
@@ -53,7 +51,6 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         dockIconSize: Double
     ) {
         self.placement = placement
-        self.materialStyle = materialStyle
         self.shortcutBindings = shortcutBindings
         self.clipboardRetention = clipboardRetention
         self.clipboardExcludedBundleIdentifiers = clipboardExcludedBundleIdentifiers
@@ -69,7 +66,6 @@ public struct AppPreferences: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case placement
-        case materialStyle
         case shortcutBindings
         case clipboardRetention
         case clipboardExcludedBundleIdentifiers
@@ -83,10 +79,16 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         case dockIconSize
     }
 
+    enum LegacyKeys: String, CodingKey {
+        case materialStyle
+    }
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.placement = try container.decode(DockPlacement.self, forKey: .placement)
-        self.materialStyle = try container.decode(DockMaterialStyle.self, forKey: .materialStyle)
+        if let extraContainer = try? decoder.container(keyedBy: LegacyKeys.self) {
+            self.legacyMaterialStyle = try? extraContainer.decode(String.self, forKey: .materialStyle)
+        }
         self.shortcutBindings = try container.decode([ShortcutBinding].self, forKey: .shortcutBindings)
         self.clipboardRetention = try container.decode(ClipboardRetentionPolicy.self, forKey: .clipboardRetention)
         self.clipboardExcludedBundleIdentifiers = try container.decode(Set<String>.self, forKey: .clipboardExcludedBundleIdentifiers)
@@ -104,7 +106,6 @@ public struct AppPreferences: Codable, Equatable, Sendable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(placement, forKey: .placement)
-        try container.encode(materialStyle, forKey: .materialStyle)
         try container.encode(shortcutBindings, forKey: .shortcutBindings)
         try container.encode(clipboardRetention, forKey: .clipboardRetention)
         try container.encode(clipboardExcludedBundleIdentifiers, forKey: .clipboardExcludedBundleIdentifiers)
