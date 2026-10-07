@@ -298,6 +298,13 @@ tested.
   per-mode move/remove controls, and a divider context menu for removal.
   Trash anchors are per-mode in settings, the Downloads/Trash/Status cluster
   has an orderable list, and the legacy `usesDockPresentation` flag is gone.
+- [x] Restyle wave 2: 14-theme system with a 5-tab Personalisation flyout;
+  battery-only status icon with layered presets; 5 icon sizes (XS–XL);
+  spring-press app tiles with hover lift; 9 flyout open animations plus height
+  presets applied to preview and panel hosts; weather-reactive and
+  theme-matched wallpapers with Canvas particles; 6-page first-launch
+  onboarding; theme-aware indicator colours with gradient fills and gradient
+  clock text. Pure-logic coverage is now 17 tests green.
 - [x] Present the approved bottom taskbar as a screen-edge `NSPanel` using the
   existing panel manager and screen geometry code. Keep the macOS Dock visible
   during this first panel milestone; it must be independently reversible.
