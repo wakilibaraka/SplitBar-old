@@ -61,7 +61,9 @@ protocol ClipboardMonitoring: AnyObject {
     func updateExcludedBundleIdentifiers(_ identifiers: Set<String>)
 }
 
-protocol ClipboardPersisting {
+/// Persistence is `Sendable` because the coordinator hands it to its background
+/// queue. The real implementation is a value type over a URL; tests use a spy.
+protocol ClipboardPersisting: Sendable {
     func loadHistory() throws -> [ClipboardEntry]
     func saveHistory(_ entries: [ClipboardEntry]) throws
     func saveBlob(data: Data, relativePath: String) throws

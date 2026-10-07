@@ -148,6 +148,7 @@ public final class AppRuntimeController {
     public let catalogService: ApplicationCatalogService
     public let shortcutService: GlobalShortcutService
     let clipboardCoordinator: ClipboardCoordinator
+    let shortcutCoordinator: ShortcutCoordinator
     public let panelController: EdgePanelController
     public let flyoutController: FlyoutPanelController
     private var dockHostingView: NSHostingView<DockInteractiveContainerView>?
@@ -221,6 +222,7 @@ public final class AppRuntimeController {
         self.launchService = launchService
         self.catalogService = catalogService
         self.shortcutService = shortcutService
+        self.shortcutCoordinator = ShortcutCoordinator(service: shortcutService)
         self.flyoutController = flyoutController
         self.clipboardCoordinator = ClipboardCoordinator(
             monitor: clipboardMonitor,
@@ -311,6 +313,9 @@ public final class AppRuntimeController {
         self.statusBarController = statusBar
         statusSelf = self
 
+        self.shortcutCoordinator.route(to: self)
+
+
         self.clipboardCoordinator.historyDidChange = { [weak self] change in
             guard let self else { return }
             switch change {
@@ -327,7 +332,7 @@ public final class AppRuntimeController {
 
         self.updateDockContent()
         self.syncPanels()
-        self.setupDefaultShortcuts()
+        self.shortcutCoordinator.start(observing: taskbarConceptState.$shortcutBindings.eraseToAnyPublisher())
         self.setupTaskbarPanel()
         self.setupRunningState()
         self.setupWeatherForwarding()
@@ -979,68 +984,9 @@ public final class AppRuntimeController {
             .store(in: &taskbarPanelSubscriptions)
     }
 
-    private func setupDefaultShortcuts() {
-        registerShortcutBindings()
-        taskbarConceptState.$shortcutBindings
-            .removeDuplicates()
-            .sink { [weak self] _ in
-                self?.registerShortcutBindings()
-            }
-            .store(in: &taskbarPanelSubscriptions)
-    }
-
-    private func registerShortcutBindings() {
-        let bindings = taskbarConceptState.shortcutBindings
-        _ = shortcutService.register(bindings: bindings) { [weak self] action in
-            Logger.shortcuts.debug("Triggered shortcut action")
-            Task { @MainActor in
-                self?.handleShortcutAction(action)
-            }
-        }
-    }
 
     public func handleShortcutAction(_ action: ShortcutAction) {
-        switch action {
-        case .toggleDock:
-            toggleDockVisibility()
-        case .focusNext:
-            guard !state.dockItems.isEmpty else { return }
-            if let currentID = state.selectedItemID,
-               let currentIndex = state.dockItems.firstIndex(where: { $0.id == currentID }) {
-                let nextIndex = min(currentIndex + 1, state.dockItems.count - 1)
-                dispatch(action: .selectItem(id: state.dockItems[nextIndex].id))
-            } else {
-                dispatch(action: .selectItem(id: state.dockItems[0].id))
-            }
-        case .focusPrevious:
-            guard !state.dockItems.isEmpty else { return }
-            if let currentID = state.selectedItemID,
-               let currentIndex = state.dockItems.firstIndex(where: { $0.id == currentID }) {
-                let prevIndex = max(currentIndex - 1, 0)
-                dispatch(action: .selectItem(id: state.dockItems[prevIndex].id))
-            } else {
-                dispatch(action: .selectItem(id: state.dockItems[0].id))
-            }
-        case .activateSelected:
-            if let selectedID = state.selectedItemID {
-                dispatch(action: .selectItem(id: selectedID))
-            }
-        case .openAddPanel:
-            openAddPanel()
-        case .openClipboard:
-            if let clipboardItem = state.dockItems.first(where: {
-                if case .widget(let id) = $0.kind, id == "clipboard" { return true }
-                return false
-            }) {
-                dispatch(action: .selectItem(id: clipboardItem.id))
-            }
-        case .openCommandPalette:
-            openCommandPalette()
-        case .activateItem(let id):
-            dispatch(action: .selectItem(id: id))
-        case .tileWindow(let tilingAction):
-            windowManagerService.tileFrontmostWindow(action: tilingAction)
-        }
+        shortcutCoordinator.handle(action)
     }
 
     public func dispatch(action: AppAction) {
@@ -2615,5 +2561,27 @@ public final class AppRuntimeController {
             panelController.hide(edge: state.placement.edge)
             tooltipController.hide()
         }
+    }
+}
+
+
+extension AppRuntimeController: ShortcutActionRouting {
+    var dockItemIDs: [UUID] { state.dockItems.map(\.id) }
+
+    var selectedItemID: UUID? { state.selectedItemID }
+
+    var clipboardItemID: UUID? {
+        state.dockItems.first { item in
+            if case .widget(let identifier) = item.kind, identifier == "clipboard" { return true }
+            return false
+        }?.id
+    }
+
+    func selectItem(id: UUID) {
+        dispatch(action: .selectItem(id: id))
+    }
+
+    func tileFrontmostWindow(action: WindowTilingAction) {
+        _ = windowManagerService.tileFrontmostWindow(action: action)
     }
 }
