@@ -58,12 +58,12 @@ Status legend: **done** · **partial** · **todo** · **blocked** (needs a perso
 | B4 | Gate AI credential features, status-line first | P1 | done | B3 |
 | B5 | Location/network: CoreLocation, favicons, inventory | P1 | partial | B1 |
 | B6 | Process + Terminal dispatch hardening | P1 | done | – |
-| C1 | Split `TaskbarConceptView.swift` | P1 | todo | A1 |
+| C1 | Split `TaskbarConceptView.swift` | P1 | todo (see `REFACTOR_PLAN.md`) | A1 |
 | C2 | Split `AppRuntimeController.swift` | P1 | todo | C1 |
 | C3 | Extract SwiftPM modules | P2 | todo | C1, C2 |
 | C4 | Test expansion | P1 | done (grows) | B2, B3 |
 | C5 | Swift 6 concurrency migration | P2 | todo | C3 |
-| C6 | Replace silent `try?` | P2 | todo | C4 |
+| C6 | Replace silent `try?` | P2 | todo (see `REFACTOR_PLAN.md`) | C4 |
 | C7 | CI: bundle check, lint, coverage | P1 | done | A4, B1 |
 | D1 | Accessibility + keyboard navigation | P1 | partial | C1 |
 | D2 | Privacy and data center UI | P1 | done | B2, B5 |
@@ -153,6 +153,11 @@ Timeout and large-output behaviour are unit tested.
 Splitting the two large files, extracting SPM modules, migrating to Swift 6
 language mode and replacing silent `try?` are multi-PR mechanical programmes,
 sequenced C1 → C2 → C3 → C5 → C6. Do not start them piecemeal.
+
+**Expanded plan:** [`REFACTOR_PLAN.md`](./REFACTOR_PLAN.md) gives the measured
+baseline (7,800-line view file with 89 top-level types, 2,762-line runtime with 70
+methods and no tests, 10 `@unchecked Sendable`, 68 `try?`), the PR breakdown for
+each task, the ordering rationale, and the acceptance criteria.
 
 ### C4 — Test expansion (done, grows with B and C)
 Covers: layout/dividers, Dock state round-trip and legacy-payload refusal,

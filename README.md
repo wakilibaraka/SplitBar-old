@@ -94,6 +94,7 @@ Built against the macOS 27 SDK, deployment target macOS 15, public API only
 - `Reference/` — read-only design inspiration, not a dependency; see its README.
 - `NETWORK.md` — every host the app contacts, why, and the setting that gates it.
 - `IMPROVEMENT_PLAN.md` — the review backlog, invariants, and per-task status.
+- `REFACTOR_PLAN.md` — the planned structural work (file/module splitting, Swift 6).
 - `Tests/SplitBarTests/` — pure-logic tests (layout, dividers, state files).
 
 See [MIGRATION_AND_BUILD_PLAN.md](./MIGRATION_AND_BUILD_PLAN.md) for the
