@@ -1,6 +1,6 @@
 # SplitBar — Structural Refactor Plan (C1, C2, C3, C5, C6)
 
-Status: **in progress** (C1 executing) · Baseline: v0.3.0 · Measured 2026-10-07
+Status: **C1 done · C2.1–C2.3 done** · C2.4–C2.6 remain · Baseline: v0.3.0
 
 This expands the five structural tasks in `IMPROVEMENT_PLAN.md` into executable
 work. It changes no behaviour. Every phase is a sequence of small PRs that keep
@@ -269,6 +269,14 @@ large branch.
 
 Each slice is one commit, verified with `swift build -Xswiftc -warnings-as-errors`
 and `swift test` before the commit.
+
+`TaskbarConceptView.swift` no longer exists: 7,800 lines became 18 files, and no
+file in `Sources/` is over 1,200 lines except `AppRuntimeController.swift`. The
+runtime is at 2,587 lines from 2,763, with three coordinators and 22 new tests.
+The remaining runtime work is the half this plan deferred: panel and flyout
+orchestration, window previews, the AI account flow, dock hide/restore and window
+tiling. Those are worth doing, but they are the parts that need a running UI to
+verify, so they get their own slices rather than being bundled with the moves.
 
 | Slice | Commit | Result |
 |---|---|---|
