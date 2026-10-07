@@ -23,6 +23,7 @@ public final class DockController {
     /// Autohide delay applied while SplitBar hides the Dock. Large enough to
     /// suppress edge-hover reveal; the saved value is restored on quit.
     public static let suppressionDelay: Double = 1000
+    public static let restoreAgentLabel = "com.baraka.splitbar.restore"
     private let stateFileURL: URL
     private let logger = Logger(subsystem: "com.baraka.splitbar", category: "dock")
 
@@ -68,10 +69,49 @@ public final class DockController {
                 return
             }
             writeDockDefaults(autohide: true, autohideDelay: Self.suppressionDelay)
+            installRestoreAgent()
             restartDock()
         } else {
             restore()
         }
+    }
+
+    /// Installs the login-time restore helper while the Dock is hidden, so a
+    /// crash or SIGKILL still leaves a path back to the saved Dock state.
+    private func installRestoreAgent() {
+        let helperURL = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Helpers/SplitBarDockRestore")
+        guard FileManager.default.isExecutableFile(atPath: helperURL.path) else {
+            logger.warning("Restore helper not found in bundle; skipping LaunchAgent install")
+            return
+        }
+        let agentsURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents")
+        let plistURL = agentsURL.appendingPathComponent("\(Self.restoreAgentLabel).plist")
+        let plist = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0">
+            <dict>
+                <key>Label</key><string>\(Self.restoreAgentLabel)</string>
+                <key>ProgramArguments</key><array><string>\(helperURL.path)</string></array>
+                <key>RunAtLoad</key><true/>
+            </dict>
+            </plist>
+            """
+        do {
+            try FileManager.default.createDirectory(at: agentsURL, withIntermediateDirectories: true)
+            try plist.write(to: plistURL, atomically: true, encoding: .utf8)
+            logger.info("Installed Dock restore LaunchAgent")
+        } catch {
+            logger.error("Failed to install restore LaunchAgent error=\(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func removeRestoreAgent() {
+        let plistURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents/\(Self.restoreAgentLabel).plist")
+        try? FileManager.default.removeItem(at: plistURL)
     }
 
     private func restore() {
@@ -84,6 +124,7 @@ public final class DockController {
             writeDockString(saved.orientation, forKey: "orientation")
         }
         try? FileManager.default.removeItem(at: stateFileURL)
+        removeRestoreAgent()
         restartDock()
         logger.info("macOS Dock restored")
     }

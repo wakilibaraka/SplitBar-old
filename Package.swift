@@ -10,7 +10,11 @@ let package = Package(
         .executable(
             name: "SplitBar",
             targets: ["SplitBar"]
-        )
+        ),
+        .executable(
+            name: "SplitBarDockRestore",
+            targets: ["SplitBarDockRestore"]
+        ),
     ],
     dependencies: [],
     targets: [
@@ -26,6 +30,13 @@ let package = Package(
             name: "SplitBarTests",
             dependencies: ["SplitBar"],
             path: "Tests/SplitBarTests",
+            swiftSettings: [
+                .swiftLanguageMode(.v5)
+            ]
+        ),
+        .executableTarget(
+            name: "SplitBarDockRestore",
+            path: "Sources/SplitBarDockRestore",
             swiftSettings: [
                 .swiftLanguageMode(.v5)
             ]
