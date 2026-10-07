@@ -86,7 +86,7 @@ public func fetchClaudeTokenOwner(accessToken: String) async throws -> ClaudeTok
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
             lastNetworkError = error
-            Logger.general.warning("Claude profile lookup network error attempt=\(attempt, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+            Logger.general.warning("Claude profile lookup network error attempt=\(attempt, privacy: .public) error=\(error.localizedDescription, privacy: .private)")
             try await Task.sleep(for: .milliseconds(400 * attempt))
             continue
         }

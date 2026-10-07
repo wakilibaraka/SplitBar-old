@@ -69,7 +69,7 @@ public struct ClaudeStatusLineBridge: Sendable {
         }
         settings["statusLine"] = statusLine
         try write(try serialize(settings, path: settingsURL.path), to: settingsURL, permissions: nil)
-        Logger.general.info("Installed Claude status line bridge script=\(scriptURL.path, privacy: .public)")
+        Logger.general.info("Installed Claude status line bridge script=\(scriptURL.path, privacy: .private)")
     }
 
     public func uninstall() throws {

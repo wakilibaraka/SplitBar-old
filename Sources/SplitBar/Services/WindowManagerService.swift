@@ -87,7 +87,7 @@ public final class WindowManagerService: @unchecked Sendable {
             }
         }
         if !minimizedAny {
-            Logger.panels.warning("AX minimize affected no windows bundle=\(bundleIdentifier, privacy: .public)")
+            Logger.panels.warning("AX minimize affected no windows bundle=\(bundleIdentifier, privacy: .private)")
         }
         return minimizedAny
     }

@@ -256,7 +256,7 @@ public final class AIUsageService {
         do {
             accounts = try await accountStore.synchronize()
         } catch {
-            Logger.general.error("AI account sync failed error=\(String(describing: error), privacy: .public)")
+            Logger.general.error("AI account sync failed error=\(String(describing: error), privacy: .private)")
             return currentState.limitCards
         }
         var registry = accounts.registry
@@ -286,7 +286,7 @@ public final class AIUsageService {
                     registry = await recordLimits(snapshot, for: activeClaude, fallback: registry)
                 }
             } catch {
-                Logger.general.error("Claude limit capture unreadable error=\(String(describing: error), privacy: .public)")
+                Logger.general.error("Claude limit capture unreadable error=\(String(describing: error), privacy: .private)")
             }
         }
 
@@ -295,7 +295,7 @@ public final class AIUsageService {
         do {
             isBridgeInstalled = try claudeBridge.isInstalled()
         } catch {
-            Logger.general.error("Claude bridge status unreadable error=\(String(describing: error), privacy: .public)")
+            Logger.general.error("Claude bridge status unreadable error=\(String(describing: error), privacy: .private)")
             isBridgeInstalled = false
         }
 
@@ -320,7 +320,7 @@ public final class AIUsageService {
         do {
             return try await accountStore.recordLimits(snapshot, for: account)
         } catch {
-            Logger.general.error("Saving limits failed account=\(account.accountID, privacy: .public) error=\(String(describing: error), privacy: .public)")
+            Logger.general.error("Saving limits failed account=\(account.accountID, privacy: .private) error=\(String(describing: error), privacy: .private)")
             return fallback
         }
     }
@@ -780,12 +780,12 @@ public final class AIUsageService {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-                Logger.general.error("Ollama request failed path=\(path, privacy: .public) status=\(status, privacy: .public)")
+                Logger.general.error("Ollama request failed path=\(path, privacy: .private) status=\(status, privacy: .public)")
                 return nil
             }
             return try JSONDecoder().decode(Response.self, from: data)
         } catch {
-            Logger.general.error("Ollama request failed path=\(path, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+            Logger.general.error("Ollama request failed path=\(path, privacy: .private) error=\(error.localizedDescription, privacy: .private)")
             return nil
         }
     }

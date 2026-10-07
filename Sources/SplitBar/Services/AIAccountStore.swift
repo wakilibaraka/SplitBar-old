@@ -133,7 +133,7 @@ public actor AIAccountStore {
                 registry.accountsNeedingLogin.remove(codex.account.id)
             }
         } catch {
-            Logger.general.error("AI account sync skipped provider=codex error=\(String(describing: error), privacy: .public)")
+            Logger.general.error("AI account sync skipped provider=codex error=\(String(describing: error), privacy: .private)")
         }
 
         do {
@@ -142,7 +142,7 @@ public actor AIAccountStore {
             active[.claude] = result.profileAccount
             claudeIssue = result.issue
         } catch {
-            Logger.general.error("AI account sync skipped provider=claude error=\(String(describing: error), privacy: .public)")
+            Logger.general.error("AI account sync skipped provider=claude error=\(String(describing: error), privacy: .private)")
         }
 
         try saveRegistry(registry)
@@ -170,7 +170,7 @@ public actor AIAccountStore {
         var registry = try loadRegistry()
         registry.switchedAt[target.provider.rawValue] = Date()
         try saveRegistry(registry)
-        Logger.general.info("Switched AI account provider=\(target.provider.rawValue, privacy: .public) account=\(target.accountID, privacy: .public)")
+        Logger.general.info("Switched AI account provider=\(target.provider.rawValue, privacy: .public) account=\(target.accountID, privacy: .private)")
         return try await synchronize()
     }
 
@@ -182,7 +182,7 @@ public actor AIAccountStore {
         do {
             try deleteKeychainPassword(service: savedSecretService(account.provider), account: account.accountID)
         } catch SecurityKeychainError.itemNotFound {
-            Logger.general.notice("Saved credentials already absent account=\(account.accountID, privacy: .public)")
+            Logger.general.notice("Saved credentials already absent account=\(account.accountID, privacy: .private)")
         }
         var registry = snapshot.registry
         registry.accounts.removeAll { $0.id == account.id }
@@ -239,7 +239,7 @@ public actor AIAccountStore {
                 verification = try await verifyClaudeCredentials(credentials)
             } catch {
                 // Ağ hatası: doğrulanamayan kimlik bilgisi kaydedilmez, bir sonraki yenilemede tekrar denenir
-                Logger.general.warning("Claude login verification unavailable error=\(String(describing: error), privacy: .public)")
+                Logger.general.warning("Claude login verification unavailable error=\(String(describing: error), privacy: .private)")
                 return ClaudeSyncResult(registry: updated, profileAccount: profile.account, issue: nil)
             }
             lastClaudeVerification = (credentials: credentials, result: verification)
@@ -272,7 +272,7 @@ public actor AIAccountStore {
 
         case .rejected(let error):
             updated.accountsNeedingLogin.insert(profile.account.id)
-            Logger.general.error("Active Claude login rejected account=\(profile.account.accountID, privacy: .public) error=\(String(describing: error), privacy: .public)")
+            Logger.general.error("Active Claude login rejected account=\(profile.account.accountID, privacy: .private) error=\(String(describing: error), privacy: .private)")
             return ClaudeSyncResult(
                 registry: updated,
                 profileAccount: profile.account,
@@ -345,7 +345,7 @@ public actor AIAccountStore {
             } catch SecurityKeychainError.itemNotFound {
                 continue
             } catch {
-                Logger.general.warning("Claude backup check skipped account=\(account.accountID, privacy: .public) error=\(String(describing: error), privacy: .public)")
+                Logger.general.warning("Claude backup check skipped account=\(account.accountID, privacy: .private) error=\(String(describing: error), privacy: .private)")
             }
         }
 
@@ -368,9 +368,9 @@ public actor AIAccountStore {
                             let moved = try encodeClaudeSecret(credentials: Data(result.secret.credentials.utf8), oauthAccountJSON: ownerSecret.oauthAccountJSON)
                             try writeSavedSecret(account: ownerAccount, secret: moved)
                             repairedOwners.insert(ownerAccount.id)
-                            Logger.general.notice("Moved mislabeled Claude backup to its owner account=\(ownerAccount.accountID, privacy: .public)")
+                            Logger.general.notice("Moved mislabeled Claude backup to its owner account=\(ownerAccount.accountID, privacy: .private)")
                         } catch {
-                            Logger.general.error("Moving mislabeled Claude backup failed error=\(String(describing: error), privacy: .public)")
+                            Logger.general.error("Moving mislabeled Claude backup failed error=\(String(describing: error), privacy: .private)")
                         }
                     }
                 }
@@ -379,7 +379,7 @@ public actor AIAccountStore {
                     try deleteKeychainPassword(service: savedSecretService(account.provider), account: account.accountID)
                     syncedSecrets[account.id] = nil
                 } catch {
-                    Logger.general.error("Deleting mislabeled Claude backup failed error=\(String(describing: error), privacy: .public)")
+                    Logger.general.error("Deleting mislabeled Claude backup failed error=\(String(describing: error), privacy: .private)")
                 }
                 updated.accountsNeedingLogin.insert(account.id)
             case .rejected(let error) where error.isExpiredButRefreshable:
@@ -393,7 +393,7 @@ public actor AIAccountStore {
         do {
             try saveRegistry(updated)
         } catch {
-            Logger.general.error("Saving repaired account registry failed error=\(String(describing: error), privacy: .public)")
+            Logger.general.error("Saving repaired account registry failed error=\(String(describing: error), privacy: .private)")
         }
         return updated
     }
@@ -524,7 +524,7 @@ public actor AIAccountStore {
             updated.accounts[index] = account
         } else {
             updated.accounts.append(account)
-            Logger.general.info("Saved new AI account provider=\(account.provider.rawValue, privacy: .public) account=\(account.accountID, privacy: .public)")
+            Logger.general.info("Saved new AI account provider=\(account.provider.rawValue, privacy: .public) account=\(account.accountID, privacy: .private)")
         }
         return updated
     }

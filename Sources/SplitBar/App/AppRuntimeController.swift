@@ -244,12 +244,12 @@ public final class AppRuntimeController {
         do {
             self.clipboardHistory = try clipboardPersistence.loadHistory()
         } catch {
-            Logger.persistence.error("Failed to load clipboard history error=\(error.localizedDescription, privacy: .public)")
+            Logger.persistence.error("Failed to load clipboard history error=\(error.localizedDescription, privacy: .private)")
             do {
                 let backupURL = try clipboardPersistence.quarantineCorruptHistory()
-                Logger.persistence.notice("Moved unreadable clipboard history aside backup=\(backupURL.path, privacy: .public)")
+                Logger.persistence.notice("Moved unreadable clipboard history aside backup=\(backupURL.path, privacy: .private)")
             } catch {
-                Logger.persistence.error("Failed to quarantine clipboard history error=\(error.localizedDescription, privacy: .public)")
+                Logger.persistence.error("Failed to quarantine clipboard history error=\(error.localizedDescription, privacy: .private)")
             }
             self.clipboardHistory = []
         }
@@ -715,7 +715,7 @@ public final class AppRuntimeController {
     private func launchPinnedApplication(bundleIdentifier: String) {
         taskbarConceptState.recordLaunch(bundleIdentifier)
         guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
-            Logger.lifecycle.error("Pinned application is not installed bundle=\(bundleIdentifier, privacy: .public)")
+            Logger.lifecycle.error("Pinned application is not installed bundle=\(bundleIdentifier, privacy: .private)")
             let alert = NSAlert()
             alert.messageText = "Application Not Found"
             alert.informativeText = "The application \(bundleIdentifier) could not be found on this Mac."
@@ -751,10 +751,10 @@ public final class AppRuntimeController {
             return
         case .invalidTarget:
             message = "The launch target is invalid."
-            Logger.lifecycle.error("Launch target is invalid target=\(targetName, privacy: .public)")
+            Logger.lifecycle.error("Launch target is invalid target=\(targetName, privacy: .private)")
         case .systemFailure(let detail):
             message = detail
-            Logger.lifecycle.error("Launch failed target=\(targetName, privacy: .public) error=\(detail, privacy: .public)")
+            Logger.lifecycle.error("Launch failed target=\(targetName, privacy: .private) error=\(detail, privacy: .private)")
         }
 
         let alert = NSAlert()
@@ -819,7 +819,7 @@ public final class AppRuntimeController {
         do {
             try configPersistence.save(snapshot: snapshot)
         } catch {
-            Logger.persistence.error("Failed to persist configuration error=\(error.localizedDescription, privacy: .public)")
+            Logger.persistence.error("Failed to persist configuration error=\(error.localizedDescription, privacy: .private)")
         }
     }
 
@@ -956,7 +956,7 @@ public final class AppRuntimeController {
                 do {
                     try persistence.saveBlob(data: imageData, relativePath: relativePath)
                 } catch {
-                    Logger.persistence.error("Failed to save clipboard image blob path=\(relativePath, privacy: .public) bytes=\(imageData.count, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+                    Logger.persistence.error("Failed to save clipboard image blob path=\(relativePath, privacy: .private) bytes=\(imageData.count, privacy: .public) error=\(error.localizedDescription, privacy: .private)")
                 }
             }
         }
@@ -1178,7 +1178,7 @@ public final class AppRuntimeController {
     }
 
     private func presentError(title: String, error: Error) {
-        Logger.general.error("\(title, privacy: .public) error=\(String(describing: error), privacy: .public)")
+        Logger.general.error("\(title, privacy: .private) error=\(String(describing: error), privacy: .private)")
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = title
@@ -1667,7 +1667,7 @@ public final class AppRuntimeController {
             pasteboard.writeObjects(urls as [NSURL])
         case .imageBlob(let relPath, _):
             guard let data = clipboardPersistence.loadBlob(relativePath: relPath) else {
-                Logger.clipboard.error("Clipboard image blob is missing path=\(relPath, privacy: .public)")
+                Logger.clipboard.error("Clipboard image blob is missing path=\(relPath, privacy: .private)")
                 NSSound.beep()
                 return
             }
@@ -1691,7 +1691,7 @@ public final class AppRuntimeController {
                 try persistence.saveHistory(entries)
                 try persistence.cleanupUnreferencedBlobs(referencedPaths: referencedBlobPaths)
             } catch {
-                Logger.persistence.error("Failed to persist clipboard history entries=\(entries.count, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+                Logger.persistence.error("Failed to persist clipboard history entries=\(entries.count, privacy: .public) error=\(error.localizedDescription, privacy: .private)")
             }
         }
     }
@@ -1814,7 +1814,7 @@ public final class AppRuntimeController {
                     do {
                         try lockScreenImmediately()
                     } catch {
-                        Logger.general.error("Lock screen action failed error=\(String(describing: error), privacy: .public)")
+                        Logger.general.error("Lock screen action failed error=\(String(describing: error), privacy: .private)")
                         NSSound.beep()
                     }
                 }
@@ -1834,7 +1834,7 @@ public final class AppRuntimeController {
                         do {
                             try sleepDisplays()
                         } catch {
-                            Logger.general.error("Sleep display action failed error=\(String(describing: error), privacy: .public)")
+                            Logger.general.error("Sleep display action failed error=\(String(describing: error), privacy: .private)")
                             DispatchQueue.main.async {
                                 NSSound.beep()
                             }

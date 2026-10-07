@@ -80,10 +80,10 @@ public final class WeatherService {
                     longitude = ln
                     if let c = geo.city, !c.isEmpty { city = c }
                 } else {
-                    Logger.general.warning("Weather geolocation returned no coordinates url=\(geoURL.absoluteString, privacy: .public)")
+                    Logger.general.warning("Weather geolocation returned no coordinates host=\(geoURL.host ?? "unknown", privacy: .private)")
                 }
             } catch {
-                Logger.general.warning("Weather geolocation failed url=\(geoURL.absoluteString, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+                Logger.general.warning("Weather geolocation failed host=\(geoURL.host ?? "unknown", privacy: .private) error=\(error.localizedDescription, privacy: .private)")
             }
         }
 
@@ -98,7 +98,7 @@ public final class WeatherService {
             let (data, response) = try await URLSession.shared.data(from: url)
             guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-                Logger.general.error("Weather request failed status=\(status, privacy: .public) body=\(String(decoding: data.prefix(512), as: UTF8.self), privacy: .public)")
+                Logger.general.error("Weather request failed status=\(status, privacy: .public) bytes=\(data.count, privacy: .public)")
                 return
             }
 
@@ -154,7 +154,7 @@ public final class WeatherService {
             onUpdate?(self.currentState)
         } catch {
             // Geçici ağ hatasında önbellekteki durum korunur
-            Logger.general.warning("Weather refresh failed error=\(error.localizedDescription, privacy: .public)")
+            Logger.general.warning("Weather refresh failed error=\(error.localizedDescription, privacy: .private)")
         }
     }
 

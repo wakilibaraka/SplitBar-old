@@ -50,7 +50,7 @@ public actor ProviderUsageScanner {
                 }
                 result[key] = scoped.snapshot
             } catch {
-                Logger.general.error("T3 usage cache unreadable path=\(url.path, privacy: .public) error=\(String(describing: error), privacy: .public)")
+                Logger.general.error("T3 usage cache unreadable path=\(url.path, privacy: .private) error=\(String(describing: error), privacy: .private)")
             }
         }
         return result
@@ -171,7 +171,7 @@ public actor ProviderUsageScanner {
             do {
                 values = try url.resourceValues(forKeys: Set(keys))
             } catch {
-                Logger.general.error("Cannot stat transcript path=\(url.path, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+                Logger.general.error("Cannot stat transcript path=\(url.path, privacy: .private) error=\(error.localizedDescription, privacy: .private)")
                 continue
             }
             guard values.isRegularFile == true,
@@ -202,7 +202,7 @@ public actor ProviderUsageScanner {
                 do {
                     state = try scanAppendedLines(of: file.url, from: state, calendar: calendar, parse: parse)
                 } catch {
-                    Logger.general.error("Token history scan failed path=\(file.url.path, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+                    Logger.general.error("Token history scan failed path=\(file.url.path, privacy: .private) error=\(error.localizedDescription, privacy: .private)")
                 }
             }
             cache[file.url.path] = state
@@ -262,7 +262,7 @@ public actor ProviderUsageScanner {
             }
             return nil
         } catch {
-            Logger.general.error("Codex limit scan failed path=\(url.path, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+            Logger.general.error("Codex limit scan failed path=\(url.path, privacy: .private) error=\(error.localizedDescription, privacy: .private)")
             return nil
         }
     }

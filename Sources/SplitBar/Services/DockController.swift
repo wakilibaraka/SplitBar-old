@@ -65,7 +65,7 @@ public final class DockController {
             do {
                 try persistCurrentSettings()
             } catch {
-                logger.error("Refusing to hide the Dock without a saved state error=\(error.localizedDescription, privacy: .public)")
+                logger.error("Refusing to hide the Dock without a saved state error=\(error.localizedDescription, privacy: .private)")
                 return
             }
             writeDockDefaults(autohide: true, autohideDelay: Self.suppressionDelay)
@@ -104,7 +104,7 @@ public final class DockController {
             try plist.write(to: plistURL, atomically: true, encoding: .utf8)
             logger.info("Installed Dock restore LaunchAgent")
         } catch {
-            logger.error("Failed to install restore LaunchAgent error=\(error.localizedDescription, privacy: .public)")
+            logger.error("Failed to install restore LaunchAgent error=\(error.localizedDescription, privacy: .private)")
         }
     }
 

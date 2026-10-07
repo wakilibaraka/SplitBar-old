@@ -60,13 +60,13 @@ public final class BluetoothService {
     /// `onComplete`, bağlantı denemesi sonuçlandığında ana thread'de çağrılır.
     public func connect(deviceID: String, onComplete: @escaping @MainActor () -> Void) {
         guard let device = pairedDevice(address: deviceID) else {
-            Logger.general.error("Bluetooth connect: paired device not found address=\(deviceID, privacy: .public)")
+            Logger.general.error("Bluetooth connect: paired device not found address=\(deviceID, privacy: .private)")
             onComplete()
             return
         }
         let observer = BluetoothConnectionObserver { [weak self] status in
             if status != kIOReturnSuccess {
-                Logger.general.error("Bluetooth connect failed address=\(deviceID, privacy: .public) status=\(status, privacy: .public)")
+                Logger.general.error("Bluetooth connect failed address=\(deviceID, privacy: .private) status=\(status, privacy: .public)")
             }
             self?.pendingConnections[deviceID] = nil
             _ = self?.fetchCurrentState()
@@ -75,7 +75,7 @@ public final class BluetoothService {
         pendingConnections[deviceID] = observer
         let startStatus = device.openConnection(observer)
         if startStatus != kIOReturnSuccess {
-            Logger.general.error("Bluetooth connect could not start address=\(deviceID, privacy: .public) status=\(startStatus, privacy: .public)")
+            Logger.general.error("Bluetooth connect could not start address=\(deviceID, privacy: .private) status=\(startStatus, privacy: .public)")
             pendingConnections[deviceID] = nil
             onComplete()
         }
@@ -83,12 +83,12 @@ public final class BluetoothService {
 
     public func disconnect(deviceID: String) {
         guard let device = pairedDevice(address: deviceID) else {
-            Logger.general.error("Bluetooth disconnect: paired device not found address=\(deviceID, privacy: .public)")
+            Logger.general.error("Bluetooth disconnect: paired device not found address=\(deviceID, privacy: .private)")
             return
         }
         let status = device.closeConnection()
         if status != kIOReturnSuccess {
-            Logger.general.error("Bluetooth disconnect failed address=\(deviceID, privacy: .public) status=\(status, privacy: .public)")
+            Logger.general.error("Bluetooth disconnect failed address=\(deviceID, privacy: .private) status=\(status, privacy: .public)")
         }
         _ = fetchCurrentState()
     }

@@ -1,0 +1,18 @@
+# Logged interpolations allowed to remain `privacy: .public`.
+# One line per (file, expression). Only non-sensitive scalars may appear here.
+#
+# Never allowlist: URLs with query strings, filesystem paths, account or email
+# identifiers, device addresses, tokens, clipboard content, window or app
+# titles, response bodies, or free-form error text.
+AppRuntimeController.swift imageData.count    byte count of a PNG blob, not content
+AppRuntimeController.swift entries.count      number of clipboard entries, not content
+AIAccountStore.swift target.provider.rawValue  enum name of the provider
+AIAccountStore.swift account.provider.rawValue enum name of the provider
+AIUsageService.swift process.terminationStatus  process exit status
+AIUsageService.swift status                   HTTP status code
+BluetoothService.swift status                 IOReturn status code
+BluetoothService.swift startStatus            IOReturn status code
+BluetoothService.swift matchStatus            IOReturn status code
+WeatherService.swift status                   HTTP status code
+WeatherService.swift data.count               response size in bytes
+ClaudeTokenOwnerLookup.swift attempt          retry attempt counter
