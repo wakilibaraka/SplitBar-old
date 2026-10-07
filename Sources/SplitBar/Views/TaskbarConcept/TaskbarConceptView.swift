@@ -1602,6 +1602,18 @@ final class TaskbarConceptState: ObservableObject {
     @Published var previewBundleID: String?
     @Published var systemMetrics: SystemMetrics?
     @Published var weather = WeatherState.defaultSample()
+    @Published var weatherWidgetState = WidgetState.placeholder
+
+    fileprivate func widgetState(for widget: DashboardWidget) -> WidgetState {
+        switch widget {
+        case .weather:
+            weatherWidgetState
+        case .systemRings, .systemResources, .network:
+            systemMetrics == nil ? .placeholder : .loaded
+        default:
+            .loaded
+        }
+    }
     @Published var nowPlaying = NowPlayingState.idle()
     var onTogglePlayback: (() -> Void)?
     @Published var networkPeakIn: Double = 0
@@ -3860,6 +3872,7 @@ private struct SystemRingsWidget: View {
     let batteryLevel: Int
     let processCount: Int
     let contentHeight: CGFloat
+    var state = WidgetState.loaded
 
     private var uptimeText: String {
         let totalMinutes = Int(ProcessInfo.processInfo.systemUptime / 60)
@@ -3871,20 +3884,24 @@ private struct SystemRingsWidget: View {
 
     var body: some View {
         WidgetCard(title: "System", symbol: "cpu", tint: .blue, minContentHeight: contentHeight) {
-            VStack(spacing: 10) {
-                HStack(spacing: 0) {
-                    ringDial(value: cpuPercent / 100, color: .blue, label: "CPU")
-                    ringDial(value: memoryPercent / 100, color: .purple, label: "MEM")
-                    ringDial(value: diskPercent / 100, color: .green, label: "DISK")
-                    ringDial(value: Double(batteryLevel) / 100, color: .orange, label: "BATT")
+            if state == .loaded {
+                VStack(spacing: 10) {
+                    HStack(spacing: 0) {
+                        ringDial(value: cpuPercent / 100, color: .blue, label: "CPU")
+                        ringDial(value: memoryPercent / 100, color: .purple, label: "MEM")
+                        ringDial(value: diskPercent / 100, color: .green, label: "DISK")
+                        ringDial(value: Double(batteryLevel) / 100, color: .orange, label: "BATT")
+                    }
+                    HStack {
+                        Text("Uptime \(uptimeText)")
+                        Spacer(minLength: 0)
+                        Text("Processes \(processCount)")
+                    }
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
                 }
-                HStack {
-                    Text("Uptime \(uptimeText)")
-                    Spacer(minLength: 0)
-                    Text("Processes \(processCount)")
-                }
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.secondary)
+            } else {
+                WidgetStateBanner(state: state)
             }
         }
     }
@@ -4125,7 +4142,7 @@ private struct WidgetsPanel: View {
     private func widgetContent(_ widget: DashboardWidget, size: WidgetSizePreset) -> some View {
         switch widget {
         case .weather:
-            WeatherWidget(weather: model.weather, contentHeight: size.weatherContentHeight)
+            WeatherWidget(weather: model.weather, contentHeight: size.weatherContentHeight, state: model.widgetState(for: .weather))
         case .systemResources:
             SystemResourcesWidget(contentHeight: size.cardContentHeight)
         case .nowPlaying:
@@ -4145,7 +4162,8 @@ private struct WidgetsPanel: View {
                 diskPercent: model.systemMetrics?.disk.usagePercent ?? 0,
                 batteryLevel: model.systemStatus.batteryLevel,
                 processCount: model.totalProcessCount,
-                contentHeight: size.cardContentHeight
+                contentHeight: size.cardContentHeight,
+                state: model.widgetState(for: .systemRings)
             )
         case .network:
             NetworkWidget(
@@ -4223,6 +4241,7 @@ private struct WidgetCard<Content: View>: View {
 private struct WeatherWidget: View {
     let weather: WeatherState
     let contentHeight: CGFloat
+    var state = WidgetState.loaded
 
     private static let dayParser: DateFormatter = {
         let formatter = DateFormatter()
@@ -4248,7 +4267,13 @@ private struct WeatherWidget: View {
 
     var body: some View {
         WidgetCard(title: "Weather", symbol: "cloud.sun.fill", tint: .blue, minContentHeight: contentHeight) {
-            VStack(alignment: .leading, spacing: 11) {
+            if state == .loading {
+                WidgetStateBanner(state: state)
+            } else {
+                VStack(alignment: .leading, spacing: 11) {
+                    if state != .loaded {
+                        WidgetStateBanner(state: state)
+                    }
                 HStack(spacing: 12) {
                     Image(systemName: weather.symbolName)
                         .symbolRenderingMode(.multicolor)
@@ -4324,6 +4349,7 @@ private struct WeatherWidget: View {
                         }
                     }
                 }
+            }
             }
         }
     }

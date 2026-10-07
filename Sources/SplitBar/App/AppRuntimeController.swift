@@ -919,8 +919,10 @@ public final class AppRuntimeController {
 
     private func setupWeatherForwarding() {
         taskbarConceptState.weather = weatherService.currentState
+        taskbarConceptState.weatherWidgetState = .loading
         weatherService.onUpdate = { [weak self] state in
             self?.taskbarConceptState.weather = state
+            self?.taskbarConceptState.weatherWidgetState = state.isLive ? .loaded : .error("Weather unavailable — showing sample")
         }
         taskbarConceptState.nowPlaying = nowPlayingService.currentState
         taskbarConceptState.onTogglePlayback = { [weak self] in
