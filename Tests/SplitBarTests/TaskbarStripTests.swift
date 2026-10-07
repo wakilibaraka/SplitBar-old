@@ -93,6 +93,22 @@ struct TaskbarStripTests {
         }
     }
 
+    @Test func statusIconPresetCases() {
+        #expect(StatusIconPreset.allCases.count == 4)
+        #expect(StatusIconPreset.batteryOnly.rawValue == "batteryOnly")
+    }
+
+    @Test func iconSizePresetsScaleUp() {
+        #expect(TaskbarIconSize.allCases.count == 5)
+        let fractions = TaskbarIconSize.allCases.map(\.glyphFraction)
+        #expect(fractions == [0.42, 0.50, 0.60, 0.72, 0.84])
+        #expect(TaskbarIconSize.allCases.map(\.title) == ["XS", "S", "M", "L", "XL"])
+    }
+
+    @Test func iconShapeCases() {
+        #expect(IconShape.allCases.count == 3)
+    }
+
     @Test func singleIslandModesProduceNoIslands() {
         let layout = TaskbarStrip.layoutIslands(
             screenWidth: 1728,

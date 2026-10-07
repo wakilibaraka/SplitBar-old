@@ -407,6 +407,14 @@ private extension View {
     }
 }
 
+private struct WidgetOutlineKey: EnvironmentKey {
+    static let defaultValue = WidgetOutlineStyle()
+}
+
+private struct IconBackgroundKey: EnvironmentKey {
+    static let defaultValue = IconBackgroundStyle()
+}
+
 private extension EnvironmentValues {
     var surfaceStyle: SurfaceStyle {
         get { self[SurfaceStyleKey.self] }
@@ -416,6 +424,16 @@ private extension EnvironmentValues {
     var surfaceTransparency: Double {
         get { self[TransparencyKey.self] }
         set { self[TransparencyKey.self] = newValue }
+    }
+
+    var widgetOutline: WidgetOutlineStyle {
+        get { self[WidgetOutlineKey.self] }
+        set { self[WidgetOutlineKey.self] = newValue }
+    }
+
+    var iconBackground: IconBackgroundStyle {
+        get { self[IconBackgroundKey.self] }
+        set { self[IconBackgroundKey.self] = newValue }
     }
 }
 
@@ -515,7 +533,9 @@ private enum ClockDisplayStyle: String, CaseIterable, Identifiable {
     }
 }
 
-private enum TaskbarIconSize: String, CaseIterable, Identifiable {
+enum TaskbarIconSize: String, CaseIterable, Identifiable {
+    case extraSmall
+    case small
     case medium
     case large
     case extraLarge
@@ -524,19 +544,67 @@ private enum TaskbarIconSize: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .medium: "Medium"
-        case .large: "Large"
-        case .extraLarge: "Extra large"
+        case .extraSmall: "XS"
+        case .small: "S"
+        case .medium: "M"
+        case .large: "L"
+        case .extraLarge: "XL"
         }
     }
 
     var glyphFraction: CGFloat {
         switch self {
-        case .medium: 0.54
-        case .large: 0.64
-        case .extraLarge: 0.76
+        case .extraSmall: 0.42
+        case .small: 0.50
+        case .medium: 0.60
+        case .large: 0.72
+        case .extraLarge: 0.84
         }
     }
+}
+
+enum StatusIconPreset: String, CaseIterable, Identifiable {
+    case batteryOnly
+    case batteryVolume
+    case batteryVolumeNet
+    case customSFSymbol
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .batteryOnly: "Battery"
+        case .batteryVolume: "Battery + volume"
+        case .batteryVolumeNet: "Battery + volume + network"
+        case .customSFSymbol: "Custom symbol"
+        }
+    }
+}
+
+enum IconShape: String, CaseIterable, Identifiable {
+    case circle
+    case roundedRect
+    case roundedRectLarge
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .circle: "Circle"
+        case .roundedRect: "Rounded"
+        case .roundedRectLarge: "Large rounded"
+        }
+    }
+}
+
+struct WidgetOutlineStyle: Equatable {
+    var showsBorder = true
+    var width: CGFloat = 1.0
+}
+
+struct IconBackgroundStyle: Equatable {
+    var isVisible = true
+    var shape = IconShape.roundedRect
 }
 
 enum TrashPlacement: String, CaseIterable, Identifiable {
@@ -1084,6 +1152,24 @@ final class TaskbarConceptState: ObservableObject {
     @Published fileprivate var taskbarIconSize = TaskbarIconSize.medium {
         didSet { UserDefaults.standard.set(taskbarIconSize.rawValue, forKey: "taskbar.iconSize") }
     }
+    @Published var statusIconPreset = StatusIconPreset.batteryOnly {
+        didSet { UserDefaults.standard.set(statusIconPreset.rawValue, forKey: "status.iconPreset") }
+    }
+    @Published var statusIconCustomSymbol = "battery.75percent" {
+        didSet { UserDefaults.standard.set(statusIconCustomSymbol, forKey: "status.customSymbol") }
+    }
+    @Published var widgetOutlineBorder = true {
+        didSet { UserDefaults.standard.set(widgetOutlineBorder, forKey: "widgets.outlineBorder") }
+    }
+    @Published var widgetOutlineWidth: CGFloat = 1.0 {
+        didSet { UserDefaults.standard.set(Double(widgetOutlineWidth), forKey: "widgets.outlineWidth") }
+    }
+    @Published var iconBackgroundVisible = true {
+        didSet { UserDefaults.standard.set(iconBackgroundVisible, forKey: "icons.backgroundVisible") }
+    }
+    @Published var iconBackgroundShape = IconShape.roundedRect {
+        didSet { UserDefaults.standard.set(iconBackgroundShape.rawValue, forKey: "icons.backgroundShape") }
+    }
     @Published fileprivate var trashPlacement = TrashPlacement.withApps {
         didSet { UserDefaults.standard.set(trashPlacement.rawValue, forKey: "taskbar.trashPlacement") }
     }
@@ -1143,6 +1229,14 @@ final class TaskbarConceptState: ObservableObject {
             return saved
         }
         return trashPlacement
+    }
+
+    var widgetOutline: WidgetOutlineStyle {
+        WidgetOutlineStyle(showsBorder: widgetOutlineBorder, width: max(0.5, widgetOutlineWidth))
+    }
+
+    var iconBackground: IconBackgroundStyle {
+        IconBackgroundStyle(isVisible: iconBackgroundVisible, shape: iconBackgroundShape)
     }
 
     private var tileHoverTask: Task<Void, Never>?
@@ -1332,6 +1426,20 @@ final class TaskbarConceptState: ObservableObject {
         }
         if let savedIconSize = defaults.string(forKey: "taskbar.iconSize").flatMap(TaskbarIconSize.init(rawValue:)) {
             taskbarIconSize = savedIconSize
+        }
+        if let savedStatusPreset = defaults.string(forKey: "status.iconPreset").flatMap(StatusIconPreset.init(rawValue:)) {
+            statusIconPreset = savedStatusPreset
+        }
+        if let savedCustomSymbol = defaults.string(forKey: "status.customSymbol"), !savedCustomSymbol.isEmpty {
+            statusIconCustomSymbol = savedCustomSymbol
+        }
+        widgetOutlineBorder = defaults.object(forKey: "widgets.outlineBorder") == nil ? true : defaults.bool(forKey: "widgets.outlineBorder")
+        if defaults.object(forKey: "widgets.outlineWidth") != nil {
+            widgetOutlineWidth = max(0.5, min(3, CGFloat(defaults.double(forKey: "widgets.outlineWidth"))))
+        }
+        iconBackgroundVisible = defaults.object(forKey: "icons.backgroundVisible") == nil ? true : defaults.bool(forKey: "icons.backgroundVisible")
+        if let savedIconShape = defaults.string(forKey: "icons.backgroundShape").flatMap(IconShape.init(rawValue:)) {
+            iconBackgroundShape = savedIconShape
         }
         if let savedTrashPlacement = defaults.string(forKey: "taskbar.trashPlacement").flatMap(TrashPlacement.init(rawValue:)) {
             trashPlacement = savedTrashPlacement
@@ -1586,6 +1694,12 @@ final class TaskbarConceptState: ObservableObject {
         taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)
         taskbarHeight = 46
         taskbarIconSize = .medium
+        statusIconPreset = .batteryOnly
+        statusIconCustomSymbol = "battery.75percent"
+        widgetOutlineBorder = true
+        widgetOutlineWidth = 1.0
+        iconBackgroundVisible = true
+        iconBackgroundShape = .roundedRect
         trashPlacement = .withApps
         panelWidths = [:]
     }
@@ -1601,6 +1715,8 @@ struct TaskbarFlyoutContentView: View {
         flyoutContent
             .environment(\.surfaceStyle, model.surfaceStyle)
             .environment(\.surfaceTransparency, model.interfaceTransparency)
+            .environment(\.widgetOutline, model.widgetOutline)
+            .environment(\.iconBackground, model.iconBackground)
     }
 
     @ViewBuilder
@@ -1667,6 +1783,12 @@ struct TaskbarFlyoutContentView: View {
                 cornerWidgets: $model.cornerWidgets,
                 cornerFlyouts: $model.cornerFlyouts,
                 taskbarIconSize: $model.taskbarIconSize,
+                statusIconPreset: $model.statusIconPreset,
+                statusIconCustomSymbol: $model.statusIconCustomSymbol,
+                widgetOutlineBorder: $model.widgetOutlineBorder,
+                widgetOutlineWidth: $model.widgetOutlineWidth,
+                iconBackgroundVisible: $model.iconBackgroundVisible,
+                iconBackgroundShape: $model.iconBackgroundShape,
                 trashPlacement: $model.trashPlacement,
                 panelWidths: $model.panelWidths,
                 accent: model.clockTint,
@@ -1784,6 +1906,8 @@ struct TaskbarPanelContentView: View {
             rendersSplitRow: false
         )
         .environment(\.surfaceTransparency, model.interfaceTransparency)
+        .environment(\.widgetOutline, model.widgetOutline)
+        .environment(\.iconBackground, model.iconBackground)
         .preferredColorScheme(model.isDarkMode ? .dark : .light)
     }
 }
@@ -1968,6 +2092,12 @@ public struct TaskbarConceptView: View {
                         cornerWidgets: $model.cornerWidgets,
                         cornerFlyouts: $model.cornerFlyouts,
                         taskbarIconSize: $model.taskbarIconSize,
+                        statusIconPreset: $model.statusIconPreset,
+                        statusIconCustomSymbol: $model.statusIconCustomSymbol,
+                        widgetOutlineBorder: $model.widgetOutlineBorder,
+                        widgetOutlineWidth: $model.widgetOutlineWidth,
+                        iconBackgroundVisible: $model.iconBackgroundVisible,
+                        iconBackgroundShape: $model.iconBackgroundShape,
                         trashPlacement: $model.trashPlacement,
                         panelWidths: $model.panelWidths,
                         accent: clockTint,
@@ -1996,6 +2126,8 @@ public struct TaskbarConceptView: View {
             .clipped()
             .animation(.spring(response: 0.38, dampingFraction: 0.86), value: openPanel)
             .environment(\.surfaceTransparency, interfaceTransparency)
+            .environment(\.widgetOutline, model.widgetOutline)
+            .environment(\.iconBackground, model.iconBackground)
             .preferredColorScheme(isDarkMode ? .dark : .light)
         }
     }
@@ -2171,6 +2303,8 @@ struct TaskbarIslandContent: View {
             menuStyle: model.contextMenuStyle,
             isDarkMode: model.isDarkMode,
             systemStatus: model.systemStatus,
+            statusIconPreset: model.statusIconPreset,
+            statusIconCustomSymbol: model.statusIconCustomSymbol,
             tileSide: max(28, model.taskbarHeight - 4),
             glyphSize: model.taskbarHeight * model.taskbarIconSize.glyphFraction,
             previewsEnabled: model.showWindowPreviews,
@@ -2313,6 +2447,8 @@ private struct TaskbarTiles {
     let menuStyle: ContextMenuStyle
     let isDarkMode: Bool
     let systemStatus: SystemStatusSnapshot
+    let statusIconPreset: StatusIconPreset
+    let statusIconCustomSymbol: String
     let tileSide: CGFloat
     let glyphSize: CGFloat
     let previewsEnabled: Bool
@@ -2329,32 +2465,26 @@ private struct TaskbarTiles {
         let title = taskbarDisplayName(for: bundleIdentifier)
         let isRunning = runningBundleIDs.contains(bundleIdentifier)
         let isFrontmost = frontmostBundleID == bundleIdentifier
-        return Button {
-            onTaskbarIconClick(bundleIdentifier)
-        } label: {
-            MacOSAppIcon(
+        return AppTile(
+            title: title,
+            icon: MacOSAppIcon(
                 bundleIdentifier: bundleIdentifier,
                 fallbackSymbol: app?.symbol ?? "app.fill",
                 fallbackColor: app?.color ?? .secondary,
                 size: glyphSize
             )
             .frame(width: tileSide, height: tileSide)
-            .taskbarTile(highlighted: isRunning && indicatorStyle == .highlight, highlightColor: indicatorColor)
-            .overlay(alignment: .bottom) {
+            .taskbarTile(highlighted: isRunning && indicatorStyle == .highlight, highlightColor: indicatorColor),
+            indicator: Group {
                 if isRunning, indicatorStyle != .highlight {
                     runningIndicator(isFrontmost: isFrontmost)
                         .padding(.bottom, 4)
                 }
-            }
-        }
-        .buttonStyle(.plain)
-        .help(title)
-        .contextMenu {
-            tileContextMenu(bundleIdentifier)
-        }
-        .onHover { hovering in
-            onHoverChanged(bundleIdentifier, hovering)
-        }
+            },
+            onActivate: { onTaskbarIconClick(bundleIdentifier) },
+            menu: AnyView(tileContextMenu(bundleIdentifier)),
+            onHoverChanged: { onHoverChanged(bundleIdentifier, $0) }
+        )
     }
 
     private func runningIndicator(isFrontmost: Bool) -> some View {
@@ -2517,7 +2647,12 @@ private struct TaskbarTiles {
             Button {
                 onToggleControls()
             } label: {
-                SystemStatusIcon(snapshot: systemStatus, glyphSize: glyphSize)
+                SystemStatusIcon(
+                    snapshot: systemStatus,
+                    glyphSize: glyphSize,
+                    preset: statusIconPreset,
+                    customSymbol: statusIconCustomSymbol
+                )
                     .frame(width: tileSide, height: tileSide)
                     .taskbarTile()
             }
@@ -2555,6 +2690,8 @@ private struct Taskbar: View {
             menuStyle: model.contextMenuStyle,
             isDarkMode: model.isDarkMode,
             systemStatus: model.systemStatus,
+            statusIconPreset: model.statusIconPreset,
+            statusIconCustomSymbol: model.statusIconCustomSymbol,
             tileSide: tileSide,
             glyphSize: glyphSize,
             previewsEnabled: model.showWindowPreviews,
@@ -3047,6 +3184,8 @@ private struct DownloadsTile: View {
 private struct SystemStatusIcon: View {
     let snapshot: SystemStatusSnapshot
     let glyphSize: CGFloat
+    var preset = StatusIconPreset.batteryOnly
+    var customSymbol = "battery.75percent"
 
     private var ringDiameter: CGFloat { glyphSize * 0.92 }
 
@@ -3057,9 +3196,19 @@ private struct SystemStatusIcon: View {
     }
 
     var body: some View {
-        HStack(spacing: glyphSize * 0.12) {
-            batteryRing
-            wifiGlyph
+        Group {
+            switch preset {
+            case .batteryOnly:
+                batteryRing
+            case .batteryVolume:
+                batteryRingWithVolumeArc(showNetworkDot: false)
+            case .batteryVolumeNet:
+                batteryRingWithVolumeArc(showNetworkDot: true)
+            case .customSFSymbol:
+                Image(systemName: customSymbol.isEmpty ? "battery.75percent" : customSymbol)
+                    .font(.system(size: glyphSize * 0.72, weight: .medium))
+                    .foregroundStyle(.primary)
+            }
         }
         .accessibilityHidden(true)
     }
@@ -3088,10 +3237,29 @@ private struct SystemStatusIcon: View {
         }
     }
 
-    private var wifiGlyph: some View {
-        Image(systemName: snapshot.wifiOn ? "wifi" : "wifi.slash")
-            .font(.system(size: glyphSize * 0.5, weight: .medium))
-            .foregroundStyle(snapshot.wifiOn ? .primary : .secondary)
+    private func batteryRingWithVolumeArc(showNetworkDot: Bool) -> some View {
+        let outerDiameter = ringDiameter + max(4, glyphSize * 0.16)
+        return ZStack(alignment: .bottomTrailing) {
+            Circle()
+                .stroke(Color.primary.opacity(0.12), lineWidth: max(1.5, glyphSize * 0.055))
+                .frame(width: outerDiameter, height: outerDiameter)
+            Circle()
+                .trim(from: 0, to: CGFloat(min(1, max(0, snapshot.isMuted ? 0 : snapshot.volumeLevel))))
+                .stroke(.blue, style: StrokeStyle(lineWidth: max(1.5, glyphSize * 0.055), lineCap: .round))
+                .frame(width: outerDiameter, height: outerDiameter)
+                .rotationEffect(.degrees(-90))
+            batteryRing
+            if showNetworkDot {
+                Circle()
+                    .fill(snapshot.wifiOn ? Color.green : Color.secondary)
+                    .frame(width: max(5, glyphSize * 0.18), height: max(5, glyphSize * 0.18))
+                    .overlay {
+                        Circle()
+                            .strokeBorder(Color.white.opacity(0.85), lineWidth: 1)
+                    }
+                    .offset(x: 1, y: 1)
+            }
+        }
     }
 }
 
@@ -3130,33 +3298,104 @@ private struct TaskbarDividerView: View {
     }
 }
 
+private struct TilePressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.72), value: configuration.isPressed)
+    }
+}
+
+private struct AppTile<Icon: View, Indicator: View>: View {
+    let title: String
+    let icon: Icon
+    let indicator: Indicator
+    let onActivate: () -> Void
+    let menu: AnyView
+    let onHoverChanged: (Bool) -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: onActivate) {
+            ZStack {
+                icon
+                VStack {
+                    Spacer(minLength: 0)
+                    indicator
+                }
+            }
+            .offset(y: isHovering ? -2 : 0)
+            .scaleEffect(isHovering ? 1.03 : 1.0)
+            .animation(.spring(response: 0.24, dampingFraction: 0.78), value: isHovering)
+        }
+        .buttonStyle(TilePressButtonStyle())
+        .help(title)
+        .contextMenu { menu }
+        .onHover { hovering in
+            isHovering = hovering
+            onHoverChanged(hovering)
+        }
+    }
+}
+
 private struct TaskbarTileStyle: ViewModifier {
     var highlighted = false
     var highlightColor = Color.blue
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.iconBackground) private var iconBackground
 
     func body(content: Content) -> some View {
-        content
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(highlighted ? highlightColor.opacity(0.22) : Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(
-                                highlighted ? highlightColor.opacity(0.55) : Color.white.opacity(colorScheme == .dark ? 0.14 : 0.5),
-                                lineWidth: 1
-                            )
-                    }
+        Group {
+            if iconBackground.isVisible {
+                content
+                    .background { tileBackground }
+                    .contentShape(tileShape)
+            } else {
+                content
+                    .contentShape(Rectangle())
             }
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.pointingHand.push()
-                } else {
-                    NSCursor.pop()
-                }
+        }
+        .onHover { hovering in
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
             }
+        }
+    }
+
+    private var tileFill: Color {
+        if highlighted {
+            return highlightColor.opacity(0.22)
+        }
+        return Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10)
+    }
+
+    private var tileStroke: Color {
+        if highlighted {
+            return highlightColor.opacity(0.55)
+        }
+        return Color.white.opacity(colorScheme == .dark ? 0.14 : 0.5)
+    }
+
+    private var tileBackground: some View {
+        tileShape
+            .fill(tileFill)
+            .overlay {
+                tileShape.stroke(tileStroke, lineWidth: 1)
+            }
+    }
+
+    private var tileShape: AnyShape {
+        switch iconBackground.shape {
+        case .circle:
+            AnyShape(Circle())
+        case .roundedRect:
+            AnyShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        case .roundedRectLarge:
+            AnyShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
     }
 }
 
@@ -3172,6 +3411,18 @@ private struct MacOSAppIcon: View {
     let fallbackColor: Color
     let size: CGFloat
     @ObservedObject private var store = AppIconStore.shared
+    @Environment(\.iconBackground) private var iconBackground
+
+    private var fallbackClip: AnyShape {
+        switch iconBackground.shape {
+        case .circle:
+            AnyShape(Circle())
+        case .roundedRect:
+            AnyShape(RoundedRectangle(cornerRadius: max(6, size * 0.24), style: .continuous))
+        case .roundedRectLarge:
+            AnyShape(RoundedRectangle(cornerRadius: max(8, size * 0.36), style: .continuous))
+        }
+    }
 
     var body: some View {
         Group {
@@ -3187,6 +3438,7 @@ private struct MacOSAppIcon: View {
                         .foregroundStyle(fallbackColor)
                         .padding(size * 0.14)
                 }
+                .clipShape(fallbackClip)
                 .task(id: bundleIdentifier) {
                     _ = store.icon(for: bundleIdentifier)
                 }
@@ -3535,6 +3787,7 @@ private struct WidgetCard<Content: View>: View {
     @Environment(\.surfaceStyle) private var surfaceStyle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.surfaceTransparency) private var transparency
+    @Environment(\.widgetOutline) private var widgetOutline
 
     init(
         title: String,
@@ -3572,8 +3825,13 @@ private struct WidgetCard<Content: View>: View {
             in: RoundedRectangle(cornerRadius: surfaceStyle == .windowsXP ? 9 : (surfaceStyle == .classic98 ? 2 : 15), style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: surfaceStyle == .windowsXP ? 9 : (surfaceStyle == .classic98 ? 2 : 15), style: .continuous)
-                .strokeBorder(surfaceStyle == .classic98 ? Color.white : (surfaceStyle == .neumorphism ? Color.black.opacity(0.035) : Color.white.opacity(0.9)), lineWidth: surfaceStyle == .classic98 ? 2 : 1)
+            if widgetOutline.showsBorder {
+                RoundedRectangle(cornerRadius: surfaceStyle == .windowsXP ? 9 : (surfaceStyle == .classic98 ? 2 : 15), style: .continuous)
+                    .strokeBorder(
+                        surfaceStyle == .classic98 ? Color.white : (surfaceStyle == .neumorphism ? Color.black.opacity(0.035) : Color.white.opacity(0.9)),
+                        lineWidth: surfaceStyle == .classic98 ? 2 : widgetOutline.width
+                    )
+            }
         }
         .shadow(color: .black.opacity(surfaceStyle == .glassmorphism ? 0.035 : 0.09), radius: surfaceStyle == .claymorphism ? 12 : 8, x: 0, y: surfaceStyle == .neumorphism ? 2 : 4)
         .shadow(color: .white.opacity(surfaceStyle == .neumorphism ? 0.75 : 0), radius: 5, x: -3, y: -3)
@@ -4947,6 +5205,12 @@ private struct SettingsFlyout: View {
     @Binding var cornerWidgets: CornerStyle
     @Binding var cornerFlyouts: CornerStyle
     @Binding var taskbarIconSize: TaskbarIconSize
+    @Binding var statusIconPreset: StatusIconPreset
+    @Binding var statusIconCustomSymbol: String
+    @Binding var widgetOutlineBorder: Bool
+    @Binding var widgetOutlineWidth: CGFloat
+    @Binding var iconBackgroundVisible: Bool
+    @Binding var iconBackgroundShape: IconShape
     @Binding var trashPlacement: TrashPlacement
     @Binding var panelWidths: [PanelKind: CGFloat]
     let accent: Color
@@ -5381,6 +5645,7 @@ private struct SettingsFlyout: View {
             VStack(alignment: .leading, spacing: 14) {
                 themeSwatchCard
                 appearanceCard
+                iconSizeCard
                 transparencyCard
                 cornersCard
                 taskbarGradientCard
@@ -5573,12 +5838,66 @@ private struct SettingsFlyout: View {
     private var widgetsTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                widgetAppearanceCard
                 wallpaperPresetsCard
                 wallpaperGradientCard
             }
             .padding(18)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private var widgetAppearanceCard: some View {
+        settingsSection("Widget cards") {
+            Toggle(isOn: $widgetOutlineBorder) {
+                Text("Card outline")
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .toggleStyle(.switch)
+            HStack {
+                Text("Outline width")
+                    .font(.system(size: 12, weight: .medium))
+                Slider(value: $widgetOutlineWidth, in: 0.5...3, step: 0.5).tint(accent)
+                sliderValueLabel("\(String(format: "%.1f", widgetOutlineWidth)) pt")
+            }
+            .disabled(!widgetOutlineBorder)
+            Toggle(isOn: $iconBackgroundVisible) {
+                Text("Icon tile background")
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .toggleStyle(.switch)
+            HStack(spacing: 8) {
+                ForEach(IconShape.allCases) { shape in
+                    Button { iconBackgroundShape = shape } label: {
+                        Text(shape.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                iconBackgroundShape == shape ? accent.opacity(0.12) : Color.primary.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .disabled(!iconBackgroundVisible)
+            HStack {
+                Text("Weather card corners")
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                Picker("", selection: $cornerWidgets) {
+                    ForEach(CornerStyle.allCases) { style in
+                        Text(style.title).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+            }
+            Text("Weather follows the Widgets corner style; pick it here without leaving this tab.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
     }
 
     private var wallpaperPresetsCard: some View {
@@ -5689,8 +6008,8 @@ private struct SettingsFlyout: View {
                 runningIndicatorCard
                 clickBehaviorCard
                 contextMenuCard
+                statusIconCard
                 privacyCard
-                iconSizeCard
                 trashPlacementCard
             }
             .padding(18)
@@ -5834,13 +6153,13 @@ private struct SettingsFlyout: View {
     private var iconSizeCard: some View {
         settingsSection("Taskbar icons") {
             HStack(spacing: 8) {
-                ForEach(Array(TaskbarIconSize.allCases.enumerated()), id: \.element) { index, size in
+                ForEach(TaskbarIconSize.allCases) { size in
                     Button { taskbarIconSize = size } label: {
                         VStack(spacing: 7) {
                             Image(systemName: "app.fill")
-                                .font(.system(size: 10 + CGFloat(index) * 4, weight: .medium))
+                                .font(.system(size: max(13, size.glyphFraction * 42), weight: .medium))
                                 .foregroundStyle(accent)
-                                .frame(height: 26)
+                                .frame(height: 30)
                             Text(size.title)
                                 .font(.system(size: 10, weight: .semibold))
                         }
@@ -5853,6 +6172,42 @@ private struct SettingsFlyout: View {
                     }
                     .buttonStyle(.plain)
                 }
+            }
+            Text("Glyph scales with taskbar height; XS is compact, XL is touch-sized.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var statusIconCard: some View {
+        settingsSection("Status icon") {
+            Text("One primary glyph per tile. Volume and network layer inside the battery ring — never side by side.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            VStack(spacing: 8) {
+                ForEach(StatusIconPreset.allCases) { preset in
+                    Button { statusIconPreset = preset } label: {
+                        HStack {
+                            Text(preset.title)
+                                .font(.system(size: 12, weight: .medium))
+                            Spacer(minLength: 0)
+                            Image(systemName: statusIconPreset == preset ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(statusIconPreset == preset ? accent : .secondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            statusIconPreset == preset ? accent.opacity(0.10) : Color.primary.opacity(0.035),
+                            in: RoundedRectangle(cornerRadius: 9)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            if statusIconPreset == .customSFSymbol {
+                TextField("SF Symbol name", text: $statusIconCustomSymbol)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12))
             }
         }
     }
