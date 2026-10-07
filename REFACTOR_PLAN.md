@@ -246,6 +246,7 @@ and `swift test` before the commit.
 
 | Slice | Commit | Result |
 |---|---|---|
+| C1.4a | see log | Strip views extracted to `TaskbarStrip/`: `TaskbarStripViews.swift` (946), `TileViews.swift` (303), `TileStores.swift` (95); the chord-format and app-naming helpers moved to `Support/`. Source file 5,687 → 4,349 lines. Build clean, 45 tests pass, move verified. `TaskbarConceptView` deliberately stays until C1.4f: it references every flyout, so moving it earlier would force each later slice to widen types it is about to move anyway. |
 | C1.3 | see log | State extracted: `TaskbarState.swift` (803) holds `TaskbarConceptState` with `LauncherApp`, `LauncherFolder`, `LauncherDefaults`, `TopProcess`; `DesignSystem/ClockStyle.swift` (74) takes the clock style enums, `clockTime`, and the `Date`/`Calendar` helpers. Source file 6,546 → 5,687 lines. Build clean, 45 tests pass, move verified. |
 | C1.2 | see log | Strip model extracted: `DesignSystem/StripModel.swift` (615), `WallpaperPreset.swift` (52), `WidgetChrome.swift` (12); the widget catalogue appended to `WidgetProvider.swift` (61 → 142). Source file 7,252 → 6,546 lines. Build clean, 45 tests pass, move verified. |
 | C1.1 | see log | Design system extracted to `DesignSystem/`: `SurfaceStyle.swift` (452), `PanelStyle.swift` (97), `ColorExtensions.swift` (34). Source file 7,800 → 7,252 lines. Build clean, 45 tests pass. |

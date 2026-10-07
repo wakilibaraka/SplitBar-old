@@ -50,1936 +50,32 @@ import SwiftUI
 
 
 
-struct TaskbarFlyoutContentView: View {
-    let panel: OpenPanel
-    @ObservedObject var model: TaskbarConceptState
-    let onLaunchApplication: (String) -> Void
-    let onClose: () -> Void
 
-    var body: some View {
-        flyoutContent
-            .environment(\.surfaceStyle, model.surfaceStyle)
-            .environment(\.surfaceTransparency, model.interfaceTransparency)
-            .environment(\.widgetOutline, model.widgetOutline)
-            .environment(\.iconBackground, model.iconBackground)
-    }
 
-    @ViewBuilder
-    private var flyoutContent: some View {
-        switch panel {
-        case .widgets:
-            WidgetsPanel(onClose: onClose, accent: model.clockTint, model: model)
-        case .calendar:
-            ClockFlyout(
-                displayedMonth: $model.displayedMonth,
-                selectedDate: $model.selectedDate,
-                showsClockSettings: $model.showsClockSettings,
-                uses24HourTime: $model.uses24HourTime,
-                showsSeconds: $model.showsSeconds,
-                dateStyle: $model.dateStyle,
-                clockDisplayStyle: $model.clockDisplayStyle,
-                clockTint: $model.clockTint,
-                clockColorPreset: $model.clockColorPreset,
-                clockGradientEnabled: $model.clockGradientEnabled,
-                clockGradientStart: $model.clockGradientStart,
-                clockGradientEnd: $model.clockGradientEnd,
-                accent: model.clockTint,
-                cornerRadius: model.shellRadius(for: .flyouts)
-            )
-        case .controls:
-            ControlsFlyout(accent: model.clockTint, model: model)
-        case .start:
-            StartFlyout(
-                onClose: onClose,
-                accent: model.clockTint,
-                model: model,
-                onLaunchApplication: onLaunchApplication
-            )
-        case .settings:
-            SettingsFlyout(
-                surfaceStyle: $model.surfaceStyle,
-                taskbarMode: $model.taskbarMode,
-                islandGap: $model.islandGap,
-                userDividers: $model.userDividers,
-                trashAnchors: $model.trashAnchors,
-                clusterOrder: $model.clusterOrder,
-                centeredBarWidth: $model.centeredBarWidth,
-                pinnedAppBundleIDs: model.pinnedAppBundleIDs,
-                isDarkMode: $model.isDarkMode,
-                wallpaperPreset: $model.wallpaperPreset,
-                pastelTint: $model.pastelTint,
-                gradientEndTint: $model.gradientEndTint,
-                gradientAngle: $model.gradientAngle,
-                interfaceTransparency: $model.interfaceTransparency,
-                usesTaskbarGradient: $model.usesTaskbarGradient,
-                taskbarGradientStart: $model.taskbarGradientStart,
-                taskbarGradientEnd: $model.taskbarGradientEnd,
-                taskbarHeight: $model.taskbarHeight,
-                showsTaskbarPanel: $model.showsTaskbarPanel,
-                hideMacDock: $model.hideMacDock,
-                showWindowPreviews: $model.showWindowPreviews,
-                runningIndicatorStyle: $model.runningIndicatorStyle,
-                runningIndicatorSize: $model.runningIndicatorSize,
-                runningIndicatorColor: $model.runningIndicatorColor,
-                indicatorColorPreset: $model.indicatorColorPreset,
-                indicatorGradientStart: $model.indicatorGradientStart,
-                indicatorGradientEnd: $model.indicatorGradientEnd,
-                minimizeMode: $model.minimizeMode,
-                contextMenuStyle: $model.contextMenuStyle,
-                showWifiName: $model.showWifiName,
-                showBluetoothDevices: $model.showBluetoothDevices,
-                ddcBrightnessEnabled: $model.ddcBrightnessEnabled,
-                cornerStyle: $model.cornerStyle,
-                cornerScope: $model.cornerScope,
-                cornerTaskbar: $model.cornerTaskbar,
-                cornerWidgets: $model.cornerWidgets,
-                cornerFlyouts: $model.cornerFlyouts,
-                taskbarIconSize: $model.taskbarIconSize,
-                statusIconPreset: $model.statusIconPreset,
-                statusIconCustomSymbol: $model.statusIconCustomSymbol,
-                widgetOutlineBorder: $model.widgetOutlineBorder,
-                widgetOutlineWidth: $model.widgetOutlineWidth,
-                iconBackgroundVisible: $model.iconBackgroundVisible,
-                iconBackgroundShape: $model.iconBackgroundShape,
-                flyoutAnimation: $model.flyoutAnimation,
-                flyoutHeightPreset: $model.flyoutHeightPreset,
-                trashPlacement: $model.trashPlacement,
-                shortcutBindings: $model.shortcutBindings,
-                clipboardHistoryEnabled: $model.clipboardHistoryEnabled,
-                ipGeolocationEnabled: $model.ipGeolocationEnabled,
-                faviconServiceEnabled: $model.faviconServiceEnabled,
-                aiAccountSwitchingEnabled: $model.aiAccountSwitchingEnabled,
-                clipboardRetention: $model.clipboardRetention,
-                panelWidths: $model.panelWidths,
-                accent: model.clockTint,
-                onClose: onClose,
-                onResetPersonalisation: { model.resetPersonalisation() },
-                cornerRadius: model.shellRadius(for: .flyouts)
-            )
-        }
-    }
-}
 
-struct WindowPreviewContent: View {
-    let bundleID: String
-    let appTitle: String
-    let windows: [AppWindowInfo]
-    let surfaceStyle: SurfaceStyle
-    let onSelectWindow: (AppWindowInfo) -> Void
-    let onClose: () -> Void
-    let cornerRadius: CGFloat
-    @State private var thumbnails: [CGWindowID: NSImage] = [:]
-    @State private var didAttemptCapture = false
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.surfaceTransparency) private var transparency
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(appTitle)
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-                Text("\(windows.count) \(windows.count == 1 ? "window" : "windows")")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(windows.prefix(6)) { window in
-                previewRow(window)
-            }
-            if didAttemptCapture, thumbnails.isEmpty {
-                Text("Grant Screen Recording for live thumbnails.")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(14)
-        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.76), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
-        .task {
-            await captureThumbnails()
-        }
-    }
 
-    private func previewRow(_ window: AppWindowInfo) -> some View {
-        Button {
-            onSelectWindow(window)
-        } label: {
-            HStack(spacing: 10) {
-                if let image = thumbnails[window.id] {
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 120, height: 72)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
-                    MacOSAppIcon(
-                        bundleIdentifier: bundleID,
-                        fallbackSymbol: "app.fill",
-                        fallbackColor: .secondary,
-                        size: 34
-                    )
-                    .frame(width: 120, height: 72)
-                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
-                }
-                Text(window.title)
-                    .font(.system(size: 10, weight: .medium))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                Spacer(minLength: 0)
-            }
-            .padding(8)
-            .background(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.05), in: RoundedRectangle(cornerRadius: 10))
-        }
-        .buttonStyle(.plain)
-    }
 
-    private func captureThumbnails() async {
-        let service = AppWindowPreviewService()
-        for window in windows.prefix(6) {
-            if let image = await service.captureThumbnail(forWindowID: window.id) {
-                thumbnails[window.id] = image
-            }
-        }
-        didAttemptCapture = true
-    }
-}
 
-struct TaskbarPanelContentView: View {
-    @ObservedObject var model: TaskbarConceptState
-    let onLaunchApplication: (String) -> Void
-    let onTaskbarIconClick: (String) -> Void
-    let onTaskbarTileAction: (TaskbarTileAction) -> Void
 
-    var body: some View {
-        Taskbar(
-            model: model,
-            height: $model.taskbarHeight,
-            onLaunchApplication: onLaunchApplication,
-            onTaskbarIconClick: onTaskbarIconClick,
-            onTaskbarTileAction: onTaskbarTileAction,
-            rendersSplitRow: false
-        )
-        .environment(\.surfaceTransparency, model.interfaceTransparency)
-        .environment(\.widgetOutline, model.widgetOutline)
-        .environment(\.iconBackground, model.iconBackground)
-        .preferredColorScheme(model.isDarkMode ? .dark : .light)
-    }
-}
 
-public struct TaskbarConceptView: View {
-    @ObservedObject private var model: TaskbarConceptState
-    private let onLaunchApplication: (String) -> Void
-    private let onTaskbarIconClick: (String) -> Void
-    private let onTaskbarTileAction: (TaskbarTileAction) -> Void
 
-    init(model: TaskbarConceptState, onLaunchApplication: @escaping (String) -> Void, onTaskbarIconClick: @escaping (String) -> Void, onTaskbarTileAction: @escaping (TaskbarTileAction) -> Void) {
-        self._model = ObservedObject(wrappedValue: model)
-        self.onLaunchApplication = onLaunchApplication
-        self.onTaskbarIconClick = onTaskbarIconClick
-        self.onTaskbarTileAction = onTaskbarTileAction
-    }
 
-    private var openPanel: OpenPanel? {
-        get { model.openPanel }
-        nonmutating set { model.openPanel = newValue }
-    }
-    private var surfaceStyle: SurfaceStyle { model.surfaceStyle }
-    private var showsTaskbarPanel: Bool { model.showsTaskbarPanel }
-    private var isDarkMode: Bool { model.isDarkMode }
-    private var wallpaperPreset: WallpaperPreset { model.wallpaperPreset }
-    private var pastelTint: Color { model.pastelTint }
-    private var gradientEndTint: Color { model.gradientEndTint }
-    private var gradientAngle: Double { model.gradientAngle }
-    private var interfaceTransparency: Double { model.interfaceTransparency }
-    private var usesTaskbarGradient: Bool { model.usesTaskbarGradient }
-    private var taskbarGradientStart: Color { model.taskbarGradientStart }
-    private var taskbarGradientEnd: Color { model.taskbarGradientEnd }
-    private var taskbarHeight: CGFloat { model.taskbarHeight }
-    private var showsClockSettings: Bool { model.showsClockSettings }
-    private var uses24HourTime: Bool { model.uses24HourTime }
-    private var showsSeconds: Bool { model.showsSeconds }
-    private var dateStyle: ClockDateStyle { model.dateStyle }
-    private var clockTint: Color { model.clockTint }
-    private var displayedMonth: Date { model.displayedMonth }
-    private var selectedDate: Date { model.selectedDate }
 
-    private func panelFrameWidth(_ kind: PanelKind, available: CGFloat) -> CGFloat {
-        min(model.panelWidth(for: kind), available)
-    }
 
-    public var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .bottom) {
-                DesktopBackdrop(
-                    isDarkMode: isDarkMode,
-                    preset: wallpaperPreset,
-                    pastelTint: pastelTint,
-                    gradientEndTint: gradientEndTint,
-                    gradientAngle: gradientAngle,
-                    surfaceStyle: surfaceStyle,
-                    weather: model.weather
-                )
 
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "square.grid.2x2.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.roseAccent)
-                        Text("TASKBAR CONCEPT")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .tracking(2.2)
-                            .foregroundStyle(.white.opacity(0.72))
-                    }
-                    .padding(.top, 30)
-                    .padding(.leading, 34)
 
-                    Spacer()
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("A calmer kind of desktop.")
-                            .font(.system(size: 42, weight: .semibold, design: .rounded))
-                            .tracking(-1.8)
-                        Text("A Windows-inspired taskbar, thoughtfully reimagined for macOS.")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.68))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.leading, 72)
-                    .padding(.bottom, 180)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
 
-                if openPanel == .widgets, !showsTaskbarPanel {
-                    WidgetsPanel(onClose: { openPanel = nil }, accent: clockTint, model: model)
-                        .frame(
-                            width: panelFrameWidth(.widgets, available: geometry.size.width - 36),
-                            height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 28)
-                        )
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .padding(.leading, 14)
-                        .padding(.top, 14)
-                        .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
-                        .environment(\.surfaceStyle, surfaceStyle)
-                        .zIndex(2)
-                }
 
-                if openPanel == .calendar, !showsTaskbarPanel {
-                    ClockFlyout(
-                        displayedMonth: $model.displayedMonth,
-                        selectedDate: $model.selectedDate,
-                        showsClockSettings: $model.showsClockSettings,
-                        uses24HourTime: $model.uses24HourTime,
-                        showsSeconds: $model.showsSeconds,
-                        dateStyle: $model.dateStyle,
-                        clockDisplayStyle: $model.clockDisplayStyle,
-                        clockTint: $model.clockTint,
-                        clockColorPreset: $model.clockColorPreset,
-                        clockGradientEnabled: $model.clockGradientEnabled,
-                        clockGradientStart: $model.clockGradientStart,
-                        clockGradientEnd: $model.clockGradientEnd,
-                        accent: clockTint,
-                        cornerRadius: model.shellRadius(for: .flyouts)
-                    )
-                    .frame(width: min(520, geometry.size.width - 36), height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 28))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(.trailing, 14)
-                    .padding(.top, 14)
-                    .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
-                    .environment(\.surfaceStyle, surfaceStyle)
-                    .zIndex(2)
-                }
 
-                if openPanel == .controls, !showsTaskbarPanel {
-                    ControlsFlyout(accent: clockTint, model: model)
-                        .frame(width: panelFrameWidth(.controls, available: geometry.size.width - 36), height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 28))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                        .padding(.trailing, 14)
-                        .padding(.top, 14)
-                        .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
-                        .environment(\.surfaceStyle, surfaceStyle)
-                        .zIndex(2)
-                }
 
-                if openPanel == .start, !showsTaskbarPanel {
-                    StartFlyout(
-                        onClose: { openPanel = nil },
-                        accent: clockTint,
-                        model: model,
-                        onLaunchApplication: onLaunchApplication
-                    )
-                        .frame(width: panelFrameWidth(.start, available: geometry.size.width - 48), height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 36))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                        .padding(.bottom, taskbarHeight + 12)
-                        .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
-                        .environment(\.surfaceStyle, surfaceStyle)
-                        .zIndex(2)
-                }
 
-                if openPanel == .settings, !showsTaskbarPanel {
-                    SettingsFlyout(
-                        surfaceStyle: $model.surfaceStyle,
-                        taskbarMode: $model.taskbarMode,
-                        islandGap: $model.islandGap,
-                        userDividers: $model.userDividers,
-                        trashAnchors: $model.trashAnchors,
-                        clusterOrder: $model.clusterOrder,
-                        centeredBarWidth: $model.centeredBarWidth,
-                        pinnedAppBundleIDs: model.pinnedAppBundleIDs,
-                        isDarkMode: $model.isDarkMode,
-                        wallpaperPreset: $model.wallpaperPreset,
-                        pastelTint: $model.pastelTint,
-                        gradientEndTint: $model.gradientEndTint,
-                        gradientAngle: $model.gradientAngle,
-                        interfaceTransparency: $model.interfaceTransparency,
-                        usesTaskbarGradient: $model.usesTaskbarGradient,
-                        taskbarGradientStart: $model.taskbarGradientStart,
-                        taskbarGradientEnd: $model.taskbarGradientEnd,
-                        taskbarHeight: $model.taskbarHeight,
-                        showsTaskbarPanel: $model.showsTaskbarPanel,
-                        hideMacDock: $model.hideMacDock,
-                        showWindowPreviews: $model.showWindowPreviews,
-                        runningIndicatorStyle: $model.runningIndicatorStyle,
-                        runningIndicatorSize: $model.runningIndicatorSize,
-                        runningIndicatorColor: $model.runningIndicatorColor,
-                        indicatorColorPreset: $model.indicatorColorPreset,
-                        indicatorGradientStart: $model.indicatorGradientStart,
-                        indicatorGradientEnd: $model.indicatorGradientEnd,
-                        minimizeMode: $model.minimizeMode,
-                        contextMenuStyle: $model.contextMenuStyle,
-                        showWifiName: $model.showWifiName,
-                        showBluetoothDevices: $model.showBluetoothDevices,
-                        ddcBrightnessEnabled: $model.ddcBrightnessEnabled,
-                        cornerStyle: $model.cornerStyle,
-                        cornerScope: $model.cornerScope,
-                        cornerTaskbar: $model.cornerTaskbar,
-                        cornerWidgets: $model.cornerWidgets,
-                        cornerFlyouts: $model.cornerFlyouts,
-                        taskbarIconSize: $model.taskbarIconSize,
-                        statusIconPreset: $model.statusIconPreset,
-                        statusIconCustomSymbol: $model.statusIconCustomSymbol,
-                        widgetOutlineBorder: $model.widgetOutlineBorder,
-                        widgetOutlineWidth: $model.widgetOutlineWidth,
-                        iconBackgroundVisible: $model.iconBackgroundVisible,
-                        iconBackgroundShape: $model.iconBackgroundShape,
-                        flyoutAnimation: $model.flyoutAnimation,
-                        flyoutHeightPreset: $model.flyoutHeightPreset,
-                        trashPlacement: $model.trashPlacement,
-                        shortcutBindings: $model.shortcutBindings,
-                        clipboardHistoryEnabled: $model.clipboardHistoryEnabled,
-                        ipGeolocationEnabled: $model.ipGeolocationEnabled,
-                        faviconServiceEnabled: $model.faviconServiceEnabled,
-                        aiAccountSwitchingEnabled: $model.aiAccountSwitchingEnabled,
-                        clipboardRetention: $model.clipboardRetention,
-                        panelWidths: $model.panelWidths,
-                        accent: clockTint,
-                        onClose: { openPanel = nil },
-                        onResetPersonalisation: { model.resetPersonalisation() },
-                        cornerRadius: model.shellRadius(for: .flyouts)
-                    )
-                    .frame(width: panelFrameWidth(.settings, available: geometry.size.width - 40), height: max(560, model.flyoutHeight(available: geometry.size.height - taskbarHeight - 40)))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .padding(.bottom, taskbarHeight)
-                    .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
-                    .environment(\.surfaceStyle, surfaceStyle)
-                        .zIndex(2)
-                }
 
-                Taskbar(
-                    model: model,
-                    height: $model.taskbarHeight,
-                    onLaunchApplication: onLaunchApplication,
-                    onTaskbarIconClick: onTaskbarIconClick,
-                    onTaskbarTileAction: onTaskbarTileAction
-                )
-                .zIndex(3)
 
-                if model.showsOnboarding {
-                    OnboardingView(model: model, accent: model.clockTint, isDarkMode: model.isDarkMode) {
-                        model.completeOnboarding()
-                    }
-                    .transition(.opacity)
-                    .zIndex(10)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
-            .animation(MotionTokens.spring(response: 0.38, dampingFraction: 0.86, reduceMotion: model.reduceMotion), value: openPanel)
-            .animation(MotionTokens.spring(response: 0.35, reduceMotion: model.reduceMotion), value: model.flyoutHeightPreset)
-            .environment(\.surfaceTransparency, interfaceTransparency)
-            .environment(\.widgetOutline, model.widgetOutline)
-            .environment(\.iconBackground, model.iconBackground)
-            .preferredColorScheme(isDarkMode ? .dark : .light)
-        }
-    }
-}
 
-private struct DesktopBackdrop: View {
-    let isDarkMode: Bool
-    let preset: WallpaperPreset
-    let pastelTint: Color
-    let gradientEndTint: Color
-    let gradientAngle: Double
-    let surfaceStyle: SurfaceStyle
-    let weather: WeatherState
 
-    private var weatherKind: WeatherBackdropKind {
-        weatherBackdropKind(for: weather)
-    }
 
-    private var gradientStart: UnitPoint {
-        UnitPoint(x: 0.5 - cos(gradientAngle * .pi / 180) / 2, y: 0.5 - sin(gradientAngle * .pi / 180) / 2)
-    }
-
-    private var gradientEnd: UnitPoint {
-        UnitPoint(x: 0.5 + cos(gradientAngle * .pi / 180) / 2, y: 0.5 + sin(gradientAngle * .pi / 180) / 2)
-    }
-
-    private var wallpaperColors: [Color] {
-        if preset == .custom {
-            return [pastelTint, gradientEndTint]
-        }
-        if preset == .weatherReactive {
-            return weatherBackdropPalette(for: weatherKind)
-        }
-        if preset == .themeMatched {
-            return surfaceStyle.accentGradient(darkMode: isDarkMode)
-        }
-        if isDarkMode && !preset.isDark {
-            return [
-                Color(red: 0.035, green: 0.055, blue: 0.10),
-                Color(red: 0.10, green: 0.075, blue: 0.14),
-                Color(red: 0.045, green: 0.10, blue: 0.16)
-            ]
-        }
-        return preset.colors
-    }
-
-    private var particleIntensity: Double {
-        switch weatherKind {
-        case .storm, .rain, .snow: 1.0
-        case .cloudy, .fog: 0.7
-        case .clearNight, .clearDay: 0.6
-        }
-    }
-
-    var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: wallpaperColors,
-                startPoint: gradientStart,
-                endPoint: gradientEnd
-            )
-
-            Circle()
-                .fill((preset == .custom ? pastelTint : wallpaperColors.first ?? pastelTint).opacity(0.47))
-                .frame(width: 520, height: 520)
-                .blur(radius: 85)
-                .offset(x: 380, y: -170)
-
-            Circle()
-                .fill((preset == .custom ? gradientEndTint : wallpaperColors.last ?? gradientEndTint).opacity(0.31))
-                .frame(width: 460, height: 460)
-                .blur(radius: 100)
-                .offset(x: -430, y: 140)
-
-            Ellipse()
-                .fill(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.13), Color.white.opacity(0.015)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 860, height: 410)
-                .rotationEffect(.degrees(-26))
-                .offset(x: 220, y: 130)
-
-            Ellipse()
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                .frame(width: 960, height: 480)
-                .rotationEffect(.degrees(-26))
-                .offset(x: 210, y: 135)
-
-            if preset == .weatherReactive {
-                WeatherParticles(kind: weatherKind, intensity: particleIntensity)
-            }
-        }
-        .ignoresSafeArea()
-    }
-}
-
-/// Human-readable label for a shortcut chord, e.g. "⌃⌥←".
-func shortcutChordLabel(_ chord: ShortcutChord) -> String {
-    var modifiers = ""
-    if chord.carbonModifiers & 0x1000 != 0 { modifiers += "⌃" }
-    if chord.carbonModifiers & 0x0800 != 0 { modifiers += "⌥" }
-    if chord.carbonModifiers & 0x0100 != 0 { modifiers += "⌘" }
-    if chord.carbonModifiers & 0x0200 != 0 { modifiers += "⇧" }
-    let keys: [UInt32: String] = [
-        0x00: "A", 0x0B: "B", 0x08: "C", 0x02: "D", 0x0E: "E", 0x03: "F",
-        0x05: "G", 0x04: "H", 0x22: "I", 0x26: "J", 0x28: "K", 0x25: "L",
-        0x2E: "M", 0x2D: "N", 0x1F: "O", 0x23: "P", 0x0C: "Q", 0x0F: "R",
-        0x01: "S", 0x11: "T", 0x20: "U", 0x09: "V", 0x0D: "W", 0x07: "X",
-        0x10: "Y", 0x06: "Z",
-        0x1D: "0", 0x12: "1", 0x13: "2", 0x14: "3", 0x15: "4",
-        0x17: "5", 0x16: "6", 0x1A: "7", 0x1C: "8", 0x19: "9",
-        0x31: "Space", 0x33: "⌫", 0x24: "↩", 0x30: "⇥", 0x35: "⎋",
-        0x7B: "←", 0x7C: "→", 0x7D: "↓", 0x7E: "↑",
-    ]
-    return modifiers + (keys[chord.carbonKeyCode] ?? String(format: "Key 0x%02X", chord.carbonKeyCode))
-}
-
-/// Carbon modifier flags from a key-down event's modifier flags.
-func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
-    var result: UInt32 = 0
-    if flags.contains(.control) { result |= 0x1000 }
-    if flags.contains(.option) { result |= 0x0800 }
-    if flags.contains(.command) { result |= 0x0100 }
-    if flags.contains(.shift) { result |= 0x0200 }
-    return result
-}
-
-private func taskbarDisplayName(for bundleIdentifier: String) -> String {
-    if let known = LauncherDefaults.apps.first(where: { $0.bundleIdentifier == bundleIdentifier }) {
-        return known.title
-    }
-    if let running = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleIdentifier }),
-       let name = running.localizedName, !name.isEmpty {
-        return name
-    }
-    return bundleIdentifier
-}
-
-private struct TaskbarWeatherSection: View {
-    @ObservedObject var model: TaskbarConceptState
-
-    private var glyphSize: CGFloat { model.taskbarHeight * model.taskbarIconSize.glyphFraction }
-
-    var body: some View {
-        Button {
-            model.openPanel = model.openPanel == .widgets ? nil : .widgets
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: model.weather.symbolName)
-                    .symbolRenderingMode(.multicolor)
-                    .font(.system(size: glyphSize))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.weather.formattedTemperature)
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(model.weather.conditionText)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            .frame(width: 170, height: model.taskbarHeight - 4, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help("Open widgets")
-    }
-}
-
-private struct TaskbarClockSection: View {
-    @ObservedObject var model: TaskbarConceptState
-
-    var body: some View {
-        clockSchedule { date in
-            Button {
-                model.openPanel = model.openPanel == .calendar ? nil : .calendar
-            } label: {
-                TaskbarClockDisplay(
-                    date: date,
-                    style: model.clockDisplayStyle,
-                    dateStyle: model.dateStyle,
-                    uses24HourTime: model.uses24HourTime,
-                    showsSeconds: model.showsSeconds,
-                    tint: model.resolvedClockTint,
-                    height: model.taskbarHeight,
-                    tintGradient: model.clockTintGradient
-                )
-                .frame(minWidth: 88, minHeight: model.taskbarHeight - 8, alignment: .trailing)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Open calendar")
-        }
-    }
-
-    private func clockSchedule<Content: View>(@ViewBuilder content: @escaping (Date) -> Content) -> some View {
-        if model.showsSeconds {
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                content(context.date)
-            }
-        } else {
-            TimelineView(.periodic(from: .now.nextMinuteBoundary, by: 60)) { context in
-                content(context.date)
-            }
-        }
-    }
-}
-
-struct TaskbarIslandContent: View {
-    let sections: [TaskbarSection]
-    @ObservedObject var model: TaskbarConceptState
-    let onLaunchApplication: (String) -> Void
-    let onTaskbarIconClick: (String) -> Void
-    let onTaskbarTileAction: (TaskbarTileAction) -> Void
-    var maxAppTiles: Int? = nil
-    var showOverflowChevron: Bool = false
-    @FocusState private var focusedTile: String?
-
-    private var focusableAppIDs: [String] {
-        visibleItems.compactMap {
-            if case .app(let bundleID) = $0 { bundleID } else { nil }
-        }
-    }
-
-    private var tiles: TaskbarTiles {
-        TaskbarTiles(
-            pinnedBundleIDs: model.pinnedAppBundleIDs,
-            runningBundleIDs: model.runningBundleIDs,
-            frontmostBundleID: model.frontmostBundleID,
-            indicatorStyle: model.runningIndicatorStyle,
-            indicatorSize: model.runningIndicatorSize,
-            indicatorFill: model.resolvedIndicatorFill,
-            menuStyle: model.contextMenuStyle,
-            isDarkMode: model.isDarkMode,
-            systemStatus: model.systemStatus,
-            statusIconPreset: model.statusIconPreset,
-            statusIconCustomSymbol: model.statusIconCustomSymbol,
-            tileSide: max(28, model.taskbarHeight - 4),
-            glyphSize: model.taskbarHeight * model.taskbarIconSize.glyphFraction,
-            previewsEnabled: model.showWindowPreviews,
-            previewBundleID: $model.previewBundleID,
-            clusterOrder: model.clusterOrder,
-            dividers: model.userDividers,
-            onTaskbarIconClick: onTaskbarIconClick,
-            onTaskbarTileAction: onTaskbarTileAction,
-            onToggleControls: { model.openPanel = model.openPanel == .controls ? nil : .controls },
-            onHoverChanged: model.handleTaskbarTileHover,
-            onMovePinned: model.movePinned
-        )
-    }
-
-    private var stripItems: [StripItem] {
-        let running = model.runningAppOrder.filter({ !model.pinnedAppBundleIDs.contains($0) })
-        let dividers = model.taskbarMode == .macOS ? [] : model.userDividers
-        return TaskbarStrip.compose(
-            pins: model.pinnedAppBundleIDs,
-            runningOrder: running,
-            dividers: dividers
-        )
-    }
-
-    private var visibleItems: [StripItem] {
-        guard let maxAppTiles else { return stripItems }
-        var appsSeen = 0
-        var result: [StripItem] = []
-        for item in stripItems {
-            if case .app = item {
-                appsSeen += 1
-                if appsSeen > maxAppTiles {
-                    continue
-                }
-            }
-            result.append(item)
-        }
-        return TaskbarStrip.pruned(result)
-    }
-
-    private var isClipped: Bool {
-        guard maxAppTiles != nil else { return false }
-        return visibleItems.count < stripItems.count
-    }
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(sections, id: \.self) { section in
-                switch section {
-                case .weather:
-                    TaskbarWeatherSection(model: model)
-                case .apps:
-                    appsGroup
-                case .tray:
-                    trayGroup(includeClock: false)
-                case .clock:
-                    clockGroup
-                }
-            }
-        }
-    }
-
-    private var appsGroup: some View {
-        HStack(spacing: 4) {
-            Button {
-                model.openPanel = model.openPanel == .start ? nil : .start
-            } label: {
-                MacOSAppIcon(
-                    bundleIdentifier: "com.apple.launchpad",
-                    fallbackSymbol: "square.grid.3x3.fill",
-                    fallbackColor: model.isDarkMode ? Color(red: 0.54, green: 0.76, blue: 1) : .blue,
-                    size: model.taskbarHeight * model.taskbarIconSize.glyphFraction
-                )
-                .frame(width: max(28, model.taskbarHeight - 4), height: max(28, model.taskbarHeight - 4))
-                .taskbarTile()
-            }
-            .buttonStyle(.plain)
-            .help("Open Start")
-            ForEach(visibleItems, id: \.self) { item in
-                switch item {
-                case .app(let bundleID):
-                    tiles.taskbarAppTile(bundleID)
-                        .focused($focusedTile, equals: bundleID)
-                case .divider(let id):
-                    TaskbarDividerView()
-                        .padding(.vertical, 6)
-                        .contextMenu {
-                            Button("Remove divider", role: .destructive) {
-                                model.removeDivider(id)
-                            }
-                        }
-                }
-            }
-            if model.trashPlacement(for: model.taskbarMode) == .withApps {
-                tiles.trashCluster
-            }
-            if showOverflowChevron, isClipped {
-                Button {
-                    model.openPanel = .start
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 28, height: max(28, model.taskbarHeight - 4))
-                }
-                .buttonStyle(.plain)
-                .help("More apps in the launcher")
-            }
-        }
-        .onMoveCommand { direction in
-            let ids = focusableAppIDs
-            guard !ids.isEmpty else { return }
-            switch direction {
-            case .left, .up:
-                if let current = focusedTile, let index = ids.firstIndex(of: current) {
-                    focusedTile = ids[max(index - 1, 0)]
-                } else {
-                    focusedTile = ids.last
-                }
-            case .right, .down:
-                if let current = focusedTile, let index = ids.firstIndex(of: current) {
-                    focusedTile = ids[min(index + 1, ids.count - 1)]
-                } else {
-                    focusedTile = ids.first
-                }
-            @unknown default:
-                break
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func trayGroup(includeClock: Bool) -> some View {
-        if model.trashPlacement(for: model.taskbarMode) == .beforeTray {
-            tiles.trashCluster
-        }
-        if includeClock {
-            clockGroup
-        }
-    }
-
-    private var clockGroup: some View {
-        HStack(spacing: 4) {
-            if model.trashPlacement(for: model.taskbarMode) == .beforeClock {
-                tiles.trashCluster
-            }
-            TaskbarClockSection(model: model)
-            if model.trashPlacement(for: model.taskbarMode) == .farRight {
-                tiles.trashCluster
-            }
-        }
-    }
-}
-
-private struct TaskbarTiles {
-    let pinnedBundleIDs: [String]
-    let runningBundleIDs: Set<String>
-    let frontmostBundleID: String?
-    let indicatorStyle: RunningIndicatorStyle
-    let indicatorSize: RunningIndicatorSize
-    let indicatorFill: IndicatorFill
-    let menuStyle: ContextMenuStyle
-    let isDarkMode: Bool
-    let systemStatus: SystemStatusSnapshot
-    let statusIconPreset: StatusIconPreset
-    let statusIconCustomSymbol: String
-    let tileSide: CGFloat
-    let glyphSize: CGFloat
-    let previewsEnabled: Bool
-    var previewBundleID: Binding<String?>
-    let clusterOrder: [String]
-    let dividers: [TaskbarDivider]
-    let onTaskbarIconClick: (String) -> Void
-    let onTaskbarTileAction: (TaskbarTileAction) -> Void
-    let onToggleControls: () -> Void
-    let onHoverChanged: (String, Bool) -> Void
-    let onMovePinned: (String, String) -> Void
-
-    func taskbarAppTile(_ bundleIdentifier: String) -> some View {
-        let app = LauncherDefaults.apps.first { $0.bundleIdentifier == bundleIdentifier }
-        let title = taskbarDisplayName(for: bundleIdentifier)
-        let isRunning = runningBundleIDs.contains(bundleIdentifier)
-        let isFrontmost = frontmostBundleID == bundleIdentifier
-        let windowCount = isRunning ? AppWindowPreviewService().windows(forBundleIdentifier: bundleIdentifier, appName: title).count : 0
-        return AppTile(
-            title: title,
-            icon: MacOSAppIcon(
-                bundleIdentifier: bundleIdentifier,
-                fallbackSymbol: app?.symbol ?? "app.fill",
-                fallbackColor: app?.color ?? .secondary,
-                size: glyphSize
-            )
-            .frame(width: tileSide, height: tileSide)
-            .taskbarTile(highlighted: isRunning && indicatorStyle == .highlight, highlightFill: indicatorFill),
-            indicator: Group {
-                if isRunning, indicatorStyle != .highlight {
-                    runningIndicator(isFrontmost: isFrontmost, windowCount: windowCount)
-                        .padding(.bottom, 4)
-                }
-            },
-            onActivate: { onTaskbarIconClick(bundleIdentifier) },
-            menu: AnyView(tileContextMenu(bundleIdentifier)),
-            onHoverChanged: { onHoverChanged(bundleIdentifier, $0) }
-        )
-        .overlay(alignment: .topTrailing) {
-            if windowCount > 1 {
-                Text("\(min(windowCount, 9))")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(width: 15, height: 15)
-                    .background(Circle().fill(Color.red))
-                    .offset(x: 3, y: -3)
-                    .accessibilityLabel("\(windowCount) windows open")
-            }
-        }
-        .draggable(bundleIdentifier)
-        .dropDestination(for: String.self) { droppedItems, _ in
-            guard let draggedID = droppedItems.first, draggedID != bundleIdentifier else { return false }
-            onMovePinned(draggedID, bundleIdentifier)
-            return true
-        }
-    }
-
-    private func runningIndicator(isFrontmost: Bool, windowCount: Int = 0) -> some View {
-        let opacity = isFrontmost ? 1.0 : 0.55
-        let multiWindow = windowCount > 1 && !isFrontmost
-        return Group {
-            switch indicatorStyle {
-            case .dot:
-                if isFrontmost {
-                    Capsule()
-                        .fill(indicatorFill.style(opacity: opacity))
-                        .frame(width: max(indicatorSize.dotDiameter + 8, 12), height: 4)
-                } else if multiWindow {
-                    ZStack {
-                        Capsule()
-                            .fill(indicatorFill.style(opacity: opacity))
-                            .frame(width: max(indicatorSize.dotDiameter + 8, 12), height: 4)
-                            .offset(x: 2.5, y: -2.5)
-                        Capsule()
-                            .fill(indicatorFill.style(opacity: opacity))
-                            .frame(width: max(indicatorSize.dotDiameter + 8, 12), height: 4)
-                            .offset(x: -2.5, y: 2.5)
-                    }
-                } else {
-                    Capsule()
-                        .fill(indicatorFill.style(opacity: opacity))
-                        .frame(width: max(indicatorSize.dotDiameter, 8), height: 4)
-                }
-            case .dash:
-                Capsule()
-                    .fill(indicatorFill.style(opacity: opacity))
-                    .frame(width: indicatorSize.dashWidth + (isFrontmost ? 6 : 0), height: indicatorSize.dashHeight)
-            case .highlight:
-                EmptyView()
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func tileContextMenu(_ bundleIdentifier: String) -> some View {
-        switch menuStyle {
-        case .native:
-            nativeTileMenu(bundleIdentifier)
-        case .windows:
-            windowsTileMenu(bundleIdentifier)
-        }
-    }
-
-    @ViewBuilder
-    private func nativeTileMenu(_ bundleIdentifier: String) -> some View {
-        let isRunning = runningBundleIDs.contains(bundleIdentifier)
-        Button(isRunning ? "Activate" : "Open") {
-            onTaskbarIconClick(bundleIdentifier)
-        }
-        Button("Show in Finder") {
-            onTaskbarTileAction(.revealInFinder(bundleID: bundleIdentifier))
-        }
-        let windows = AppWindowPreviewService().windows(
-            forBundleIdentifier: bundleIdentifier,
-            appName: taskbarDisplayName(for: bundleIdentifier)
-        )
-        if !windows.isEmpty {
-            Divider()
-            ForEach(windows.prefix(5)) { window in
-                Button(window.title) {
-                    AppWindowPreviewService().focusWindow(info: window, bundleIdentifier: bundleIdentifier)
-                }
-            }
-        }
-        if isRunning {
-            Divider()
-            Button("Hide") {
-                onTaskbarTileAction(.hideApp(bundleID: bundleIdentifier))
-            }
-            Button("Quit") {
-                onTaskbarTileAction(.quitApp(bundleID: bundleIdentifier))
-            }
-        }
-        dividerMenu(for: bundleIdentifier)
-    }
-
-    @ViewBuilder
-    private func dividerMenu(for bundleIdentifier: String) -> some View {
-        Divider()
-        Menu("Divider") {
-            Button(hasDividerAfter(bundleIdentifier) ? "Remove divider here" : "Add divider after this app") {
-                if hasDividerAfter(bundleIdentifier) {
-                    onTaskbarTileAction(.removeDivider(afterBundleID: bundleIdentifier))
-                } else {
-                    onTaskbarTileAction(.addDivider(afterBundleID: bundleIdentifier))
-                }
-            }
-            if !dividers.isEmpty {
-                Menu("Move divider to here") {
-                    ForEach(Array(dividers.enumerated()), id: \.element.id) { index, divider in
-                        Button("Divider \(index + 1)") {
-                            onTaskbarTileAction(.moveDivider(id: divider.id, afterBundleID: bundleIdentifier))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func hasDividerAfter(_ bundleIdentifier: String) -> Bool {
-        dividers.contains { $0.anchorBundleID == bundleIdentifier }
-    }
-
-    @ViewBuilder
-    private func windowsTileMenu(_ bundleIdentifier: String) -> some View {
-        let isRunning = runningBundleIDs.contains(bundleIdentifier)
-        let isPinned = pinnedBundleIDs.contains(bundleIdentifier)
-        Button("Open") {
-            onTaskbarIconClick(bundleIdentifier)
-        }
-        Button("Open new window") {
-            onTaskbarTileAction(.newWindow(bundleID: bundleIdentifier))
-        }
-        Button("Open file location") {
-            onTaskbarTileAction(.revealInFinder(bundleID: bundleIdentifier))
-        }
-        let windows = AppWindowPreviewService().windows(
-            forBundleIdentifier: bundleIdentifier,
-            appName: taskbarDisplayName(for: bundleIdentifier)
-        )
-        if !windows.isEmpty {
-            Divider()
-            ForEach(windows.prefix(5)) { window in
-                Button(window.title) {
-                    AppWindowPreviewService().focusWindow(info: window, bundleIdentifier: bundleIdentifier)
-                }
-            }
-        }
-        let recents = recentDocuments(for: bundleIdentifier)
-        if !recents.isEmpty {
-            Divider()
-            Menu("Recent") {
-                ForEach(recents, id: \.self) { url in
-                    Button(url.deletingPathExtension().lastPathComponent) {
-                        onTaskbarTileAction(.openRecent(url))
-                    }
-                }
-            }
-        }
-        Divider()
-        Button(isPinned ? "Unpin from taskbar" : "Pin to taskbar") {
-            onTaskbarTileAction(.togglePin(bundleID: bundleIdentifier))
-        }
-        .disabled(!isPinned && pinnedBundleIDs.count >= 8)
-        if isRunning {
-            Button("Quit") {
-                onTaskbarTileAction(.quitApp(bundleID: bundleIdentifier))
-            }
-        }
-        dividerMenu(for: bundleIdentifier)
-    }
-
-    private func recentDocuments(for bundleIdentifier: String) -> [URL] {
-        let recents = NSDocumentController.shared.recentDocumentURLs
-        var matches: [URL] = []
-        for url in recents.prefix(20) {
-            guard let appURL = NSWorkspace.shared.urlForApplication(toOpen: url),
-                  Bundle(url: appURL)?.bundleIdentifier == bundleIdentifier
-            else {
-                continue
-            }
-            matches.append(url)
-            if matches.count >= 5 {
-                break
-            }
-        }
-        return matches
-    }
-
-    var trashCluster: some View {
-        HStack(spacing: 4) {
-            ForEach(clusterOrder, id: \.self) { key in
-                clusterTile(key)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func clusterTile(_ key: String) -> some View {
-        switch key {
-        case "downloads":
-            DownloadsTile(tileSide: tileSide, glyphSize: glyphSize)
-        case "trash":
-            TrashTile(tileSide: tileSide, glyphSize: glyphSize, darkMode: isDarkMode)
-        default:
-            Button {
-                onToggleControls()
-            } label: {
-                SystemStatusIcon(
-                    snapshot: systemStatus,
-                    glyphSize: glyphSize,
-                    preset: statusIconPreset,
-                    customSymbol: statusIconCustomSymbol
-                )
-                    .frame(width: tileSide, height: tileSide)
-                    .taskbarTile()
-            }
-            .buttonStyle(.plain)
-            .help("Open quick controls, volume, Bluetooth and battery")
-        }
-    }
-
-}
-
-private struct Taskbar: View {
-    @ObservedObject var model: TaskbarConceptState
-    @Binding var height: CGFloat
-    @State private var dragStartHeight: CGFloat?
-    let onLaunchApplication: (String) -> Void
-    let onTaskbarIconClick: (String) -> Void
-    let onTaskbarTileAction: (TaskbarTileAction) -> Void
-    var rendersSplitRow: Bool = true
-
-    private var mode: TaskbarMode { model.taskbarMode }
-    private var glyphSize: CGFloat { height * model.taskbarIconSize.glyphFraction }
-    private var tileSide: CGFloat { max(28, height - 4) }
-    private var isFloating: Bool { mode == .macOS }
-    private var isConstrained: Bool { isFloating || mode == .centered }
-    private var showsDividers: Bool { !isFloating }
-
-    private var tiles: TaskbarTiles {
-        TaskbarTiles(
-            pinnedBundleIDs: model.pinnedAppBundleIDs,
-            runningBundleIDs: model.runningBundleIDs,
-            frontmostBundleID: model.frontmostBundleID,
-            indicatorStyle: model.runningIndicatorStyle,
-            indicatorSize: model.runningIndicatorSize,
-            indicatorFill: model.resolvedIndicatorFill,
-            menuStyle: model.contextMenuStyle,
-            isDarkMode: model.isDarkMode,
-            systemStatus: model.systemStatus,
-            statusIconPreset: model.statusIconPreset,
-            statusIconCustomSymbol: model.statusIconCustomSymbol,
-            tileSide: tileSide,
-            glyphSize: glyphSize,
-            previewsEnabled: model.showWindowPreviews,
-            previewBundleID: $model.previewBundleID,
-            clusterOrder: model.clusterOrder,
-            dividers: model.userDividers,
-            onTaskbarIconClick: onTaskbarIconClick,
-            onTaskbarTileAction: onTaskbarTileAction,
-            onToggleControls: { toggle(.controls) },
-            onHoverChanged: model.handleTaskbarTileHover,
-            onMovePinned: model.movePinned
-        )
-    }
-
-    var body: some View {
-        Group {
-            if mode.isSplit, rendersSplitRow {
-                TaskbarSplitRow(
-                    model: model,
-                    onLaunchApplication: onLaunchApplication,
-                    onTaskbarIconClick: onTaskbarIconClick,
-                    onTaskbarTileAction: onTaskbarTileAction
-                )
-            } else if mode.isSplit {
-                Color.clear
-            } else {
-                barShell
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: height)
-        .environment(\.surfaceTransparency, model.interfaceTransparency)
-        .overlay(alignment: .top) {
-            resizeHandle
-        }
-        .overlay(alignment: .top) {
-            if !isFloating, model.surfaceStyle == .classic98 {
-                Rectangle()
-                    .fill(Color.white.opacity(0.9))
-                    .frame(height: 1)
-                    .offset(y: -1)
-            }
-        }
-        .contentShape(Rectangle())
-        .contextMenu {
-            Button {
-                model.openPanel = .settings
-            } label: {
-                Label("Customise taskbar", systemImage: "slider.horizontal.3")
-            }
-
-            Divider()
-
-            Button(role: .destructive) {
-                NSApp.terminate(nil)
-            } label: {
-                Label("Quit Taskbar", systemImage: "power")
-            }
-        }
-    }
-
-    private var barShell: some View {
-        GeometryReader { geometry in
-            ZStack {
-                barBackground
-                HStack(spacing: 0) {
-                    TaskbarWeatherSection(model: model)
-                        .padding(.leading, 18)
-                    if showsDividers, !model.userDividers.isEmpty {
-                        TaskbarDividerView()
-                            .padding(.vertical, 6)
-                            .padding(.leading, 10)
-                    }
-                    Spacer(minLength: 0)
-                    trailingTrayCluster
-                        .layoutPriority(1)
-                }
-                .padding(.horizontal, isFloating ? 18 : 8)
-                .frame(maxWidth: .infinity)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(width: isConstrained ? min(geometry.size.width, model.centeredBarWidth) : nil)
-            .frame(maxWidth: .infinity)
-            .overlay(alignment: .center) {
-                TaskbarIslandContent(
-                    sections: [.apps],
-                    model: model,
-                    onLaunchApplication: onLaunchApplication,
-                    onTaskbarIconClick: onTaskbarIconClick,
-                    onTaskbarTileAction: onTaskbarTileAction
-                )
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var barBackground: some View {
-        let radius = model.shellRadius(for: .taskbar)
-        if isFloating {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.42), lineWidth: 1)
-                }
-                .padding(.vertical, 3)
-        } else if model.usesTaskbarGradient {
-            Rectangle()
-                .fill(LinearGradient(colors: [model.taskbarGradientStart, model.taskbarGradientEnd], startPoint: .leading, endPoint: .trailing))
-        } else if model.surfaceStyle == .windowsAero {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.44, green: 0.74, blue: 0.96).opacity(model.isDarkMode ? 0.22 : 0.45),
-                            Color.white.opacity(model.isDarkMode ? 0.03 : 0.16),
-                            Color(red: 0.18, green: 0.43, blue: 0.71).opacity(model.isDarkMode ? 0.18 : 0.30)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                }
-        } else {
-            let fill: AnyShapeStyle = {
-                switch model.surfaceStyle {
-                case .windowsXP:
-                    return AnyShapeStyle(LinearGradient(
-                        colors: [Color(red: 0.15, green: 0.44, blue: 0.88), Color(red: 0.04, green: 0.22, blue: 0.61)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
-                case .aqua:
-                    return AnyShapeStyle(LinearGradient(
-                        colors: [Color(red: 0.30, green: 0.65, blue: 0.96), Color(red: 0.10, green: 0.40, blue: 0.88)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
-                case .frutigerAero:
-                    return AnyShapeStyle(LinearGradient(
-                        colors: [Color(red: 0.42, green: 0.78, blue: 0.96), Color(red: 0.18, green: 0.62, blue: 0.82)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
-                case .y2k:
-                    return AnyShapeStyle(LinearGradient(
-                        colors: [Color(red: 0.72, green: 0.82, blue: 1.0), Color(red: 0.44, green: 0.60, blue: 0.96)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
-                default:
-                    return AnyShapeStyle(model.surfaceStyle.taskbarFill(darkMode: model.isDarkMode))
-                }
-            }()
-            Rectangle()
-                .fill(fill)
-                .overlay(alignment: .top) {
-                    if model.surfaceStyle == .neobrutalism {
-                        Rectangle()
-                            .fill(Color.black)
-                            .frame(height: 3)
-                    } else {
-                        Rectangle()
-                            .fill(Color.white.opacity(0.42))
-                            .frame(height: 1)
-                    }
-                }
-        }
-    }
-
-    private var trailingTrayCluster: some View {
-        HStack(spacing: model.trashPlacement(for: mode) == .beforeClock ? 4 : 8) {
-            if model.trashPlacement(for: mode) == .beforeTray {
-                tiles.trashCluster
-            }
-            if model.trashPlacement(for: mode) == .beforeClock {
-                tiles.trashCluster
-            }
-            TaskbarClockSection(model: model)
-            if model.trashPlacement(for: mode) == .farRight {
-                tiles.trashCluster
-            }
-        }
-        .padding(.trailing, 12)
-    }
-
-    private var resizeHandle: some View {
-        Color.clear
-            .frame(maxWidth: .infinity)
-            .frame(height: 12)
-            .overlay(alignment: .top) {
-                Capsule()
-                    .fill(Color.primary.opacity(0.16))
-                    .frame(width: 42, height: 3)
-                    .padding(.top, 3)
-            }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 1)
-                    .onChanged { value in
-                        if dragStartHeight == nil {
-                            dragStartHeight = height
-                        }
-                        if let dragStartHeight {
-                            height = min(48, max(32, dragStartHeight - value.translation.height))
-                        }
-                    }
-                    .onEnded { _ in
-                        dragStartHeight = nil
-                    }
-            )
-            .help("Drag to resize the taskbar")
-    }
-
-    private func toggle(_ panel: OpenPanel) {
-        model.openPanel = model.openPanel == panel ? nil : panel
-    }
-}
-
-private struct TaskbarSplitRow: View {
-    @ObservedObject var model: TaskbarConceptState
-    let onLaunchApplication: (String) -> Void
-    let onTaskbarIconClick: (String) -> Void
-    let onTaskbarTileAction: (TaskbarTileAction) -> Void
-
-    var body: some View {
-        GeometryReader { geometry in
-            let appCount = model.pinnedAppBundleIDs.count
-                + model.runningAppOrder.filter({ !model.pinnedAppBundleIDs.contains($0) }).count
-            let layout = TaskbarStripMetrics.layout(
-                screenWidth: geometry.size.width,
-                mode: model.taskbarMode,
-                barHeight: model.taskbarHeight,
-                gap: model.islandGap,
-                appCount: appCount
-            )
-            ZStack(alignment: .topLeading) {
-                ForEach(Array(layout.islands.enumerated()), id: \.offset) { _, island in
-                    islandShell(
-                        sections: island.sections,
-                        frame: island.frame,
-                        maxAppTiles: layout.visibleAppTiles,
-                        showsOverflow: layout.showsOverflow
-                    )
-                    .offset(x: island.frame.minX, y: island.frame.minY)
-                }
-            }
-            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
-        }
-    }
-
-    private func islandShell(
-        sections: [TaskbarSection],
-        frame: CGRect,
-        maxAppTiles: Int,
-        showsOverflow: Bool
-    ) -> some View {
-        let radius = model.shellRadius(for: .taskbar)
-        return TaskbarIslandContent(
-            sections: sections,
-            model: model,
-            onLaunchApplication: onLaunchApplication,
-            onTaskbarIconClick: onTaskbarIconClick,
-            onTaskbarTileAction: onTaskbarTileAction,
-            maxAppTiles: maxAppTiles,
-            showOverflowChevron: showsOverflow
-        )
-        .padding(.horizontal, 10)
-        .frame(width: frame.width, height: frame.height)
-        .background {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.38), lineWidth: 1)
-                }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-    }
-}
-
-private struct TaskbarClockDisplay: View {
-    let date: Date
-    let style: ClockDisplayStyle
-    let dateStyle: ClockDateStyle
-    let uses24HourTime: Bool
-    let showsSeconds: Bool
-    let tint: Color
-    let height: CGFloat
-    var tintGradient: LinearGradient? = nil
-
-    private var time: String {
-        clockTime(date, uses24HourTime: uses24HourTime, showsSeconds: showsSeconds)
-    }
-
-    private var textStyle: AnyShapeStyle {
-        if let tintGradient {
-            return AnyShapeStyle(tintGradient)
-        }
-        return AnyShapeStyle(tint)
-    }
-
-    var body: some View {
-        Group {
-            switch style {
-            case .stacked:
-                VStack(alignment: .trailing, spacing: 2) {
-                    timeLabel
-                    dateLabel
-                }
-            case .inline:
-                HStack(spacing: 6) {
-                    timeLabel
-                    Text(dateStyle.string(from: date))
-                        .font(.system(size: height * 0.19, weight: .medium))
-                        .foregroundStyle(textStyle)
-                        .lineLimit(1)
-                }
-            case .digital:
-                timeLabel
-            case .analog:
-                HStack(spacing: 6) {
-                    AnalogClockFace(date: date, tint: tint, size: min(height - 12, 24))
-                    VStack(alignment: .trailing, spacing: 2) {
-                        timeLabel
-                        dateLabel
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .trailing)
-    }
-
-    private var timeLabel: some View {
-        Text(time)
-            .font(.system(size: height * (style == .digital ? 0.32 : 0.27), weight: .semibold, design: .rounded))
-            .foregroundStyle(textStyle)
-            .lineLimit(1)
-    }
-
-    private var dateLabel: some View {
-        Text(dateStyle.string(from: date))
-            .font(.system(size: height * 0.20, weight: .medium))
-            .foregroundStyle(textStyle)
-            .lineLimit(1)
-    }
-}
-
-private struct AnalogClockFace: View {
-    let date: Date
-    let tint: Color
-    let size: CGFloat
-
-    private var hourAngle: Double {
-        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
-        return Double((components.hour ?? 0) % 12) * 30 + Double(components.minute ?? 0) / 2
-    }
-
-    private var minuteAngle: Double {
-        Double(Calendar.current.component(.minute, from: date)) * 6
-    }
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .strokeBorder(tint.opacity(0.7), lineWidth: 1.2)
-            Capsule()
-                .fill(tint)
-                .frame(width: 2, height: size * 0.24)
-                .offset(y: -size * 0.12)
-                .rotationEffect(.degrees(hourAngle))
-            Capsule()
-                .fill(tint)
-                .frame(width: 1.3, height: size * 0.34)
-                .offset(y: -size * 0.17)
-                .rotationEffect(.degrees(minuteAngle))
-            Circle()
-                .fill(tint)
-                .frame(width: 3, height: 3)
-        }
-        .frame(width: size, height: size)
-        .accessibilityLabel(date.formatted(date: .omitted, time: .shortened))
-    }
-}
-
-private final class AppIconStore: ObservableObject {
-    static let shared = AppIconStore()
-
-    @Published private(set) var icons: [String: NSImage] = [:]
-
-    private let queue = DispatchQueue(label: "com.baraka.splitbar.appicon", qos: .userInitiated)
-    private var resolved = Set<String>()
-
-    private init() {}
-
-    func icon(for bundleIdentifier: String) -> NSImage? {
-        if let cached = icons[bundleIdentifier] {
-            return cached
-        }
-        resolve(bundleIdentifier)
-        return nil
-    }
-
-    private func resolve(_ bundleIdentifier: String) {
-        guard resolved.insert(bundleIdentifier).inserted else { return }
-        queue.async { [weak self] in
-            guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else { return }
-            let image = NSWorkspace.shared.icon(forFile: appURL.path)
-            DispatchQueue.main.async {
-                self?.icons[bundleIdentifier] = image
-            }
-        }
-    }
-}
-
-private final class TrashStore: ObservableObject {
-    static let shared = TrashStore()
-
-    @Published private(set) var isEmpty = true
-
-    private let queue = DispatchQueue(label: "com.baraka.splitbar.trash", qos: .utility)
-    private let metadataQuery = NSMetadataQuery()
-
-    private var trashURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash", isDirectory: true)
-    }
-
-    private init() {
-        metadataQuery.searchScopes = [trashURL]
-        metadataQuery.predicate = NSPredicate(format: "%K LIKE '*'", NSMetadataItemFSNameKey)
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(queryUpdated),
-            name: .NSMetadataQueryDidFinishGathering,
-            object: metadataQuery
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(queryUpdated),
-            name: .NSMetadataQueryDidUpdate,
-            object: metadataQuery
-        )
-        refresh()
-        metadataQuery.start()
-    }
-
-    @objc private func queryUpdated() {
-        refresh()
-    }
-
-    func refresh() {
-        let url = trashURL
-        queue.async { [weak self] in
-            let names = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
-            let hasVisibleItems = names.contains { !$0.hasPrefix(".") }
-            DispatchQueue.main.async {
-                self?.isEmpty = !hasVisibleItems
-            }
-        }
-    }
-
-    func openTrash() {
-        NSWorkspace.shared.open(trashURL)
-        refresh()
-    }
-
-    func emptyTrash() {
-        queue.async { [weak self] in
-            guard let script = NSAppleScript(source: "tell application \"Finder\" to empty trash") else { return }
-            var errorDict: NSDictionary?
-            script.executeAndReturnError(&errorDict)
-            DispatchQueue.main.async {
-                self?.refresh()
-            }
-        }
-    }
-}
-
-private struct DownloadsTile: View {
-    let tileSide: CGFloat
-    let glyphSize: CGFloat
-
-    private var downloadsURL: URL? {
-        FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-    }
-
-    var body: some View {
-        Button {
-            if let url = downloadsURL {
-                NSWorkspace.shared.open(url)
-            }
-        } label: {
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: glyphSize, weight: .medium))
-                .foregroundStyle(.teal)
-                .frame(width: tileSide, height: tileSide)
-                .taskbarTile()
-        }
-        .buttonStyle(.plain)
-        .help("Open Downloads")
-        .disabled(downloadsURL == nil)
-    }
-}
-
-private struct SystemStatusIcon: View {
-    let snapshot: SystemStatusSnapshot
-    let glyphSize: CGFloat
-    var preset = StatusIconPreset.batteryOnly
-    var customSymbol = "battery.75percent"
-
-    private var ringDiameter: CGFloat { glyphSize * 0.92 }
-
-    private var batteryColor: Color {
-        if snapshot.batteryLevel <= 15 { return .red }
-        if snapshot.batteryLevel <= 30 { return .orange }
-        return .green
-    }
-
-    var body: some View {
-        Group {
-            switch preset {
-            case .batteryOnly:
-                batteryRing
-            case .batteryVolume:
-                batteryRingWithVolumeArc(showNetworkDot: false)
-            case .batteryVolumeNet:
-                batteryRingWithVolumeArc(showNetworkDot: true)
-            case .customSFSymbol:
-                Image(systemName: customSymbol.isEmpty ? "battery.75percent" : customSymbol)
-                    .font(.system(size: glyphSize * 0.72, weight: .medium))
-                    .foregroundStyle(.primary)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-
-    private var batteryRing: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.primary.opacity(0.18), lineWidth: max(2, glyphSize * 0.09))
-                .frame(width: ringDiameter, height: ringDiameter)
-            Circle()
-                .trim(from: 0, to: CGFloat(snapshot.batteryLevel) / 100)
-                .stroke(batteryColor, style: StrokeStyle(lineWidth: max(2, glyphSize * 0.09), lineCap: .round))
-                .frame(width: ringDiameter, height: ringDiameter)
-                .rotationEffect(.degrees(-90))
-            if snapshot.isCharging {
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: ringDiameter * 0.44, weight: .bold))
-                    .foregroundStyle(.yellow)
-            } else {
-                Text("\(snapshot.batteryLevel)")
-                    .font(.system(size: ringDiameter * 0.30, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-            }
-        }
-    }
-
-    private func batteryRingWithVolumeArc(showNetworkDot: Bool) -> some View {
-        let outerDiameter = ringDiameter + max(4, glyphSize * 0.16)
-        return ZStack(alignment: .bottomTrailing) {
-            Circle()
-                .stroke(Color.primary.opacity(0.12), lineWidth: max(1.5, glyphSize * 0.055))
-                .frame(width: outerDiameter, height: outerDiameter)
-            Circle()
-                .trim(from: 0, to: CGFloat(min(1, max(0, snapshot.isMuted ? 0 : snapshot.volumeLevel))))
-                .stroke(.blue, style: StrokeStyle(lineWidth: max(1.5, glyphSize * 0.055), lineCap: .round))
-                .frame(width: outerDiameter, height: outerDiameter)
-                .rotationEffect(.degrees(-90))
-            batteryRing
-            if showNetworkDot {
-                Circle()
-                    .fill(snapshot.wifiOn ? Color.green : Color.secondary)
-                    .frame(width: max(5, glyphSize * 0.18), height: max(5, glyphSize * 0.18))
-                    .overlay {
-                        Circle()
-                            .strokeBorder(Color.white.opacity(0.85), lineWidth: 1)
-                    }
-                    .offset(x: 1, y: 1)
-            }
-        }
-    }
-}
-
-private struct TrashTile: View {
-    let tileSide: CGFloat
-    let glyphSize: CGFloat
-    let darkMode: Bool
-    @ObservedObject private var store = TrashStore.shared
-
-    var body: some View {
-        Button {
-            store.openTrash()
-        } label: {
-            Image(systemName: store.isEmpty ? "trash" : "trash.fill")
-                .font(.system(size: glyphSize, weight: .medium))
-                .foregroundStyle(darkMode ? Color(red: 0.72, green: 0.78, blue: 0.88) : .secondary)
-                .frame(width: tileSide, height: tileSide)
-                .taskbarTile()
-        }
-        .buttonStyle(.plain)
-        .help(store.isEmpty ? "Open Trash (empty)" : "Open Trash")
-        .contextMenu {
-            Button("Open Trash") { store.openTrash() }
-            Button("Empty Trash") { store.emptyTrash() }
-                .disabled(store.isEmpty)
-        }
-        .onAppear { store.refresh() }
-    }
-}
-
-private struct TaskbarDividerView: View {
-    var body: some View {
-        Rectangle()
-            .fill(Color.primary.opacity(0.14))
-            .frame(width: 1)
-    }
-}
-
-private struct TilePressButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.72), value: configuration.isPressed)
-    }
-}
-
-private struct AppTile<Icon: View, Indicator: View>: View {
-    let title: String
-    let icon: Icon
-    let indicator: Indicator
-    let onActivate: () -> Void
-    let menu: AnyView
-    let onHoverChanged: (Bool) -> Void
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: onActivate) {
-            ZStack {
-                icon
-                VStack {
-                    Spacer(minLength: 0)
-                    indicator
-                }
-            }
-            .offset(y: isHovering ? -2 : 0)
-            .scaleEffect(isHovering ? 1.03 : 1.0)
-            .animation(.spring(response: 0.24, dampingFraction: 0.78), value: isHovering)
-        }
-        .buttonStyle(TilePressButtonStyle())
-        .help(title)
-        .contextMenu { menu }
-        .onHover { hovering in
-            isHovering = hovering
-            onHoverChanged(hovering)
-        }
-    }
-}
-
-private struct TaskbarTileStyle: ViewModifier {
-    var highlighted = false
-    var highlightFill = IndicatorFill.solid(.blue)
-    @Environment(\.surfaceStyle) private var surfaceStyle
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.iconBackground) private var iconBackground
-
-    func body(content: Content) -> some View {
-        Group {
-            if iconBackground.isVisible {
-                content
-                    .background { tileBackground }
-                    .contentShape(tileShape)
-            } else {
-                content
-                    .contentShape(Rectangle())
-            }
-        }
-        .onHover { hovering in
-            if hovering {
-                NSCursor.pointingHand.push()
-            } else {
-                NSCursor.pop()
-            }
-        }
-    }
-
-    private var tileFill: AnyShapeStyle {
-        if highlighted {
-            return highlightFill.style(opacity: 0.22)
-        }
-        return AnyShapeStyle(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10))
-    }
-
-    private var tileStroke: AnyShapeStyle {
-        if highlighted {
-            return highlightFill.style(opacity: 0.55)
-        }
-        return AnyShapeStyle(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.5))
-    }
-
-    private var tileBackground: some View {
-        tileShape
-            .fill(tileFill)
-            .overlay {
-                tileShape.stroke(tileStroke, lineWidth: 1)
-            }
-    }
-
-    private var tileShape: AnyShape {
-        switch iconBackground.shape {
-        case .circle:
-            AnyShape(Circle())
-        case .roundedRect:
-            AnyShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        case .roundedRectLarge:
-            AnyShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-    }
-}
-
-private extension View {
-    func taskbarTile(highlighted: Bool = false, highlightFill: IndicatorFill = .solid(.blue)) -> some View {
-        modifier(TaskbarTileStyle(highlighted: highlighted, highlightFill: highlightFill))
-    }
-}
-
-private struct MacOSAppIcon: View {
-    let bundleIdentifier: String
-    let fallbackSymbol: String
-    let fallbackColor: Color
-    let size: CGFloat
-    @ObservedObject private var store = AppIconStore.shared
-    @Environment(\.iconBackground) private var iconBackground
-
-    private var fallbackClip: AnyShape {
-        switch iconBackground.shape {
-        case .circle:
-            AnyShape(Circle())
-        case .roundedRect:
-            AnyShape(RoundedRectangle(cornerRadius: max(6, size * 0.24), style: .continuous))
-        case .roundedRectLarge:
-            AnyShape(RoundedRectangle(cornerRadius: max(8, size * 0.36), style: .continuous))
-        }
-    }
-
-    var body: some View {
-        Group {
-            if let icon = store.icons[bundleIdentifier] {
-                Image(nsImage: icon)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } else {
-                ZStack {
-                    Image(systemName: fallbackSymbol)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .foregroundStyle(fallbackColor)
-                        .padding(size * 0.14)
-                }
-                .clipShape(fallbackClip)
-                .task(id: bundleIdentifier) {
-                    _ = store.icon(for: bundleIdentifier)
-                }
-            }
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
-    }
-}
 
 private struct DateWidget: View {
     let contentHeight: CGFloat
@@ -5684,6 +3780,570 @@ private struct StartFlyout: View {
 }
 
 
+struct TaskbarFlyoutContentView: View {
+    let panel: OpenPanel
+    @ObservedObject var model: TaskbarConceptState
+    let onLaunchApplication: (String) -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        flyoutContent
+            .environment(\.surfaceStyle, model.surfaceStyle)
+            .environment(\.surfaceTransparency, model.interfaceTransparency)
+            .environment(\.widgetOutline, model.widgetOutline)
+            .environment(\.iconBackground, model.iconBackground)
+    }
+
+    @ViewBuilder
+    private var flyoutContent: some View {
+        switch panel {
+        case .widgets:
+            WidgetsPanel(onClose: onClose, accent: model.clockTint, model: model)
+        case .calendar:
+            ClockFlyout(
+                displayedMonth: $model.displayedMonth,
+                selectedDate: $model.selectedDate,
+                showsClockSettings: $model.showsClockSettings,
+                uses24HourTime: $model.uses24HourTime,
+                showsSeconds: $model.showsSeconds,
+                dateStyle: $model.dateStyle,
+                clockDisplayStyle: $model.clockDisplayStyle,
+                clockTint: $model.clockTint,
+                clockColorPreset: $model.clockColorPreset,
+                clockGradientEnabled: $model.clockGradientEnabled,
+                clockGradientStart: $model.clockGradientStart,
+                clockGradientEnd: $model.clockGradientEnd,
+                accent: model.clockTint,
+                cornerRadius: model.shellRadius(for: .flyouts)
+            )
+        case .controls:
+            ControlsFlyout(accent: model.clockTint, model: model)
+        case .start:
+            StartFlyout(
+                onClose: onClose,
+                accent: model.clockTint,
+                model: model,
+                onLaunchApplication: onLaunchApplication
+            )
+        case .settings:
+            SettingsFlyout(
+                surfaceStyle: $model.surfaceStyle,
+                taskbarMode: $model.taskbarMode,
+                islandGap: $model.islandGap,
+                userDividers: $model.userDividers,
+                trashAnchors: $model.trashAnchors,
+                clusterOrder: $model.clusterOrder,
+                centeredBarWidth: $model.centeredBarWidth,
+                pinnedAppBundleIDs: model.pinnedAppBundleIDs,
+                isDarkMode: $model.isDarkMode,
+                wallpaperPreset: $model.wallpaperPreset,
+                pastelTint: $model.pastelTint,
+                gradientEndTint: $model.gradientEndTint,
+                gradientAngle: $model.gradientAngle,
+                interfaceTransparency: $model.interfaceTransparency,
+                usesTaskbarGradient: $model.usesTaskbarGradient,
+                taskbarGradientStart: $model.taskbarGradientStart,
+                taskbarGradientEnd: $model.taskbarGradientEnd,
+                taskbarHeight: $model.taskbarHeight,
+                showsTaskbarPanel: $model.showsTaskbarPanel,
+                hideMacDock: $model.hideMacDock,
+                showWindowPreviews: $model.showWindowPreviews,
+                runningIndicatorStyle: $model.runningIndicatorStyle,
+                runningIndicatorSize: $model.runningIndicatorSize,
+                runningIndicatorColor: $model.runningIndicatorColor,
+                indicatorColorPreset: $model.indicatorColorPreset,
+                indicatorGradientStart: $model.indicatorGradientStart,
+                indicatorGradientEnd: $model.indicatorGradientEnd,
+                minimizeMode: $model.minimizeMode,
+                contextMenuStyle: $model.contextMenuStyle,
+                showWifiName: $model.showWifiName,
+                showBluetoothDevices: $model.showBluetoothDevices,
+                ddcBrightnessEnabled: $model.ddcBrightnessEnabled,
+                cornerStyle: $model.cornerStyle,
+                cornerScope: $model.cornerScope,
+                cornerTaskbar: $model.cornerTaskbar,
+                cornerWidgets: $model.cornerWidgets,
+                cornerFlyouts: $model.cornerFlyouts,
+                taskbarIconSize: $model.taskbarIconSize,
+                statusIconPreset: $model.statusIconPreset,
+                statusIconCustomSymbol: $model.statusIconCustomSymbol,
+                widgetOutlineBorder: $model.widgetOutlineBorder,
+                widgetOutlineWidth: $model.widgetOutlineWidth,
+                iconBackgroundVisible: $model.iconBackgroundVisible,
+                iconBackgroundShape: $model.iconBackgroundShape,
+                flyoutAnimation: $model.flyoutAnimation,
+                flyoutHeightPreset: $model.flyoutHeightPreset,
+                trashPlacement: $model.trashPlacement,
+                shortcutBindings: $model.shortcutBindings,
+                clipboardHistoryEnabled: $model.clipboardHistoryEnabled,
+                ipGeolocationEnabled: $model.ipGeolocationEnabled,
+                faviconServiceEnabled: $model.faviconServiceEnabled,
+                aiAccountSwitchingEnabled: $model.aiAccountSwitchingEnabled,
+                clipboardRetention: $model.clipboardRetention,
+                panelWidths: $model.panelWidths,
+                accent: model.clockTint,
+                onClose: onClose,
+                onResetPersonalisation: { model.resetPersonalisation() },
+                cornerRadius: model.shellRadius(for: .flyouts)
+            )
+        }
+    }
+}
 
 
+struct WindowPreviewContent: View {
+    let bundleID: String
+    let appTitle: String
+    let windows: [AppWindowInfo]
+    let surfaceStyle: SurfaceStyle
+    let onSelectWindow: (AppWindowInfo) -> Void
+    let onClose: () -> Void
+    let cornerRadius: CGFloat
+    @State private var thumbnails: [CGWindowID: NSImage] = [:]
+    @State private var didAttemptCapture = false
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.surfaceTransparency) private var transparency
 
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(appTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text("\(windows.count) \(windows.count == 1 ? "window" : "windows")")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(windows.prefix(6)) { window in
+                previewRow(window)
+            }
+            if didAttemptCapture, thumbnails.isEmpty {
+                Text("Grant Screen Recording for live thumbnails.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .background(panelBackground(style: surfaceStyle, darkMode: colorScheme == .dark, transparency: transparency), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .background(surfaceWash(style: surfaceStyle, darkMode: colorScheme == .dark))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.76), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.16), radius: 22, x: 0, y: 10)
+        .task {
+            await captureThumbnails()
+        }
+    }
+
+    private func previewRow(_ window: AppWindowInfo) -> some View {
+        Button {
+            onSelectWindow(window)
+        } label: {
+            HStack(spacing: 10) {
+                if let image = thumbnails[window.id] {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 120, height: 72)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    MacOSAppIcon(
+                        bundleIdentifier: bundleID,
+                        fallbackSymbol: "app.fill",
+                        fallbackColor: .secondary,
+                        size: 34
+                    )
+                    .frame(width: 120, height: 72)
+                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                }
+                Text(window.title)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .padding(8)
+            .background(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.05), in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func captureThumbnails() async {
+        let service = AppWindowPreviewService()
+        for window in windows.prefix(6) {
+            if let image = await service.captureThumbnail(forWindowID: window.id) {
+                thumbnails[window.id] = image
+            }
+        }
+        didAttemptCapture = true
+    }
+}
+
+
+struct TaskbarPanelContentView: View {
+    @ObservedObject var model: TaskbarConceptState
+    let onLaunchApplication: (String) -> Void
+    let onTaskbarIconClick: (String) -> Void
+    let onTaskbarTileAction: (TaskbarTileAction) -> Void
+
+    var body: some View {
+        Taskbar(
+            model: model,
+            height: $model.taskbarHeight,
+            onLaunchApplication: onLaunchApplication,
+            onTaskbarIconClick: onTaskbarIconClick,
+            onTaskbarTileAction: onTaskbarTileAction,
+            rendersSplitRow: false
+        )
+        .environment(\.surfaceTransparency, model.interfaceTransparency)
+        .environment(\.widgetOutline, model.widgetOutline)
+        .environment(\.iconBackground, model.iconBackground)
+        .preferredColorScheme(model.isDarkMode ? .dark : .light)
+    }
+}
+
+
+public struct TaskbarConceptView: View {
+    @ObservedObject private var model: TaskbarConceptState
+    private let onLaunchApplication: (String) -> Void
+    private let onTaskbarIconClick: (String) -> Void
+    private let onTaskbarTileAction: (TaskbarTileAction) -> Void
+
+    init(model: TaskbarConceptState, onLaunchApplication: @escaping (String) -> Void, onTaskbarIconClick: @escaping (String) -> Void, onTaskbarTileAction: @escaping (TaskbarTileAction) -> Void) {
+        self._model = ObservedObject(wrappedValue: model)
+        self.onLaunchApplication = onLaunchApplication
+        self.onTaskbarIconClick = onTaskbarIconClick
+        self.onTaskbarTileAction = onTaskbarTileAction
+    }
+
+    private var openPanel: OpenPanel? {
+        get { model.openPanel }
+        nonmutating set { model.openPanel = newValue }
+    }
+    private var surfaceStyle: SurfaceStyle { model.surfaceStyle }
+    private var showsTaskbarPanel: Bool { model.showsTaskbarPanel }
+    private var isDarkMode: Bool { model.isDarkMode }
+    private var wallpaperPreset: WallpaperPreset { model.wallpaperPreset }
+    private var pastelTint: Color { model.pastelTint }
+    private var gradientEndTint: Color { model.gradientEndTint }
+    private var gradientAngle: Double { model.gradientAngle }
+    private var interfaceTransparency: Double { model.interfaceTransparency }
+    private var usesTaskbarGradient: Bool { model.usesTaskbarGradient }
+    private var taskbarGradientStart: Color { model.taskbarGradientStart }
+    private var taskbarGradientEnd: Color { model.taskbarGradientEnd }
+    private var taskbarHeight: CGFloat { model.taskbarHeight }
+    private var showsClockSettings: Bool { model.showsClockSettings }
+    private var uses24HourTime: Bool { model.uses24HourTime }
+    private var showsSeconds: Bool { model.showsSeconds }
+    private var dateStyle: ClockDateStyle { model.dateStyle }
+    private var clockTint: Color { model.clockTint }
+    private var displayedMonth: Date { model.displayedMonth }
+    private var selectedDate: Date { model.selectedDate }
+
+    private func panelFrameWidth(_ kind: PanelKind, available: CGFloat) -> CGFloat {
+        min(model.panelWidth(for: kind), available)
+    }
+
+    public var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                DesktopBackdrop(
+                    isDarkMode: isDarkMode,
+                    preset: wallpaperPreset,
+                    pastelTint: pastelTint,
+                    gradientEndTint: gradientEndTint,
+                    gradientAngle: gradientAngle,
+                    surfaceStyle: surfaceStyle,
+                    weather: model.weather
+                )
+
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "square.grid.2x2.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.roseAccent)
+                        Text("TASKBAR CONCEPT")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .tracking(2.2)
+                            .foregroundStyle(.white.opacity(0.72))
+                    }
+                    .padding(.top, 30)
+                    .padding(.leading, 34)
+
+                    Spacer()
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("A calmer kind of desktop.")
+                            .font(.system(size: 42, weight: .semibold, design: .rounded))
+                            .tracking(-1.8)
+                        Text("A Windows-inspired taskbar, thoughtfully reimagined for macOS.")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.68))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.leading, 72)
+                    .padding(.bottom, 180)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if openPanel == .widgets, !showsTaskbarPanel {
+                    WidgetsPanel(onClose: { openPanel = nil }, accent: clockTint, model: model)
+                        .frame(
+                            width: panelFrameWidth(.widgets, available: geometry.size.width - 36),
+                            height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 28)
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(.leading, 14)
+                        .padding(.top, 14)
+                        .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
+                        .environment(\.surfaceStyle, surfaceStyle)
+                        .zIndex(2)
+                }
+
+                if openPanel == .calendar, !showsTaskbarPanel {
+                    ClockFlyout(
+                        displayedMonth: $model.displayedMonth,
+                        selectedDate: $model.selectedDate,
+                        showsClockSettings: $model.showsClockSettings,
+                        uses24HourTime: $model.uses24HourTime,
+                        showsSeconds: $model.showsSeconds,
+                        dateStyle: $model.dateStyle,
+                        clockDisplayStyle: $model.clockDisplayStyle,
+                        clockTint: $model.clockTint,
+                        clockColorPreset: $model.clockColorPreset,
+                        clockGradientEnabled: $model.clockGradientEnabled,
+                        clockGradientStart: $model.clockGradientStart,
+                        clockGradientEnd: $model.clockGradientEnd,
+                        accent: clockTint,
+                        cornerRadius: model.shellRadius(for: .flyouts)
+                    )
+                    .frame(width: min(520, geometry.size.width - 36), height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 28))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.trailing, 14)
+                    .padding(.top, 14)
+                    .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
+                    .environment(\.surfaceStyle, surfaceStyle)
+                    .zIndex(2)
+                }
+
+                if openPanel == .controls, !showsTaskbarPanel {
+                    ControlsFlyout(accent: clockTint, model: model)
+                        .frame(width: panelFrameWidth(.controls, available: geometry.size.width - 36), height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 28))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .padding(.trailing, 14)
+                        .padding(.top, 14)
+                        .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
+                        .environment(\.surfaceStyle, surfaceStyle)
+                        .zIndex(2)
+                }
+
+                if openPanel == .start, !showsTaskbarPanel {
+                    StartFlyout(
+                        onClose: { openPanel = nil },
+                        accent: clockTint,
+                        model: model,
+                        onLaunchApplication: onLaunchApplication
+                    )
+                        .frame(width: panelFrameWidth(.start, available: geometry.size.width - 48), height: model.flyoutHeight(available: geometry.size.height - taskbarHeight - 36))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, taskbarHeight + 12)
+                        .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
+                        .environment(\.surfaceStyle, surfaceStyle)
+                        .zIndex(2)
+                }
+
+                if openPanel == .settings, !showsTaskbarPanel {
+                    SettingsFlyout(
+                        surfaceStyle: $model.surfaceStyle,
+                        taskbarMode: $model.taskbarMode,
+                        islandGap: $model.islandGap,
+                        userDividers: $model.userDividers,
+                        trashAnchors: $model.trashAnchors,
+                        clusterOrder: $model.clusterOrder,
+                        centeredBarWidth: $model.centeredBarWidth,
+                        pinnedAppBundleIDs: model.pinnedAppBundleIDs,
+                        isDarkMode: $model.isDarkMode,
+                        wallpaperPreset: $model.wallpaperPreset,
+                        pastelTint: $model.pastelTint,
+                        gradientEndTint: $model.gradientEndTint,
+                        gradientAngle: $model.gradientAngle,
+                        interfaceTransparency: $model.interfaceTransparency,
+                        usesTaskbarGradient: $model.usesTaskbarGradient,
+                        taskbarGradientStart: $model.taskbarGradientStart,
+                        taskbarGradientEnd: $model.taskbarGradientEnd,
+                        taskbarHeight: $model.taskbarHeight,
+                        showsTaskbarPanel: $model.showsTaskbarPanel,
+                        hideMacDock: $model.hideMacDock,
+                        showWindowPreviews: $model.showWindowPreviews,
+                        runningIndicatorStyle: $model.runningIndicatorStyle,
+                        runningIndicatorSize: $model.runningIndicatorSize,
+                        runningIndicatorColor: $model.runningIndicatorColor,
+                        indicatorColorPreset: $model.indicatorColorPreset,
+                        indicatorGradientStart: $model.indicatorGradientStart,
+                        indicatorGradientEnd: $model.indicatorGradientEnd,
+                        minimizeMode: $model.minimizeMode,
+                        contextMenuStyle: $model.contextMenuStyle,
+                        showWifiName: $model.showWifiName,
+                        showBluetoothDevices: $model.showBluetoothDevices,
+                        ddcBrightnessEnabled: $model.ddcBrightnessEnabled,
+                        cornerStyle: $model.cornerStyle,
+                        cornerScope: $model.cornerScope,
+                        cornerTaskbar: $model.cornerTaskbar,
+                        cornerWidgets: $model.cornerWidgets,
+                        cornerFlyouts: $model.cornerFlyouts,
+                        taskbarIconSize: $model.taskbarIconSize,
+                        statusIconPreset: $model.statusIconPreset,
+                        statusIconCustomSymbol: $model.statusIconCustomSymbol,
+                        widgetOutlineBorder: $model.widgetOutlineBorder,
+                        widgetOutlineWidth: $model.widgetOutlineWidth,
+                        iconBackgroundVisible: $model.iconBackgroundVisible,
+                        iconBackgroundShape: $model.iconBackgroundShape,
+                        flyoutAnimation: $model.flyoutAnimation,
+                        flyoutHeightPreset: $model.flyoutHeightPreset,
+                        trashPlacement: $model.trashPlacement,
+                        shortcutBindings: $model.shortcutBindings,
+                        clipboardHistoryEnabled: $model.clipboardHistoryEnabled,
+                        ipGeolocationEnabled: $model.ipGeolocationEnabled,
+                        faviconServiceEnabled: $model.faviconServiceEnabled,
+                        aiAccountSwitchingEnabled: $model.aiAccountSwitchingEnabled,
+                        clipboardRetention: $model.clipboardRetention,
+                        panelWidths: $model.panelWidths,
+                        accent: clockTint,
+                        onClose: { openPanel = nil },
+                        onResetPersonalisation: { model.resetPersonalisation() },
+                        cornerRadius: model.shellRadius(for: .flyouts)
+                    )
+                    .frame(width: panelFrameWidth(.settings, available: geometry.size.width - 40), height: max(560, model.flyoutHeight(available: geometry.size.height - taskbarHeight - 40)))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(.bottom, taskbarHeight)
+                    .transition(MotionTokens.flyoutTransition(model.flyoutAnimation, reduceMotion: model.reduceMotion))
+                    .environment(\.surfaceStyle, surfaceStyle)
+                        .zIndex(2)
+                }
+
+                Taskbar(
+                    model: model,
+                    height: $model.taskbarHeight,
+                    onLaunchApplication: onLaunchApplication,
+                    onTaskbarIconClick: onTaskbarIconClick,
+                    onTaskbarTileAction: onTaskbarTileAction
+                )
+                .zIndex(3)
+
+                if model.showsOnboarding {
+                    OnboardingView(model: model, accent: model.clockTint, isDarkMode: model.isDarkMode) {
+                        model.completeOnboarding()
+                    }
+                    .transition(.opacity)
+                    .zIndex(10)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+            .animation(MotionTokens.spring(response: 0.38, dampingFraction: 0.86, reduceMotion: model.reduceMotion), value: openPanel)
+            .animation(MotionTokens.spring(response: 0.35, reduceMotion: model.reduceMotion), value: model.flyoutHeightPreset)
+            .environment(\.surfaceTransparency, interfaceTransparency)
+            .environment(\.widgetOutline, model.widgetOutline)
+            .environment(\.iconBackground, model.iconBackground)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
+        }
+    }
+}
+
+
+struct DesktopBackdrop: View {
+    let isDarkMode: Bool
+    let preset: WallpaperPreset
+    let pastelTint: Color
+    let gradientEndTint: Color
+    let gradientAngle: Double
+    let surfaceStyle: SurfaceStyle
+    let weather: WeatherState
+
+    private var weatherKind: WeatherBackdropKind {
+        weatherBackdropKind(for: weather)
+    }
+
+    private var gradientStart: UnitPoint {
+        UnitPoint(x: 0.5 - cos(gradientAngle * .pi / 180) / 2, y: 0.5 - sin(gradientAngle * .pi / 180) / 2)
+    }
+
+    private var gradientEnd: UnitPoint {
+        UnitPoint(x: 0.5 + cos(gradientAngle * .pi / 180) / 2, y: 0.5 + sin(gradientAngle * .pi / 180) / 2)
+    }
+
+    private var wallpaperColors: [Color] {
+        if preset == .custom {
+            return [pastelTint, gradientEndTint]
+        }
+        if preset == .weatherReactive {
+            return weatherBackdropPalette(for: weatherKind)
+        }
+        if preset == .themeMatched {
+            return surfaceStyle.accentGradient(darkMode: isDarkMode)
+        }
+        if isDarkMode && !preset.isDark {
+            return [
+                Color(red: 0.035, green: 0.055, blue: 0.10),
+                Color(red: 0.10, green: 0.075, blue: 0.14),
+                Color(red: 0.045, green: 0.10, blue: 0.16)
+            ]
+        }
+        return preset.colors
+    }
+
+    private var particleIntensity: Double {
+        switch weatherKind {
+        case .storm, .rain, .snow: 1.0
+        case .cloudy, .fog: 0.7
+        case .clearNight, .clearDay: 0.6
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: wallpaperColors,
+                startPoint: gradientStart,
+                endPoint: gradientEnd
+            )
+
+            Circle()
+                .fill((preset == .custom ? pastelTint : wallpaperColors.first ?? pastelTint).opacity(0.47))
+                .frame(width: 520, height: 520)
+                .blur(radius: 85)
+                .offset(x: 380, y: -170)
+
+            Circle()
+                .fill((preset == .custom ? gradientEndTint : wallpaperColors.last ?? gradientEndTint).opacity(0.31))
+                .frame(width: 460, height: 460)
+                .blur(radius: 100)
+                .offset(x: -430, y: 140)
+
+            Ellipse()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.13), Color.white.opacity(0.015)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 860, height: 410)
+                .rotationEffect(.degrees(-26))
+                .offset(x: 220, y: 130)
+
+            Ellipse()
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                .frame(width: 960, height: 480)
+                .rotationEffect(.degrees(-26))
+                .offset(x: 210, y: 135)
+
+            if preset == .weatherReactive {
+                WeatherParticles(kind: weatherKind, intensity: particleIntensity)
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
