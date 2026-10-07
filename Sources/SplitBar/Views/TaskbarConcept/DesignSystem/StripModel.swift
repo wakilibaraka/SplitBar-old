@@ -150,6 +150,17 @@ enum TaskbarSection: String, CaseIterable, Identifiable, Hashable {
 enum TaskbarStripMetrics {
     static func tileStride(barHeight: CGFloat) -> CGFloat { max(28, barHeight - 4) + 4 }
 
+    /// Width for a centered bar, expanded from the user's width whenever the
+    /// content at the given tile count would not fit, and clipped to the screen.
+    static func centeredFrameWidth(userWidth: CGFloat, barHeight: CGFloat, appCount: Int, availableWidth: CGFloat) -> CGFloat {
+        let stride = tileStride(barHeight: barHeight)
+        let weather: CGFloat = 196 + 18
+        let apps = CGFloat(appCount) * stride + 16
+        let trayAndClock = stride * 2 + 96
+        let intrinsic = weather + apps + trayAndClock + 32
+        return min(availableWidth, max(userWidth, intrinsic))
+    }
+
     static func layout(
         screenWidth: CGFloat,
         mode: TaskbarMode,

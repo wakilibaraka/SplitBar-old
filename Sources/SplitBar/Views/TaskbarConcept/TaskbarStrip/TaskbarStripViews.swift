@@ -547,6 +547,9 @@ struct Taskbar: View {
     private var isFloating: Bool { mode == .macOS }
     private var isConstrained: Bool { isFloating || mode == .centered }
     private var showsDividers: Bool { !isFloating }
+    private var appTileCount: Int {
+        model.pinnedAppBundleIDs.count + model.runningAppOrder.filter { !model.pinnedAppBundleIDs.contains($0) }.count
+    }
 
     private var tiles: TaskbarTiles {
         TaskbarTiles(
@@ -642,7 +645,7 @@ struct Taskbar: View {
                 .frame(maxWidth: .infinity)
             }
             .frame(maxWidth: .infinity)
-            .frame(width: isConstrained ? min(geometry.size.width, model.centeredBarWidth) : nil)
+            .frame(width: isConstrained ? (mode == .centered ? TaskbarStripMetrics.centeredFrameWidth(userWidth: model.centeredBarWidth, barHeight: height, appCount: appTileCount, availableWidth: geometry.size.width) : min(geometry.size.width, model.centeredBarWidth)) : nil)
             .frame(maxWidth: .infinity)
             .overlay(alignment: .center) {
                 TaskbarIslandContent(
