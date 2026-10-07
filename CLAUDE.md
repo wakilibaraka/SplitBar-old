@@ -71,6 +71,7 @@ For the review-driven improvement backlog, invariants and per-task status, read
 - Keep `-warnings-as-errors` green; never silence a warning with a blanket
   suppression.
 - Request permissions lazily, at first use of the feature, never at launch.
+- Never keep removed panels in panels; a panel lifecycle change must be reflected in   TaskbarPanelPlanTests, the `TaskbarPanelPlanTests` plan helper is the contract.
 - Prefer opt-in defaults for anything that touches user data or the network.
 ## Operational notes
 
@@ -79,3 +80,13 @@ For the review-driven improvement backlog, invariants and per-task status, read
 - Keep this file in sync: when the architecture changes — file moves, new
   modules, new panel kinds, changed invariants — update CLAUDE.md, because old
   instructions in it drift and then agents do the wrong thing.
+
+## Panel lifecycle (post 2026-10-07)
+
+- `TaskbarPanelController.show(_:)` tears down panels that the new layout does
+  not want (orderOut + close + removal from `panels`, `hostingViews`,
+  `panelFrames`); `refreshFullscreenVisibility()` only refreshes `activeKeys`.
+- Do not re-add a removed panel to `panels`/`hostingViews` without going through
+  the create/update/remove plan in `PanelPlan`.
+- see `docs/bugs/2026-10-07-panels/README.md` and `RENDERING_FIX_PLAN.md` for
+  the full fix set.
