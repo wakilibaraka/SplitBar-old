@@ -4,8 +4,8 @@
 # Never allowlist: URLs with query strings, filesystem paths, account or email
 # identifiers, device addresses, tokens, clipboard content, window or app
 # titles, response bodies, or free-form error text.
-AppRuntimeController.swift imageData.count    byte count of a PNG blob, not content
-AppRuntimeController.swift entries.count      number of clipboard entries, not content
+ClipboardCoordinator.swift imageData.count    byte count of a PNG blob, not content
+ClipboardCoordinator.swift entries.count      number of clipboard entries, not content
 AIAccountStore.swift target.provider.rawValue  enum name of the provider
 AIAccountStore.swift account.provider.rawValue enum name of the provider
 AIUsageService.swift process.terminationStatus  process exit status

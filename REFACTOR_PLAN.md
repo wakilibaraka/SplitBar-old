@@ -113,6 +113,23 @@ Each coordinator gets a protocol (`ClipboardCoordinating`, …) so `AppRuntimeCo
 depends on abstractions, and each holds its subscriptions in one place instead of
 sharing the runtime's `Set<AnyCancellable>`.
 
+**Decisions taken in C2.1**, which the later coordinators should follow:
+
+- Coordinators do not take `AppPreferences`. `ClipboardCoordinator` takes a
+  `ClipboardSettings` value type, so it can be tested without constructing the
+  whole settings model, and the mapping lives in one `AppPreferences` extension.
+- Narrow service protocols (`ClipboardMonitoring`, `ClipboardPersisting`) sit
+  beside the coordinator, so the tests use spies instead of the real pasteboard
+  watcher and the real disk.
+- The one subtle behaviour worth protecting: a capture refreshed the flyout only
+  when it was visible, while an edit refreshed whenever a flyout was open at all.
+  That distinction became `ClipboardHistoryChange.captured` / `.edited`, so the
+  extraction cannot quietly merge the two cases.
+- The clock is injected (`now: () -> Date`), which is what makes the pause window
+  testable without sleeping.
+- Two `privacy: .public` log allowlist entries moved with the code, from
+  `AppRuntimeController.swift` to `ClipboardCoordinator.swift`.
+
 **Sequencing note:** do C2.1–C2.3 first. They are the ones that can ship real
 tests, which pays for the refactor. Panel and Dock coordinators move later because
 their behaviour is hard to test without a running UI.
@@ -246,6 +263,7 @@ and `swift test` before the commit.
 
 | Slice | Commit | Result |
 |---|---|---|
+| C2.1 | see log | `ClipboardCoordinator` extracted (`App/Coordinators/ClipboardCoordinator.swift`, 271 lines) with `ClipboardCoordinating`, `ClipboardMonitoring` and `ClipboardPersisting`. Runtime 2,763 → 2,618 lines. Nine methods and all clipboard storage left the controller. 9 new tests (45 → 54). Build clean, logging lint passes, move verified. |
 | C1.4b | see log | Flyouts extracted and `TaskbarConceptView.swift` deleted (7,800 lines total → 0): `TaskbarSurfaces.swift` (572), `Widgets/` (271 + 612), `Launcher/` (493 + 132), `QuickSettings/` (333), `Calendar/` (309 + 86), `Settings/` (289 + 1,172 + 47). Build clean, 45 tests pass, move verified. |
 | C1.4a | see log | Strip views extracted to `TaskbarStrip/`: `TaskbarStripViews.swift` (946), `TileViews.swift` (303), `TileStores.swift` (95); the chord-format and app-naming helpers moved to `Support/`. Source file 5,687 → 4,349 lines. Build clean, 45 tests pass, move verified. `TaskbarConceptView` deliberately stays until C1.4f: it references every flyout, so moving it earlier would force each later slice to widen types it is about to move anyway. |
 | C1.3 | see log | State extracted: `TaskbarState.swift` (803) holds `TaskbarConceptState` with `LauncherApp`, `LauncherFolder`, `LauncherDefaults`, `TopProcess`; `DesignSystem/ClockStyle.swift` (74) takes the clock style enums, `clockTime`, and the `Date`/`Calendar` helpers. Source file 6,546 → 5,687 lines. Build clean, 45 tests pass, move verified. |

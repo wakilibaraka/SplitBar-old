@@ -147,13 +147,11 @@ public final class AppRuntimeController {
     public let launchService: AppLaunchService
     public let catalogService: ApplicationCatalogService
     public let shortcutService: GlobalShortcutService
+    let clipboardCoordinator: ClipboardCoordinator
     public let panelController: EdgePanelController
     public let flyoutController: FlyoutPanelController
-    public let clipboardPersistence: ClipboardPersistence
-    public let clipboardMonitor: ClipboardMonitor
     private var dockHostingView: NSHostingView<DockInteractiveContainerView>?
     private var latestSystemMetrics: SystemMetrics?
-    private let clipboardIOQueue = DispatchQueue(label: "com.baraka.splitbar.clipboard-io", qos: .utility)
     public let configPersistence: ConfigurationPersistence
     public let systemMonitorService: SystemMonitorService
     public let windowPreviewService: AppWindowPreviewService
@@ -168,8 +166,6 @@ public final class AppRuntimeController {
     public let tooltipController: DockTooltipPanelController
     public private(set) var statusBarController: StatusBarController?
     public let magnificationConfiguration: DockMagnificationConfiguration
-    public private(set) var clipboardHistory: [ClipboardEntry]
-    public let clipboardPolicy: ClipboardRetentionPolicy
     private var addItemPanel: NSPanel?
     private var addPanelGlobalMonitor: Any?
     private var addPanelLocalMonitor: Any?
@@ -182,7 +178,6 @@ public final class AppRuntimeController {
     private var currentPlaybackInterval: TimeInterval = 10.0
     private var taskbarConceptWindow: NSWindow?
     private let taskbarConceptState = TaskbarConceptState()
-    private var clipboardPausedUntil: Date?
     private let taskbarPanelController = TaskbarPanelController()
     private let displayCoordinator = DisplayCoordinator()
     private let taskbarFlyoutController = FlyoutPanelController()
@@ -227,8 +222,10 @@ public final class AppRuntimeController {
         self.catalogService = catalogService
         self.shortcutService = shortcutService
         self.flyoutController = flyoutController
-        self.clipboardPersistence = clipboardPersistence
-        self.clipboardMonitor = clipboardMonitor
+        self.clipboardCoordinator = ClipboardCoordinator(
+            monitor: clipboardMonitor,
+            persistence: clipboardPersistence
+        )
         self.configPersistence = configPersistence
         self.systemMonitorService = systemMonitorService
         self.windowPreviewService = AppWindowPreviewService()
@@ -241,19 +238,6 @@ public final class AppRuntimeController {
         self.quickNotesService = quickNotesService
         self.dockController = dockController
         self.tooltipController = DockTooltipPanelController()
-        self.clipboardPolicy = preferences.clipboardRetention
-        do {
-            self.clipboardHistory = try clipboardPersistence.loadHistory()
-        } catch {
-            Logger.persistence.error("Failed to load clipboard history error=\(error.localizedDescription, privacy: .private)")
-            do {
-                let backupURL = try clipboardPersistence.quarantineCorruptHistory()
-                Logger.persistence.notice("Moved unreadable clipboard history aside backup=\(backupURL.path, privacy: .private)")
-            } catch {
-                Logger.persistence.error("Failed to quarantine clipboard history error=\(error.localizedDescription, privacy: .private)")
-            }
-            self.clipboardHistory = []
-        }
         self.magnificationConfiguration = DockMagnificationConfiguration(
             maxScale: 1.35,
             influenceRadius: 75.0,
@@ -327,6 +311,20 @@ public final class AppRuntimeController {
         self.statusBarController = statusBar
         statusSelf = self
 
+        self.clipboardCoordinator.historyDidChange = { [weak self] change in
+            guard let self else { return }
+            switch change {
+            case .captured:
+                if self.state.flyout.isVisible, let activeID = self.state.flyout.activeItemID {
+                    self.syncFlyout(activeItemID: activeID)
+                }
+            case .edited:
+                if let activeID = self.state.flyout.activeItemID {
+                    self.syncFlyout(activeItemID: activeID)
+                }
+            }
+        }
+
         self.updateDockContent()
         self.syncPanels()
         self.setupDefaultShortcuts()
@@ -334,7 +332,7 @@ public final class AppRuntimeController {
         self.setupRunningState()
         self.setupWeatherForwarding()
         self.installPrivacyGateBridge()
-        self.setupClipboardMonitoring()
+        self.clipboardCoordinator.refreshMonitoring(for: preferences.clipboardSettings)
         self.setupLiveStreaming()
         Logger.lifecycle.info("AppRuntimeController initialized")
         openTaskbarConceptWindow()
@@ -837,14 +835,10 @@ public final class AppRuntimeController {
         if previous.faviconServiceEnabled != newPreferences.faviconServiceEnabled {
             FaviconService.usesThirdPartyService = newPreferences.faviconServiceEnabled
         }
-        if previous.clipboardHistoryEnabled != newPreferences.clipboardHistoryEnabled {
-            if newPreferences.clipboardHistoryEnabled {
-                setupClipboardMonitoring()
-            } else {
-                clipboardMonitor.stopMonitoring()
-            }
-        }
-        clipboardMonitor.updateExcludedBundleIdentifiers(newPreferences.clipboardExcludedBundleIdentifiers)
+        clipboardCoordinator.applySettingsChange(
+            from: previous.clipboardSettings,
+            to: newPreferences.clipboardSettings
+        )
         refreshSettingsWindow()
         // Açık flyout yeni temaya hemen uysun
         if state.flyout.isVisible, let activeID = state.flyout.activeItemID {
@@ -982,61 +976,6 @@ public final class AppRuntimeController {
                 self?.dockController.setHidden(hidden)
             }
             .store(in: &taskbarPanelSubscriptions)
-    }
-
-    /// Clipboard history is opt-in: with it off no timer is scheduled and
-    /// nothing is written to disk.
-    /// Suspends clipboard capture for `seconds` without forgetting the setting.
-    private func pauseClipboard(for seconds: TimeInterval) {
-        clipboardMonitor.stopMonitoring()
-        clipboardPausedUntil = Date(timeIntervalSinceNow: seconds)
-        Logger.clipboard.notice("Clipboard capture paused")
-    }
-
-    private func setupClipboardMonitoring() {
-        if let pausedUntil = clipboardPausedUntil, pausedUntil > Date() {
-            clipboardMonitor.stopMonitoring()
-            return
-        }
-        clipboardPausedUntil = nil
-        guard preferences.clipboardHistoryEnabled else {
-            clipboardMonitor.stopMonitoring()
-            Logger.clipboard.debug("Clipboard history disabled")
-            return
-        }
-        clipboardMonitor.startMonitoring(
-            interval: 0.6,
-            excludedBundleIdentifiers: preferences.clipboardExcludedBundleIdentifiers
-        ) { [weak self] capture in
-            Task { @MainActor in
-                self?.handleNewClipboardCapture(capture)
-            }
-        }
-    }
-
-    private func handleNewClipboardCapture(_ capture: ClipboardCapture) {
-        Logger.clipboard.debug("Received new clipboard candidate")
-        if let imageData = capture.imageData, case .imageBlob(let relativePath, _) = capture.entry.payload {
-            // Blob yazımı, geçmiş kaydından önce aynı seri kuyrukta çalışır; böylece temizlik yeni dosyayı silmez
-            let persistence = clipboardPersistence
-            clipboardIOQueue.async {
-                do {
-                    try persistence.saveBlob(data: imageData, relativePath: relativePath)
-                } catch {
-                    Logger.persistence.error("Failed to save clipboard image blob path=\(relativePath, privacy: .private) bytes=\(imageData.count, privacy: .public) error=\(error.localizedDescription, privacy: .private)")
-                }
-            }
-        }
-        self.clipboardHistory = mergeClipboardEntry(
-            history: clipboardHistory,
-            candidate: capture.entry,
-            policy: preferences.clipboardRetention
-        )
-        persistClipboardHistory()
-
-        if state.flyout.isVisible, let activeID = state.flyout.activeItemID {
-            syncFlyout(activeItemID: activeID)
-        }
     }
 
     private func setupDefaultShortcuts() {
@@ -1400,24 +1339,24 @@ public final class AppRuntimeController {
         let contentView: AnyView
         if case .widget(let widgetID) = item.kind, widgetID == "clipboard" {
             let clipboardView = ClipboardHistoryView(
-                history: clipboardHistory,
+                history: clipboardCoordinator.history,
                 onCopy: { [weak self] entry in
-                    self?.copyToPasteboard(entry: entry)
+                    self?.clipboardCoordinator.copyToPasteboard(entry: entry)
                 },
                 onTogglePin: { [weak self] id in
-                    self?.togglePin(id: id)
+                    self?.clipboardCoordinator.togglePin(id: id)
                 },
                 onDelete: { [weak self] id in
-                    self?.deleteClipboardEntry(id: id)
+                    self?.clipboardCoordinator.delete(id: id)
                 },
                 onClearUnpinned: { [weak self] in
-                    self?.clearUnpinnedClipboard()
+                    self?.clipboardCoordinator.clearUnpinned()
                 },
                 onClearAll: { [weak self] in
-                    self?.clearAllClipboard()
+                    self?.clipboardCoordinator.clearAll()
                 },
                 onPause: { [weak self] seconds in
-                    self?.pauseClipboard(for: seconds)
+                    self?.clipboardCoordinator.pause(for: seconds)
                 }
             )
             contentView = AnyView(
@@ -1722,89 +1661,6 @@ public final class AppRuntimeController {
         if let monitor = flyoutLocalMonitor {
             NSEvent.removeMonitor(monitor)
             flyoutLocalMonitor = nil
-        }
-    }
-
-    private func copyToPasteboard(entry: ClipboardEntry) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        switch entry.payload {
-        case .text(let text):
-            pasteboard.setString(text, forType: .string)
-        case .url(let url):
-            pasteboard.setString(url.absoluteString, forType: .URL)
-        case .fileURLs(let urls):
-            pasteboard.writeObjects(urls as [NSURL])
-        case .imageBlob(let relPath, _):
-            guard let data = clipboardPersistence.loadBlob(relativePath: relPath) else {
-                Logger.clipboard.error("Clipboard image blob is missing path=\(relPath, privacy: .private)")
-                NSSound.beep()
-                return
-            }
-            pasteboard.setData(data, forType: .png)
-        }
-    }
-
-    /// Pano geçmişini diske yazar ve artık hiçbir girdinin referans vermediği resim dosyalarını siler.
-    /// Disk işi ana thread'i bloke etmemek için seri arka plan kuyruğunda, çağrı sırasıyla yürütülür.
-    private func persistClipboardHistory() {
-        let entries = clipboardHistory
-        let persistence = clipboardPersistence
-        let referencedBlobPaths: Set<String> = Set(entries.compactMap { entry in
-            if case .imageBlob(let relativePath, _) = entry.payload {
-                return relativePath
-            }
-            return nil
-        })
-        clipboardIOQueue.async {
-            do {
-                try persistence.saveHistory(entries)
-                try persistence.cleanupUnreferencedBlobs(referencedPaths: referencedBlobPaths)
-            } catch {
-                Logger.persistence.error("Failed to persist clipboard history entries=\(entries.count, privacy: .public) error=\(error.localizedDescription, privacy: .private)")
-            }
-        }
-    }
-
-    private func togglePin(id: UUID) {
-        guard let index = clipboardHistory.firstIndex(where: { $0.id == id }) else { return }
-        let current = clipboardHistory[index]
-        let toggled = ClipboardEntry(
-            id: current.id,
-            timestamp: current.timestamp,
-            sourceBundleIdentifier: current.sourceBundleIdentifier,
-            isPinned: !current.isPinned,
-            searchableText: current.searchableText,
-            payload: current.payload
-        )
-        clipboardHistory[index] = toggled
-        persistClipboardHistory()
-        if let activeID = state.flyout.activeItemID {
-            syncFlyout(activeItemID: activeID)
-        }
-    }
-
-    private func deleteClipboardEntry(id: UUID) {
-        clipboardHistory.removeAll { $0.id == id }
-        persistClipboardHistory()
-        if let activeID = state.flyout.activeItemID {
-            syncFlyout(activeItemID: activeID)
-        }
-    }
-
-    private func clearUnpinnedClipboard() {
-        clipboardHistory.removeAll { !$0.isPinned }
-        persistClipboardHistory()
-        if let activeID = state.flyout.activeItemID {
-            syncFlyout(activeItemID: activeID)
-        }
-    }
-
-    private func clearAllClipboard() {
-        clipboardHistory.removeAll()
-        persistClipboardHistory()
-        if let activeID = state.flyout.activeItemID {
-            syncFlyout(activeItemID: activeID)
         }
     }
 
@@ -2232,7 +2088,7 @@ public final class AppRuntimeController {
             CommandPaletteItem(
                 id: "wid-clipboard",
                 title: "Clipboard History",
-                subtitle: "\(clipboardHistory.count) entries saved locally",
+                subtitle: "\(clipboardCoordinator.history.count) entries saved locally",
                 iconSystemName: "doc.on.clipboard",
                 iconColor: .purple,
                 category: .widgets,
