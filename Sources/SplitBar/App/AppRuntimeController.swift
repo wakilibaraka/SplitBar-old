@@ -154,9 +154,9 @@ public final class AppRuntimeController {
     private var latestSystemMetrics: SystemMetrics?
     public let configPersistence: ConfigurationPersistence
     public let systemMonitorService: SystemMonitorService
+    let weatherCoordinator: WeatherCoordinator
     public let windowPreviewService: AppWindowPreviewService
     public let nowPlayingService: NowPlayingService
-    public let weatherService: WeatherService
     public let bluetoothService: BluetoothService
     public let aiUsageService: AIUsageService
     public let windowManagerService: WindowManagerService
@@ -230,7 +230,7 @@ public final class AppRuntimeController {
         self.systemMonitorService = systemMonitorService
         self.windowPreviewService = AppWindowPreviewService()
         self.nowPlayingService = nowPlayingService
-        self.weatherService = weatherService
+        self.weatherCoordinator = WeatherCoordinator(service: weatherService)
         self.bluetoothService = bluetoothService
         self.aiUsageService = aiUsageService
         self.windowManagerService = windowManagerService
@@ -960,12 +960,13 @@ public final class AppRuntimeController {
     }
 
     private func setupWeatherForwarding() {
-        taskbarConceptState.weather = weatherService.currentState
+        taskbarConceptState.weather = weatherCoordinator.currentState
         taskbarConceptState.weatherWidgetState = .loading
-        weatherService.onUpdate = { [weak self] state in
+        weatherCoordinator.stateDidChange = { [weak self] state in
             self?.taskbarConceptState.weather = state
-            self?.taskbarConceptState.weatherWidgetState = state.isLive ? .loaded : .error("Weather unavailable — showing sample")
+            self?.taskbarConceptState.weatherWidgetState = WeatherCoordinator.widgetState(for: state)
         }
+        weatherCoordinator.start()
         taskbarConceptState.nowPlaying = nowPlayingService.currentState
         taskbarConceptState.onTogglePlayback = { [weak self] in
             self?.nowPlayingService.togglePlayPause()
@@ -1427,10 +1428,10 @@ public final class AppRuntimeController {
             )
         } else if case .widget(let widgetID) = item.kind, widgetID == "weather" {
             let weatherView = WeatherFlyoutView(
-                state: weatherService.currentState,
+                state: weatherCoordinator.currentState,
                 onRefresh: { [weak self] in
                     Task { @MainActor [weak self] in
-                        await self?.weatherService.refresh()
+                        self?.weatherCoordinator.refresh()
                         self?.syncFlyout(activeItemID: activeItemID)
                     }
                 }
@@ -2049,8 +2050,8 @@ public final class AppRuntimeController {
         items.append(
             CommandPaletteItem(
                 id: "wid-weather",
-                title: "Weather: \(weatherService.currentState.cityName) (\(weatherService.currentState.formattedTemperature))",
-                subtitle: weatherService.currentState.conditionText,
+                title: "Weather: \(weatherCoordinator.currentState.cityName) (\(weatherCoordinator.currentState.formattedTemperature))",
+                subtitle: weatherCoordinator.currentState.conditionText,
                 iconSystemName: "sun.max.fill",
                 iconColor: .orange,
                 category: .widgets,
@@ -2487,7 +2488,7 @@ public final class AppRuntimeController {
             state: self.state,
             preferences: self.preferences,
             config: self.magnificationConfiguration,
-            weatherState: self.weatherService.currentState,
+            weatherState: self.weatherCoordinator.currentState,
             aiUsageState: self.aiUsageService.sampleUsage(),
             // Yeniden örnekleme CPU/ağ delta'larını bozar ve her dispatch'te gereksiz sistem çağrısı yapar
             systemMetrics: self.latestSystemMetrics,
