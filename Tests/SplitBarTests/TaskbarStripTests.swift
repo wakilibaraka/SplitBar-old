@@ -195,4 +195,21 @@ struct TaskbarStripTests {
         #expect(layout.islands.isEmpty)
         #expect(!layout.showsOverflow)
     }
+
+    @Test func shortcutChordLabels() {
+        #expect(shortcutChordLabel(ShortcutChord(carbonKeyCode: 0x02, carbonModifiers: 0x0800)) == "⌥D")
+        #expect(shortcutChordLabel(ShortcutChord(carbonKeyCode: 0x31, carbonModifiers: 0x0800)) == "⌥Space")
+        #expect(shortcutChordLabel(ShortcutChord(carbonKeyCode: 0x7B, carbonModifiers: 0x1800)) == "⌃⌥←")
+        #expect(TaskbarConceptState.defaultShortcutBindings.count == 7)
+        for binding in TaskbarConceptState.defaultShortcutBindings {
+            #expect(binding.action.isRebindable)
+        }
+    }
+
+    @Test func shortcutBindingsRoundTrip() throws {
+        let expected = TaskbarConceptState.defaultShortcutBindings
+        let data = try JSONEncoder().encode(expected)
+        let restored = try JSONDecoder().decode([ShortcutBinding].self, from: data)
+        #expect(restored == expected)
+    }
 }

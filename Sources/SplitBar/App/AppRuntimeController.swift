@@ -973,25 +973,17 @@ public final class AppRuntimeController {
     }
 
     private func setupDefaultShortcuts() {
-        let toggleChord = ShortcutChord(carbonKeyCode: UInt32(0x02), carbonModifiers: UInt32(0x0800)) // Option + D
-        let paletteChord = ShortcutChord(carbonKeyCode: UInt32(0x31), carbonModifiers: UInt32(0x0800)) // Option + Space
-        let clipboardChord = ShortcutChord(carbonKeyCode: UInt32(0x09), carbonModifiers: UInt32(0x0800)) // Option + V
+        registerShortcutBindings()
+        taskbarConceptState.$shortcutBindings
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                self?.registerShortcutBindings()
+            }
+            .store(in: &taskbarPanelSubscriptions)
+    }
 
-        let tileLeftChord = ShortcutChord(carbonKeyCode: UInt32(0x7B), carbonModifiers: UInt32(0x1800)) // Control + Option + Left
-        let tileRightChord = ShortcutChord(carbonKeyCode: UInt32(0x7C), carbonModifiers: UInt32(0x1800)) // Control + Option + Right
-        let tileMaxChord = ShortcutChord(carbonKeyCode: UInt32(0x7E), carbonModifiers: UInt32(0x1800)) // Control + Option + Up
-        let tileCenterChord = ShortcutChord(carbonKeyCode: UInt32(0x7D), carbonModifiers: UInt32(0x1800)) // Control + Option + Down
-
-        let bindings = [
-            ShortcutBinding(id: UUID(), chord: toggleChord, action: .toggleDock),
-            ShortcutBinding(id: UUID(), chord: paletteChord, action: .openCommandPalette),
-            ShortcutBinding(id: UUID(), chord: clipboardChord, action: .openClipboard),
-            ShortcutBinding(id: UUID(), chord: tileLeftChord, action: .tileWindow(.leftHalf)),
-            ShortcutBinding(id: UUID(), chord: tileRightChord, action: .tileWindow(.rightHalf)),
-            ShortcutBinding(id: UUID(), chord: tileMaxChord, action: .tileWindow(.maximize)),
-            ShortcutBinding(id: UUID(), chord: tileCenterChord, action: .tileWindow(.center))
-        ]
-
+    private func registerShortcutBindings() {
+        let bindings = taskbarConceptState.shortcutBindings
         _ = shortcutService.register(bindings: bindings) { [weak self] action in
             Logger.shortcuts.debug("Triggered shortcut action")
             Task { @MainActor in

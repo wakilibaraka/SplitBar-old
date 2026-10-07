@@ -1546,6 +1546,26 @@ final class TaskbarConceptState: ObservableObject {
     }
     @Published var showsOnboarding = !UserDefaults.standard.bool(forKey: "onboarding.v1.complete")
 
+    nonisolated static var defaultShortcutBindings: [ShortcutBinding] {
+        [
+            ShortcutBinding(id: UUID(), chord: ShortcutChord(carbonKeyCode: 0x02, carbonModifiers: 0x0800), action: .toggleDock),
+            ShortcutBinding(id: UUID(), chord: ShortcutChord(carbonKeyCode: 0x31, carbonModifiers: 0x0800), action: .openCommandPalette),
+            ShortcutBinding(id: UUID(), chord: ShortcutChord(carbonKeyCode: 0x09, carbonModifiers: 0x0800), action: .openClipboard),
+            ShortcutBinding(id: UUID(), chord: ShortcutChord(carbonKeyCode: 0x7B, carbonModifiers: 0x1800), action: .tileWindow(.leftHalf)),
+            ShortcutBinding(id: UUID(), chord: ShortcutChord(carbonKeyCode: 0x7C, carbonModifiers: 0x1800), action: .tileWindow(.rightHalf)),
+            ShortcutBinding(id: UUID(), chord: ShortcutChord(carbonKeyCode: 0x7E, carbonModifiers: 0x1800), action: .tileWindow(.maximize)),
+            ShortcutBinding(id: UUID(), chord: ShortcutChord(carbonKeyCode: 0x7D, carbonModifiers: 0x1800), action: .tileWindow(.center)),
+        ]
+    }
+
+    @Published var shortcutBindings = TaskbarConceptState.defaultShortcutBindings {
+        didSet {
+            if let data = try? JSONEncoder().encode(shortcutBindings) {
+                UserDefaults.standard.set(data, forKey: "shortcuts.bindings")
+            }
+        }
+    }
+
     func completeOnboarding() {
         UserDefaults.standard.set(true, forKey: "onboarding.v1.complete")
         showsOnboarding = false
@@ -1821,6 +1841,11 @@ final class TaskbarConceptState: ObservableObject {
         }
         if defaults.object(forKey: "motion.reduced") != nil {
             reduceMotion = defaults.bool(forKey: "motion.reduced")
+        }
+        if let bindingData = defaults.data(forKey: "shortcuts.bindings"),
+           let savedBindings = try? JSONDecoder().decode([ShortcutBinding].self, from: bindingData),
+           !savedBindings.isEmpty {
+            shortcutBindings = savedBindings
         }
         showWindowPreviews = defaults.bool(forKey: "taskbar.windowPreviews")
         hideMacDock = defaults.bool(forKey: "dock.hidden")
@@ -2127,6 +2152,7 @@ struct TaskbarFlyoutContentView: View {
                 flyoutAnimation: $model.flyoutAnimation,
                 flyoutHeightPreset: $model.flyoutHeightPreset,
                 trashPlacement: $model.trashPlacement,
+                shortcutBindings: $model.shortcutBindings,
                 panelWidths: $model.panelWidths,
                 accent: model.clockTint,
                 onClose: onClose,
@@ -2447,6 +2473,7 @@ public struct TaskbarConceptView: View {
                         flyoutAnimation: $model.flyoutAnimation,
                         flyoutHeightPreset: $model.flyoutHeightPreset,
                         trashPlacement: $model.trashPlacement,
+                        shortcutBindings: $model.shortcutBindings,
                         panelWidths: $model.panelWidths,
                         accent: clockTint,
                         onClose: { openPanel = nil },
@@ -2585,6 +2612,37 @@ private struct DesktopBackdrop: View {
     }
 }
 
+/// Human-readable label for a shortcut chord, e.g. "⌃⌥←".
+func shortcutChordLabel(_ chord: ShortcutChord) -> String {
+    var modifiers = ""
+    if chord.carbonModifiers & 0x1000 != 0 { modifiers += "⌃" }
+    if chord.carbonModifiers & 0x0800 != 0 { modifiers += "⌥" }
+    if chord.carbonModifiers & 0x0100 != 0 { modifiers += "⌘" }
+    if chord.carbonModifiers & 0x0200 != 0 { modifiers += "⇧" }
+    let keys: [UInt32: String] = [
+        0x00: "A", 0x0B: "B", 0x08: "C", 0x02: "D", 0x0E: "E", 0x03: "F",
+        0x05: "G", 0x04: "H", 0x22: "I", 0x26: "J", 0x28: "K", 0x25: "L",
+        0x2E: "M", 0x2D: "N", 0x1F: "O", 0x23: "P", 0x0C: "Q", 0x0F: "R",
+        0x01: "S", 0x11: "T", 0x20: "U", 0x09: "V", 0x0D: "W", 0x07: "X",
+        0x10: "Y", 0x06: "Z",
+        0x1D: "0", 0x12: "1", 0x13: "2", 0x14: "3", 0x15: "4",
+        0x17: "5", 0x16: "6", 0x1A: "7", 0x1C: "8", 0x19: "9",
+        0x31: "Space", 0x33: "⌫", 0x24: "↩", 0x30: "⇥", 0x35: "⎋",
+        0x7B: "←", 0x7C: "→", 0x7D: "↓", 0x7E: "↑",
+    ]
+    return modifiers + (keys[chord.carbonKeyCode] ?? String(format: "Key 0x%02X", chord.carbonKeyCode))
+}
+
+/// Carbon modifier flags from a key-down event's modifier flags.
+func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
+    var result: UInt32 = 0
+    if flags.contains(.control) { result |= 0x1000 }
+    if flags.contains(.option) { result |= 0x0800 }
+    if flags.contains(.command) { result |= 0x0100 }
+    if flags.contains(.shift) { result |= 0x0200 }
+    return result
+}
+
 private func taskbarDisplayName(for bundleIdentifier: String) -> String {
     if let known = LauncherDefaults.apps.first(where: { $0.bundleIdentifier == bundleIdentifier }) {
         return known.title
@@ -2673,6 +2731,13 @@ struct TaskbarIslandContent: View {
     let onTaskbarTileAction: (TaskbarTileAction) -> Void
     var maxAppTiles: Int? = nil
     var showOverflowChevron: Bool = false
+    @FocusState private var focusedTile: String?
+
+    private var focusableAppIDs: [String] {
+        visibleItems.compactMap {
+            if case .app(let bundleID) = $0 { bundleID } else { nil }
+        }
+    }
 
     private var tiles: TaskbarTiles {
         TaskbarTiles(
@@ -2696,7 +2761,8 @@ struct TaskbarIslandContent: View {
             onTaskbarIconClick: onTaskbarIconClick,
             onTaskbarTileAction: onTaskbarTileAction,
             onToggleControls: { model.openPanel = model.openPanel == .controls ? nil : .controls },
-            onHoverChanged: model.handleTaskbarTileHover
+            onHoverChanged: model.handleTaskbarTileHover,
+            onMovePinned: model.movePinned
         )
     }
 
@@ -2768,6 +2834,7 @@ struct TaskbarIslandContent: View {
                 switch item {
                 case .app(let bundleID):
                     tiles.taskbarAppTile(bundleID)
+                        .focused($focusedTile, equals: bundleID)
                 case .divider(let id):
                     TaskbarDividerView()
                         .padding(.vertical, 6)
@@ -2792,6 +2859,26 @@ struct TaskbarIslandContent: View {
                 }
                 .buttonStyle(.plain)
                 .help("More apps in the launcher")
+            }
+        }
+        .onMoveCommand { direction in
+            let ids = focusableAppIDs
+            guard !ids.isEmpty else { return }
+            switch direction {
+            case .left, .up:
+                if let current = focusedTile, let index = ids.firstIndex(of: current) {
+                    focusedTile = ids[max(index - 1, 0)]
+                } else {
+                    focusedTile = ids.last
+                }
+            case .right, .down:
+                if let current = focusedTile, let index = ids.firstIndex(of: current) {
+                    focusedTile = ids[min(index + 1, ids.count - 1)]
+                } else {
+                    focusedTile = ids.first
+                }
+            @unknown default:
+                break
             }
         }
     }
@@ -2841,12 +2928,14 @@ private struct TaskbarTiles {
     let onTaskbarTileAction: (TaskbarTileAction) -> Void
     let onToggleControls: () -> Void
     let onHoverChanged: (String, Bool) -> Void
+    let onMovePinned: (String, String) -> Void
 
     func taskbarAppTile(_ bundleIdentifier: String) -> some View {
         let app = LauncherDefaults.apps.first { $0.bundleIdentifier == bundleIdentifier }
         let title = taskbarDisplayName(for: bundleIdentifier)
         let isRunning = runningBundleIDs.contains(bundleIdentifier)
         let isFrontmost = frontmostBundleID == bundleIdentifier
+        let windowCount = isRunning ? AppWindowPreviewService().windows(forBundleIdentifier: bundleIdentifier, appName: title).count : 0
         return AppTile(
             title: title,
             icon: MacOSAppIcon(
@@ -2859,7 +2948,7 @@ private struct TaskbarTiles {
             .taskbarTile(highlighted: isRunning && indicatorStyle == .highlight, highlightFill: indicatorFill),
             indicator: Group {
                 if isRunning, indicatorStyle != .highlight {
-                    runningIndicator(isFrontmost: isFrontmost)
+                    runningIndicator(isFrontmost: isFrontmost, windowCount: windowCount)
                         .padding(.bottom, 4)
                 }
             },
@@ -2867,20 +2956,55 @@ private struct TaskbarTiles {
             menu: AnyView(tileContextMenu(bundleIdentifier)),
             onHoverChanged: { onHoverChanged(bundleIdentifier, $0) }
         )
+        .overlay(alignment: .topTrailing) {
+            if windowCount > 1 {
+                Text("\(min(windowCount, 9))")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(width: 15, height: 15)
+                    .background(Circle().fill(Color.red))
+                    .offset(x: 3, y: -3)
+                    .accessibilityLabel("\(windowCount) windows open")
+            }
+        }
+        .draggable(bundleIdentifier)
+        .dropDestination(for: String.self) { droppedItems, _ in
+            guard let draggedID = droppedItems.first, draggedID != bundleIdentifier else { return false }
+            onMovePinned(draggedID, bundleIdentifier)
+            return true
+        }
     }
 
-    private func runningIndicator(isFrontmost: Bool) -> some View {
+    private func runningIndicator(isFrontmost: Bool, windowCount: Int = 0) -> some View {
         let opacity = isFrontmost ? 1.0 : 0.55
+        let multiWindow = windowCount > 1 && !isFrontmost
         return Group {
             switch indicatorStyle {
             case .dot:
-                Capsule()
-                    .fill(indicatorFill.style(opacity: opacity))
-                    .frame(width: max(indicatorSize.dotDiameter, 8), height: 4)
+                if isFrontmost {
+                    Capsule()
+                        .fill(indicatorFill.style(opacity: opacity))
+                        .frame(width: max(indicatorSize.dotDiameter + 8, 12), height: 4)
+                } else if multiWindow {
+                    ZStack {
+                        Capsule()
+                            .fill(indicatorFill.style(opacity: opacity))
+                            .frame(width: max(indicatorSize.dotDiameter + 8, 12), height: 4)
+                            .offset(x: 2.5, y: -2.5)
+                        Capsule()
+                            .fill(indicatorFill.style(opacity: opacity))
+                            .frame(width: max(indicatorSize.dotDiameter + 8, 12), height: 4)
+                            .offset(x: -2.5, y: 2.5)
+                    }
+                } else {
+                    Capsule()
+                        .fill(indicatorFill.style(opacity: opacity))
+                        .frame(width: max(indicatorSize.dotDiameter, 8), height: 4)
+                }
             case .dash:
                 Capsule()
                     .fill(indicatorFill.style(opacity: opacity))
-                    .frame(width: indicatorSize.dashWidth, height: indicatorSize.dashHeight)
+                    .frame(width: indicatorSize.dashWidth + (isFrontmost ? 6 : 0), height: indicatorSize.dashHeight)
             case .highlight:
                 EmptyView()
             }
@@ -2905,6 +3029,18 @@ private struct TaskbarTiles {
         }
         Button("Show in Finder") {
             onTaskbarTileAction(.revealInFinder(bundleID: bundleIdentifier))
+        }
+        let windows = AppWindowPreviewService().windows(
+            forBundleIdentifier: bundleIdentifier,
+            appName: taskbarDisplayName(for: bundleIdentifier)
+        )
+        if !windows.isEmpty {
+            Divider()
+            ForEach(windows.prefix(5)) { window in
+                Button(window.title) {
+                    AppWindowPreviewService().focusWindow(info: window, bundleIdentifier: bundleIdentifier)
+                }
+            }
         }
         if isRunning {
             Divider()
@@ -3084,7 +3220,8 @@ private struct Taskbar: View {
             onTaskbarIconClick: onTaskbarIconClick,
             onTaskbarTileAction: onTaskbarTileAction,
             onToggleControls: { toggle(.controls) },
-            onHoverChanged: model.handleTaskbarTileHover
+            onHoverChanged: model.handleTaskbarTileHover,
+            onMovePinned: model.movePinned
         )
     }
 
@@ -5657,6 +5794,7 @@ private struct SettingsFlyout: View {
     @Binding var flyoutAnimation: FlyoutAnimation
     @Binding var flyoutHeightPreset: FlyoutHeightPreset
     @Binding var trashPlacement: TrashPlacement
+    @Binding var shortcutBindings: [ShortcutBinding]
     @Binding var panelWidths: [PanelKind: CGFloat]
     let accent: Color
     let onClose: () -> Void
@@ -5666,6 +5804,9 @@ private struct SettingsFlyout: View {
     // MARK: - State
     @State private var isConfirmingReset = false
     @State private var selectedTab = SFTab.taskbar
+    @State private var recordingBindingID: UUID?
+    @State private var recordingMonitor: Any?
+    @State private var conflictMessage: String?
 
     // MARK: - Environment
     @Environment(\.surfaceStyle) private var currentStyle
@@ -6498,6 +6639,7 @@ private struct SettingsFlyout: View {
                 clickBehaviorCard
                 contextMenuCard
                 statusIconCard
+                hotkeysCard
                 privacyCard
                 trashPlacementCard
             }
@@ -6722,6 +6864,86 @@ private struct SettingsFlyout: View {
                     .font(.system(size: 12))
             }
         }
+    }
+
+    private var hotkeysCard: some View {
+        settingsSection("Keyboard shortcuts") {
+            Text("Global shortcuts. Click Record, then press a key combination. Escape cancels.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            VStack(spacing: 6) {
+                ForEach(shortcutBindings.filter(\.action.isRebindable)) { binding in
+                    HStack(spacing: 8) {
+                        Text(binding.action.title)
+                            .font(.system(size: 12, weight: .medium))
+                        Spacer(minLength: 0)
+                        Text(shortcutChordLabel(binding.chord))
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
+                        Button(recordingBindingID == binding.id ? "Press keys…" : "Record") {
+                            startRecording(binding.id)
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(accent)
+                        .disabled(recordingBindingID != nil && recordingBindingID != binding.id)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
+                }
+            }
+            if let conflictMessage {
+                Text(conflictMessage)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.red)
+            }
+            Button {
+                shortcutBindings = TaskbarConceptState.defaultShortcutBindings
+                conflictMessage = nil
+            } label: {
+                Label("Reset defaults", systemImage: "arrow.uturn.backward")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(accent)
+        }
+    }
+
+    private func startRecording(_ id: UUID) {
+        recordingMonitor.map(NSEvent.removeMonitor)
+        recordingMonitor = nil
+        recordingBindingID = id
+        conflictMessage = nil
+        recordingMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
+            if event.keyCode == 0x35 {
+                stopRecording()
+                return event
+            }
+            let modifiers = carbonModifiers(from: event.modifierFlags)
+            guard modifiers != 0 else { return event }
+            let chord = ShortcutChord(carbonKeyCode: UInt32(event.keyCode), carbonModifiers: modifiers)
+            var updated = shortcutBindings
+            updated.removeAll { $0.id == id }
+            let candidate = ShortcutBinding(id: id, chord: chord, action: shortcutBindings.first(where: { $0.id == id })?.action ?? .toggleDock)
+            let conflicts = shortcutConflicts(bindings: updated + [candidate]).filter { $0.bindingIDs.contains(id) }
+            if conflicts.isEmpty {
+                updated.append(candidate)
+                shortcutBindings = updated
+            } else {
+                conflictMessage = "\(shortcutChordLabel(chord)) is already taken."
+            }
+            stopRecording()
+            return nil
+        }
+    }
+
+    private func stopRecording() {
+        recordingMonitor.map(NSEvent.removeMonitor)
+        recordingMonitor = nil
+        recordingBindingID = nil
     }
 
     private var trashPlacementCard: some View {
