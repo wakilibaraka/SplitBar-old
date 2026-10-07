@@ -7,12 +7,15 @@
     <key>CFBundleExecutable</key><string>SplitBar</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>0.1</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+    <key>NSHumanReadableCopyright</key><string>SplitBar. Upstream concept: EdgeDeck (senoldogann), MIT.</string>
     <key>CFBundleVersion</key><string>1</string>
     <key>LSMinimumSystemVersion</key><string>15.0</string>
     <key>LSUIElement</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>
-    <key>NSLocationWhenInUseUsageDescription</key><string>SplitBar shows local weather in the dock.</string>
-    <key>NSBluetoothAlwaysUsageDescription</key><string>SplitBar shows Bluetooth device statuses in the dock.</string>
-    <key>NSAppleEventsUsageDescription</key><string>SplitBar needs to control other apps and read system state.</string>
+    <key>NSLocationWhenInUseUsageDescription</key><string>SplitBar uses your approximate location to show local weather and, if you enable it, your Wi-Fi network name. Nothing is sent anywhere except the weather service you choose.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key><string>SplitBar lists your paired Bluetooth devices in Quick Settings so you can see and reconnect them. It does not use Bluetooth for anything else.</string>
+    <key>NSAppleEventsUsageDescription</key><string>SplitBar asks other apps to perform actions you requested, such as revealing a file in Finder, closing a window, or reading a music player's now-playing status. It only does this when you click the corresponding control.</string>
 </dict>
 </plist>
