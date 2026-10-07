@@ -246,6 +246,7 @@ and `swift test` before the commit.
 
 | Slice | Commit | Result |
 |---|---|---|
+| C1.4b | see log | Flyouts extracted and `TaskbarConceptView.swift` deleted (7,800 lines total → 0): `TaskbarSurfaces.swift` (572), `Widgets/` (271 + 612), `Launcher/` (493 + 132), `QuickSettings/` (333), `Calendar/` (309 + 86), `Settings/` (289 + 1,172 + 47). Build clean, 45 tests pass, move verified. |
 | C1.4a | see log | Strip views extracted to `TaskbarStrip/`: `TaskbarStripViews.swift` (946), `TileViews.swift` (303), `TileStores.swift` (95); the chord-format and app-naming helpers moved to `Support/`. Source file 5,687 → 4,349 lines. Build clean, 45 tests pass, move verified. `TaskbarConceptView` deliberately stays until C1.4f: it references every flyout, so moving it earlier would force each later slice to widen types it is about to move anyway. |
 | C1.3 | see log | State extracted: `TaskbarState.swift` (803) holds `TaskbarConceptState` with `LauncherApp`, `LauncherFolder`, `LauncherDefaults`, `TopProcess`; `DesignSystem/ClockStyle.swift` (74) takes the clock style enums, `clockTime`, and the `Date`/`Calendar` helpers. Source file 6,546 → 5,687 lines. Build clean, 45 tests pass, move verified. |
 | C1.2 | see log | Strip model extracted: `DesignSystem/StripModel.swift` (615), `WallpaperPreset.swift` (52), `WidgetChrome.swift` (12); the widget catalogue appended to `WidgetProvider.swift` (61 → 142). Source file 7,252 → 6,546 lines. Build clean, 45 tests pass, move verified. |
@@ -270,3 +271,24 @@ moves to another file, or the build fails. Two cases recur:
 
 The reconstruction check treats these access-level changes as mechanical and
 fails on any other difference.
+
+**Deviation from the planned PR split.** The plan above put each surface in its
+own PR (C1.5 launcher, C1.6 widgets, C1.7 quick settings, C1.8 calendar,
+C1.9 settings). That is not achievable as separate buildable commits: the
+surfaces are mutually referencing, so each one depends on most of the others.
+
+Measured, before moving anything: `StartFlyout` references 23 of the private
+types, `SettingsFlyout` references 24, `WidgetsPanel` references 14. Moving one
+surface at a time would mean widening the access level of types that the very
+next commit moves, which trades the reviewability of small commits for a large
+visibility diff. So the surfaces moved together as one cluster (C1.4b), still
+into one file per surface. The result is the same file layout the plan asked
+for; only the commit granularity changed.
+
+**`SettingsFlyout` needed one non-move.** At 1,449 lines it was the last file
+over the ~1,200-line target. The six tabs are computed properties, so they moved
+into `extension SettingsFlyout` in their own file: the type keeps its stored
+properties in one place, and 57 members widen from `private` to module-internal
+because `private` inside an extension is scoped to the extension rather than to
+the type. This is the only place where a `struct` was wrapped in an `extension`,
+and it is the only addition in the diff besides the file headers.
