@@ -1,0 +1,16 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [integrate-taskbar-prototype, main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build -Xswiftc -warnings-as-errors
+      - name: Test
+        run: swift test
