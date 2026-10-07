@@ -2,6 +2,7 @@ import AppKit
 import Darwin
 import Foundation
 import OSLog
+import ServiceManagement
 
 public struct DockSettings: Codable, Equatable, Sendable {
     public static let currentVersion = 1
@@ -78,16 +79,42 @@ public final class DockController {
 
     /// Installs the login-time restore helper while the Dock is hidden, so a
     /// crash or SIGKILL still leaves a path back to the saved Dock state.
+    ///
+    /// The agent definition is embedded in the bundle and registered with
+    /// `SMAppService`, so it survives the app being moved, shows up in System
+    /// Settings › General › Login Items, and is removed when disabled. If
+    /// registration is unavailable (unsigned builds, non-app launches) we fall
+    /// back to writing the plist directly.
     private func installRestoreAgent() {
         let helperURL = Bundle.main.bundleURL
             .appendingPathComponent("Contents/Helpers/SplitBarDockRestore")
         guard FileManager.default.isExecutableFile(atPath: helperURL.path) else {
-            logger.warning("Restore helper not found in bundle; skipping LaunchAgent install")
+            logger.warning("Restore helper not found in bundle; skipping login agent install")
             return
         }
+
+        if Bundle.main.bundlePath.hasSuffix(".app") {
+            let agent = SMAppService.agent(plistName: restoreAgentPlistName)
+            do {
+                try agent.register()
+                logger.info("Registered Dock restore login agent")
+                return
+            } catch {
+                logger.error("SMAppService registration failed; falling back to a written plist")
+            }
+        }
+
+        writeRestoreAgentPlist(helperURL: helperURL)
+    }
+
+    private var restoreAgentPlistName: String {
+        "\(Self.restoreAgentLabel).plist"
+    }
+
+    private func writeRestoreAgentPlist(helperURL: URL) {
         let agentsURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents")
-        let plistURL = agentsURL.appendingPathComponent("\(Self.restoreAgentLabel).plist")
+        let plistURL = agentsURL.appendingPathComponent(restoreAgentPlistName)
         let plist = """
             <?xml version="1.0" encoding="UTF-8"?>
             <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -102,15 +129,20 @@ public final class DockController {
         do {
             try FileManager.default.createDirectory(at: agentsURL, withIntermediateDirectories: true)
             try plist.write(to: plistURL, atomically: true, encoding: .utf8)
-            logger.info("Installed Dock restore LaunchAgent")
+            logger.info("Wrote Dock restore LaunchAgent plist")
         } catch {
-            logger.error("Failed to install restore LaunchAgent error=\(error.localizedDescription, privacy: .private)")
+            logger.error("Failed to write restore LaunchAgent error=\(error.localizedDescription, privacy: .private)")
         }
     }
 
     private func removeRestoreAgent() {
+        let agent = SMAppService.agent(plistName: restoreAgentPlistName)
+        if agent.status == .enabled {
+            try? agent.unregister()
+        }
+        // Also remove a directly written plist from an earlier install.
         let plistURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/LaunchAgents/\(Self.restoreAgentLabel).plist")
+            .appendingPathComponent("Library/LaunchAgents/\(restoreAgentPlistName)")
         try? FileManager.default.removeItem(at: plistURL)
     }
 
