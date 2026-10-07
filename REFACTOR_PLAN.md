@@ -246,6 +246,7 @@ and `swift test` before the commit.
 
 | Slice | Commit | Result |
 |---|---|---|
+| C1.3 | see log | State extracted: `TaskbarState.swift` (803) holds `TaskbarConceptState` with `LauncherApp`, `LauncherFolder`, `LauncherDefaults`, `TopProcess`; `DesignSystem/ClockStyle.swift` (74) takes the clock style enums, `clockTime`, and the `Date`/`Calendar` helpers. Source file 6,546 → 5,687 lines. Build clean, 45 tests pass, move verified. |
 | C1.2 | see log | Strip model extracted: `DesignSystem/StripModel.swift` (615), `WallpaperPreset.swift` (52), `WidgetChrome.swift` (12); the widget catalogue appended to `WidgetProvider.swift` (61 → 142). Source file 7,252 → 6,546 lines. Build clean, 45 tests pass, move verified. |
 | C1.1 | see log | Design system extracted to `DesignSystem/`: `SurfaceStyle.swift` (452), `PanelStyle.swift` (97), `ColorExtensions.swift` (34). Source file 7,800 → 7,252 lines. Build clean, 45 tests pass. |
 
@@ -254,3 +255,17 @@ declarations by column-0 indentation rather than brace counting, because string
 literals in this file contain braces. Doc comments and attributes directly above
 a declaration are moved with it, so `@MainActor` never detaches from its type.
 Moved declarations lose `private`, since they become module-internal.
+
+**Access-level rule.** Anything that was `fileprivate` or `private` because it
+was scoped to the old single file must become module-internal when its owner
+moves to another file, or the build fails. Two cases recur:
+
+- top-level declarations: the splitter drops the keyword automatically;
+- members of a moved type, e.g. 48 `fileprivate` members of
+  `TaskbarConceptState`: these are widened by hand per slice, since
+  automatically widening every member would expose internals that no other
+  file needs. `private` members of a moved type stay `private`, because that
+  keyword is scoped to the type, not the file.
+
+The reconstruction check treats these access-level changes as mechanical and
+fails on any other difference.
