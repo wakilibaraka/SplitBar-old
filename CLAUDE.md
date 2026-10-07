@@ -21,7 +21,12 @@ For the review-driven improvement backlog, invariants and per-task status, read
     /usr/bin/arch -arm64 xcrun swift test
   ```
 - App bundle: `./scripts/build_app.sh <version> [--release]` (or `./run.sh` for a
-  debug wrapper). Release artifacts are ad-hoc signed until a Developer ID is
+  debug wrapper).
+- Smoke test (runs the real app): `./scripts/smoke_test.sh [--seconds 8] [--shot out.png]`.
+  Launches with `SPLITBAR_SKIP_DOCK=1`, so the real Dock is never touched, and
+  asserts the process survives, logs no error or fault, and exits cleanly on
+  SIGTERM. Run this after any slice that moves or rewrites code: a build and the
+  unit tests cannot catch a panel that never appears. Release artifacts are ad-hoc signed until a Developer ID is
   configured — see IMPROVEMENT_PLAN E1.
 
 ## Architecture rules
