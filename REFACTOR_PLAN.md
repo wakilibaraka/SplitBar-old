@@ -246,6 +246,7 @@ and `swift test` before the commit.
 
 | Slice | Commit | Result |
 |---|---|---|
+| C1.2 | see log | Strip model extracted: `DesignSystem/StripModel.swift` (615), `WallpaperPreset.swift` (52), `WidgetChrome.swift` (12); the widget catalogue appended to `WidgetProvider.swift` (61 → 142). Source file 7,252 → 6,546 lines. Build clean, 45 tests pass, move verified. |
 | C1.1 | see log | Design system extracted to `DesignSystem/`: `SurfaceStyle.swift` (452), `PanelStyle.swift` (97), `ColorExtensions.swift` (34). Source file 7,800 → 7,252 lines. Build clean, 45 tests pass. |
 
 **Mechanics.** `scripts/split_swift.py` performs the moves. It finds top-level

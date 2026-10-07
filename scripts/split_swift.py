@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Move top-level declarations out of a Swift file into a new file.
+"""Move top-level declarations out of a Swift file into another Swift file.
 
 Usage:
-  scripts/split_swift.py <source.swift> <destination.swift> <selector>...
+  scripts/split_swift.py [--append] <source.swift> <destination.swift> <selector>...
+
+With `--append` the moved declarations are added to the destination instead of
+replacing it, for types that belong in a file that already exists.
 
 Selectors are `Name` (every top-level block with that name) or `Name#line`
 (one specific block, disambiguating names like `View` that appear several
@@ -81,12 +84,17 @@ def select(blocks, selector):
 
 
 def main():
-    if len(sys.argv) < 4:
+    argv = sys.argv[1:]
+    append = False
+    if argv and argv[0] == "--append":
+        append = True
+        argv = argv[1:]
+    if len(argv) < 3:
         print(__doc__)
         return 2
-    source = pathlib.Path(sys.argv[1])
-    destination = pathlib.Path(sys.argv[2])
-    selectors = sys.argv[3:]
+    source = pathlib.Path(argv[0])
+    destination = pathlib.Path(argv[1])
+    selectors = argv[2:]
 
     lines = source.read_text().split("\n")
     blocks = top_level_declarations(lines)
@@ -129,10 +137,16 @@ def main():
         index += 1
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text("\n\n\n".join(moved_text) + "\n")
+    body = "\n\n\n".join(moved_text)
+    if append and destination.exists():
+        existing = destination.read_text().rstrip("\n")
+        destination.write_text(f"{existing}\n\n\n{body}\n")
+    else:
+        destination.write_text(body + "\n")
     source.write_text("\n".join(kept))
 
-    print(f"moved {len(chosen)} declaration(s) to {destination}:")
+    verb = "appended to" if append and destination.exists() else "moved to"
+    print(f"{verb} {destination}:")
     for start, end, name, _ in sorted(chosen):
         print(f"    {name} (lines {start + 1}..{end})")
     return 0

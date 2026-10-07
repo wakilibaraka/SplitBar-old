@@ -59,3 +59,84 @@ struct WidgetStateBanner: View {
         }
     }
 }
+
+
+enum DashboardWidget: String, CaseIterable, Identifiable {
+    case weather
+    case systemResources
+    case nowPlaying
+    case photos
+    case stickyNotes
+    case watchlist
+    case date
+    case systemRings
+    case network
+
+    var id: String { rawValue }
+
+    var defaultSize: WidgetSizePreset {
+        switch self {
+        case .weather: .large
+        case .systemResources: .medium
+        case .date, .systemRings, .network: .small
+        case .nowPlaying, .photos, .stickyNotes, .watchlist: .small
+        }
+    }
+}
+
+
+enum WidgetSizePreset: String, CaseIterable, Identifiable {
+    case small
+    case medium
+    case large
+    case extraLarge
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .small: "Small"
+        case .medium: "Medium"
+        case .large: "Large"
+        case .extraLarge: "Extra large"
+        }
+    }
+
+    var spansBoard: Bool {
+        self == .large || self == .extraLarge
+    }
+
+    var cardContentHeight: CGFloat {
+        switch self {
+        case .small: 78
+        case .medium: 126
+        case .large: 162
+        case .extraLarge: 210
+        }
+    }
+
+    var weatherContentHeight: CGFloat {
+        switch self {
+        case .small: 220
+        case .medium: 285
+        case .large: 350
+        case .extraLarge: 405
+        }
+    }
+
+    var estimatedHeight: CGFloat {
+        cardContentHeight + 56
+    }
+}
+
+
+enum WidgetBoardSection: Identifiable {
+    case columns(id: Int, leading: [DashboardWidget], trailing: [DashboardWidget])
+    case fullWidth(id: Int, widget: DashboardWidget)
+
+    var id: Int {
+        switch self {
+        case let .columns(id, _, _), let .fullWidth(id, _): id
+        }
+    }
+}
