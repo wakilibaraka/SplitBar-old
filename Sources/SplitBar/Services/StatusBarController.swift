@@ -18,6 +18,7 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
     private let onSelectTheme: (DockMaterialStyle) -> Void
     private let onExportBackup: () -> Void
     private let onImportBackup: () -> Void
+    private let onQuitAndRestore: () -> Void
     private let onQuit: () -> Void
 
     public init(
@@ -33,6 +34,7 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         onSelectTheme: @escaping (DockMaterialStyle) -> Void,
         onExportBackup: @escaping () -> Void,
         onImportBackup: @escaping () -> Void,
+        onQuitAndRestore: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
         self.onToggleDock = onToggleDock
@@ -47,6 +49,7 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
         self.onSelectTheme = onSelectTheme
         self.onExportBackup = onExportBackup
         self.onImportBackup = onImportBackup
+        self.onQuitAndRestore = onQuitAndRestore
         self.onQuit = onQuit
         super.init()
         self.setupStatusItem()
@@ -200,6 +203,14 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        let quitAndRestoreItem = NSMenuItem(
+            title: "Quit and Restore Dock",
+            action: #selector(handleQuitAndRestore),
+            keyEquivalent: ""
+        )
+        quitAndRestoreItem.target = self
+        menu.addItem(quitAndRestoreItem)
+
         let quitItem = NSMenuItem(
             title: "Quit SplitBar",
             action: #selector(handleQuit),
@@ -274,6 +285,10 @@ public final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func handleImportBackup() {
         onImportBackup()
+    }
+
+    @objc private func handleQuitAndRestore() {
+        onQuitAndRestore()
     }
 
     @objc private func handleQuit() {

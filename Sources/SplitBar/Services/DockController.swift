@@ -4,11 +4,14 @@ import Foundation
 import OSLog
 
 public struct DockSettings: Codable, Equatable, Sendable {
+    public static let currentVersion = 1
+    public let version: Int
     public let orientation: String
     public let autohide: Bool
     public let autohideDelay: Double?
 
-    public init(orientation: String, autohide: Bool, autohideDelay: Double? = nil) {
+    public init(version: Int = currentVersion, orientation: String, autohide: Bool, autohideDelay: Double? = nil) {
+        self.version = version
         self.orientation = orientation
         self.autohide = autohide
         self.autohideDelay = autohideDelay
@@ -17,6 +20,9 @@ public struct DockSettings: Codable, Equatable, Sendable {
 
 @MainActor
 public final class DockController {
+    /// Autohide delay applied while SplitBar hides the Dock. Large enough to
+    /// suppress edge-hover reveal; the saved value is restored on quit.
+    public static let suppressionDelay: Double = 1000
     private let stateFileURL: URL
     private let logger = Logger(subsystem: "com.baraka.splitbar", category: "dock")
 
@@ -61,7 +67,7 @@ public final class DockController {
                 logger.error("Refusing to hide the Dock without a saved state error=\(error.localizedDescription, privacy: .public)")
                 return
             }
-            writeDockDefaults(autohide: true, autohideDelay: 1000)
+            writeDockDefaults(autohide: true, autohideDelay: Self.suppressionDelay)
             restartDock()
         } else {
             restore()
@@ -100,6 +106,10 @@ public final class DockController {
         guard let data = try? Data(contentsOf: stateFileURL),
               let settings = try? JSONDecoder().decode(DockSettings.self, from: data)
         else {
+            return nil
+        }
+        guard settings.version <= DockSettings.currentVersion else {
+            logger.fault("Dock state file has newer schema version=\(settings.version, privacy: .public) current=\(DockSettings.currentVersion, privacy: .public); refusing to restore blindly")
             return nil
         }
         return settings

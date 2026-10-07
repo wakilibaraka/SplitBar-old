@@ -314,6 +314,10 @@ public final class AppRuntimeController {
             onImportBackup: {
                 statusSelf?.promptImportConfiguration()
             },
+            onQuitAndRestore: { [weak self] in
+                self?.dockController.setHidden(false)
+                NSApp.terminate(nil)
+            },
             onQuit: {
                 NSApp.terminate(nil)
             }
