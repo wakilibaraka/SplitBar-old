@@ -327,10 +327,39 @@ public final class AIUsageService {
 
     // MARK: - Task Dispatcher (Agent Task Delegation)
 
+    /// Exact command that will be handed to Terminal, produced without side
+    /// effects so a confirmation sheet can display it verbatim.
+    public func terminalCommand(for agentType: AIAgentType, prompt: String) -> String {
+        let quotedPrompt = shellQuoted(prompt.trimmingCharacters(in: .whitespacesAndNewlines))
+        switch agentType {
+        case .claude:
+            let dir = currentState.agentSessions.first(where: { $0.agentType == .claude })?.activeDirectory ?? NSHomeDirectory()
+            return "cd \(shellQuoted(dir)) && claude -p \(quotedPrompt)"
+        case .codex:
+            return "codex exec \(quotedPrompt)"
+        case .opencode:
+            return "opencode run \(quotedPrompt)"
+        case .ollama:
+            let model = currentState.agentSessions.first(where: { $0.agentType == .ollama })?.modelName ?? "gpt-oss:20b-cloud"
+            return "ollama run \(shellQuoted(model)) \(quotedPrompt)"
+        }
+    }
+
+    /// A Terminal dispatch may only run when it carries approval for the exact
+    /// command string. Building the token is the caller's responsibility after
+    /// showing the command to the user.
+    public struct TerminalDispatchApproval: Equatable, Sendable {
+        public let command: String
+        public init(approving command: String) {
+            self.command = command
+        }
+    }
+
     public func dispatchTask(
         agentType: AIAgentType,
         prompt: String,
-        openTerminal: Bool
+        openTerminal: Bool,
+        terminalApproval: TerminalDispatchApproval? = nil
     ) async -> String {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -338,29 +367,17 @@ public final class AIUsageService {
         }
 
         if openTerminal {
-            return await launchInTerminal(agentType: agentType, prompt: trimmed)
+            let expected = terminalCommand(for: agentType, prompt: trimmed)
+            guard let terminalApproval, terminalApproval.command == expected else {
+                return "Not sent to Terminal: the command was not confirmed.\n\(expected)"
+            }
+            return await launchInTerminal(agentType: agentType, prompt: trimmed, command: expected)
         } else {
             return await executeLocally(agentType: agentType, prompt: trimmed)
         }
     }
 
-    private func launchInTerminal(agentType: AIAgentType, prompt: String) async -> String {
-        let quotedPrompt = shellQuoted(prompt)
-        let command: String
-
-        switch agentType {
-        case .claude:
-            let dir = currentState.agentSessions.first(where: { $0.agentType == .claude })?.activeDirectory ?? NSHomeDirectory()
-            command = "cd \(shellQuoted(dir)) && claude -p \(quotedPrompt)"
-        case .codex:
-            command = "codex exec \(quotedPrompt)"
-        case .opencode:
-            command = "opencode run \(quotedPrompt)"
-        case .ollama:
-            let model = currentState.agentSessions.first(where: { $0.agentType == .ollama })?.modelName ?? "gpt-oss:20b-cloud"
-            command = "ollama run \(shellQuoted(model)) \(quotedPrompt)"
-        }
-
+    private func launchInTerminal(agentType: AIAgentType, prompt: String, command: String) async -> String {
         do {
             try runInTerminal(command: command)
         } catch {
@@ -378,29 +395,30 @@ public final class AIUsageService {
     /// Komutu yeni bir Terminal penceresinde çalıştırır. Komut AppleScript kaynağına gömülmez, argv ile
     /// aktarılır; böylece AppleScript enjeksiyonu mümkün olmaz (kabuk alıntılaması çağırana aittir).
     private func runInTerminal(command: String) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = [
-            "-e", "on run argv",
-            "-e", "tell application \"Terminal\"",
-            "-e", "activate",
-            "-e", "do script (item 1 of argv)",
-            "-e", "end tell",
-            "-e", "end run",
-            command
-        ]
+        let result: ProcessRunner.Result
         do {
-            try process.run()
+            result = try ProcessRunner.run(
+                executablePath: "/usr/bin/osascript",
+                arguments: [
+                    "-e", "on run argv",
+                    "-e", "tell application \"Terminal\"",
+                    "-e", "activate",
+                    "-e", "do script (item 1 of argv)",
+                    "-e", "end tell",
+                    "-e", "end run",
+                    command
+                ],
+                timeout: 15
+            )
         } catch {
             throw SystemSessionActionError.processLaunchFailed(executable: "/usr/bin/osascript", underlying: error)
         }
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            Logger.general.error("osascript failed status=\(process.terminationStatus, privacy: .public)")
+        guard result.succeeded else {
+            Logger.general.error("osascript failed status=\(result.status, privacy: .public)")
             throw SystemSessionActionError.processExitedWithFailure(
                 executable: "osascript (Terminal automation — check System Settings › Privacy & Security › Automation)",
                 arguments: [],
-                status: process.terminationStatus
+                status: result.status
             )
         }
     }
@@ -517,23 +535,19 @@ public final class AIUsageService {
     private func fetchRunningProcessTable() async -> [(pid: Int32, command: String)] {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/bin/ps")
-                process.arguments = ["-axo", "pid,command"]
-                let pipe = Pipe()
-                process.standardOutput = pipe
-
                 do {
-                    try process.run()
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    process.waitUntilExit()
-                    guard let output = String(data: data, encoding: .utf8) else {
+                    let result = try ProcessRunner.run(
+                        executablePath: "/bin/ps",
+                        arguments: ["-axo", "pid,command"],
+                        timeout: 10
+                    )
+                    guard result.succeeded else {
                         continuation.resume(returning: [])
                         return
                     }
 
                     var results: [(pid: Int32, command: String)] = []
-                    for line in output.components(separatedBy: "\n") {
+                    for line in result.standardOutput.components(separatedBy: "\n") {
                         let trimmed = line.trimmingCharacters(in: .whitespaces)
                         guard !trimmed.isEmpty else { continue }
                         let parts = trimmed.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
@@ -814,25 +828,18 @@ public final class AIUsageService {
     ) async -> String {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: executable)
-                process.arguments = arguments
-                process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory)
-
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = pipe
-
                 do {
-                    try process.run()
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    process.waitUntilExit()
-                    let output = String(data: data, encoding: .utf8) ?? ""
-                    guard process.terminationStatus == 0 else {
-                        continuation.resume(returning: "Process \((executable as NSString).lastPathComponent) exited with status \(process.terminationStatus):\n\(output)")
+                    let result = try ProcessRunner.run(
+                        executablePath: executable,
+                        arguments: arguments,
+                        timeout: 60,
+                        environment: ["PWD": workingDirectory]
+                    )
+                    guard result.succeeded else {
+                        continuation.resume(returning: "Process \((executable as NSString).lastPathComponent) exited with status \(result.status):\n\(result.standardOutput)")
                         return
                     }
-                    continuation.resume(returning: output)
+                    continuation.resume(returning: result.standardOutput)
                 } catch {
                     continuation.resume(returning: "Execution error: \(error.localizedDescription)")
                 }

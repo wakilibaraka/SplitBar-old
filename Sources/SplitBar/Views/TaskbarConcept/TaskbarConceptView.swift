@@ -1880,16 +1880,14 @@ final class TaskbarConceptState: ObservableObject {
     }
 
     nonisolated private static func sampleTopProcesses() -> (processes: [TopProcess], total: Int) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-axo", "comm,pcpu,rss"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
         do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            guard let output = String(data: data, encoding: .utf8) else { return (processes: [], total: 0) }
+            let result = try ProcessRunner.run(
+                executablePath: "/bin/ps",
+                arguments: ["-axo", "comm,pcpu,rss"],
+                timeout: 10
+            )
+            guard result.succeeded else { return (processes: [], total: 0) }
+            let output = result.standardOutput
             var rows: [TopProcess] = []
             var totalCount = 0
             for line in output.components(separatedBy: "\n").dropFirst() {

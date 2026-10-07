@@ -169,29 +169,17 @@ public final class DockController {
     }
 
     private func currentAutohideDelay() -> Double? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-        process.arguments = ["read", "com.apple.dock", "autohide-delay"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        guard (try? process.run()) != nil else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return nil }
-        return Double(String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
+        guard let value = readDockString(forKey: "autohide-delay") else { return nil }
+        return Double(value)
     }
 
     private func readDockString(forKey key: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-        process.arguments = ["read", "com.apple.dock", key]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        guard (try? process.run()) != nil else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return nil }
-        let value = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let result = try? ProcessRunner.run(
+            executablePath: "/usr/bin/defaults",
+            arguments: ["read", "com.apple.dock", key],
+            timeout: 5
+        ), result.succeeded else { return nil }
+        let value = result.standardOutput.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
     }
 
@@ -217,26 +205,16 @@ public final class DockController {
     }
 
     private func runDefaults(arguments: [String]) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-        process.arguments = arguments
-        try? process.run()
-        process.waitUntilExit()
+        _ = try? ProcessRunner.run(executablePath: "/usr/bin/defaults", arguments: arguments, timeout: 5)
     }
 
     private func deleteDockKey(_ key: String) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-        process.arguments = ["delete", "com.apple.dock", key]
-        try? process.run()
-        process.waitUntilExit()
+        _ = try? ProcessRunner.run(executablePath: "/usr/bin/defaults", arguments: ["delete", "com.apple.dock", key], timeout: 5)
     }
 
     private func restartDock() {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-        process.arguments = ["Dock"]
-        try? process.run()
-        process.waitUntilExit()
+        // Fire-and-forget: we deliberately do not block the main actor on the
+        // Dock restart, but we still go through ProcessRunner for path safety.
+        try? ProcessRunner.launch(executablePath: "/usr/bin/killall", arguments: ["Dock"])
     }
 }

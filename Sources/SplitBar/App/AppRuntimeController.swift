@@ -898,10 +898,8 @@ public final class AppRuntimeController {
             NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleID })?.terminate()
         case .newWindow(let bundleID):
             guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            process.arguments = ["-n", url.path]
-            try? process.run()
+            // `-n` opens a fresh instance; NSWorkspace cannot express that.
+            try? ProcessRunner.launch(executablePath: "/usr/bin/open", arguments: ["-n", url.path])
         case .togglePin(let bundleID):
             taskbarConceptState.togglePinned(bundleID)
         case .openRecent(let url):

@@ -54,20 +54,17 @@ public func lockScreenImmediately() throws {
 public func sleepDisplays() throws {
     let executable = "/usr/bin/pmset"
     let arguments = ["displaysleepnow"]
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: executable)
-    process.arguments = arguments
+    let result: ProcessRunner.Result
     do {
-        try process.run()
-    } catch {
+        result = try ProcessRunner.run(executablePath: executable, arguments: arguments, timeout: 10)
+    } catch let error as ProcessRunner.Failure {
         throw SystemSessionActionError.processLaunchFailed(executable: executable, underlying: error)
     }
-    process.waitUntilExit()
-    guard process.terminationStatus == 0 else {
+    guard result.succeeded else {
         throw SystemSessionActionError.processExitedWithFailure(
             executable: executable,
             arguments: arguments,
-            status: process.terminationStatus
+            status: result.status
         )
     }
 }
@@ -99,19 +96,25 @@ public func performSystemPowerAction(
 }
 
 private func lockMacDisplay() -> Result<Void, SystemSessionActionError> {
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
-    process.arguments = ["displaysleepnow"]
     do {
-        try process.run()
+        let result = try ProcessRunner.run(
+            executablePath: "/usr/bin/pmset",
+            arguments: ["displaysleepnow"],
+            timeout: 10
+        )
+        guard result.succeeded else {
+            return .failure(.processExitedWithFailure(
+                executable: "/usr/bin/pmset",
+                arguments: ["displaysleepnow"],
+                status: result.status
+            ))
+        }
+        return .success(())
+    } catch let error as ProcessRunner.Failure {
+        return .failure(.processLaunchFailed(executable: "/usr/bin/pmset", underlying: error))
     } catch {
         return .failure(.processLaunchFailed(executable: "/usr/bin/pmset", underlying: error))
     }
-    process.waitUntilExit()
-    guard process.terminationStatus == 0 else {
-        return .failure(.processExitedWithFailure(executable: "/usr/bin/pmset", arguments: ["displaysleepnow"], status: process.terminationStatus))
-    }
-    return .success(())
 }
 
 private func runSystemEventsCommand(_ verb: String, action: String) -> Result<Void, SystemSessionActionError> {
