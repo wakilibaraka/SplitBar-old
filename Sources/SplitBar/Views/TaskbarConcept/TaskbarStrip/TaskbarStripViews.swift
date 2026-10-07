@@ -193,9 +193,7 @@ struct TaskbarIslandContent: View {
                         }
                 }
             }
-            if model.trashPlacement(for: model.taskbarMode) == .withApps {
-                tiles.trashCluster
-            }
+
             if showOverflowChevron, isClipped {
                 Button {
                     model.openPanel = .start
@@ -233,9 +231,7 @@ struct TaskbarIslandContent: View {
 
     @ViewBuilder
     private func trayGroup(includeClock: Bool) -> some View {
-        if model.trashPlacement(for: model.taskbarMode) == .beforeTray {
-            tiles.trashCluster
-        }
+        tiles.trashCluster
         if includeClock {
             clockGroup
         }
