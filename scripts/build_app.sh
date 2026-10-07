@@ -146,5 +146,12 @@ if [ "$CONFIGURATION" = "release" ]; then
   fi
 fi
 
+if [ "$CONFIGURATION" != "release" ]; then
+  echo
+  echo "NOTE: this is a debug bundle."
+  echo "      It keeps debug symbols and local build paths, so it must not be"
+  echo "      distributed. Use --release for anything you ship."
+fi
+
 echo "==> Built $APP ($VERSION, build $BUILD_NUMBER)"
 du -sh "$APP" | sed 's/^/    /'

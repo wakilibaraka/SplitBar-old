@@ -1,16 +1,79 @@
-name: Build and Test
+name: CI
 
 on:
   push:
     branches: [integrate-taskbar-prototype, main]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Build and test
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - name: Build
         run: swift build -Xswiftc -warnings-as-errors
       - name: Test
-        run: swift test
+        run: swift test --enable-code-coverage
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: .build/coverage/
+          if-no-files-found: ignore
+
+  log-privacy:
+    name: Logging privacy lint
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check every public log interpolation is justified
+        run: ./scripts/lint_logging.sh
+
+  bundle:
+    name: App bundle check
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the bundle
+        # --release: this is the configuration that actually ships, and the
+        # one whose binary-hygiene assertions below must hold.
+        run: ./scripts/build_app.sh 0.0.0-ci --release
+      - name: Verify bundle contents
+        run: |
+          set -euo pipefail
+          app="SplitBar.app"
+
+          # The login-time Dock restore helper must ship inside the bundle.
+          test -x "$app/Contents/Helpers/SplitBarDockRestore" \
+            || { echo "missing restore helper"; exit 1; }
+
+          # Required metadata.
+          for key in CFBundleIdentifier CFBundleExecutable CFBundleName \
+                     CFBundleShortVersionString CFBundleIconFile LSMinimumSystemVersion; do
+            /usr/libexec/PlistBuddy -c "Print :$key" "$app/Contents/Info.plist" >/dev/null \
+              || { echo "missing plist key $key"; exit 1; }
+          done
+          test -f "$app/Contents/Resources/AppIcon.icns" || { echo "missing icon"; exit 1; }
+          test -f "$app/Contents/LoginItems/com.baraka.splitbar.restore.plist" \
+            || { echo "missing login agent plist"; exit 1; }
+
+          # Signature must verify.
+          codesign --verify --deep --strict "$app"
+
+          # No developer-machine paths in the shipped binary.
+          if LC_ALL=C grep -aq "/Users/" "$app/Contents/MacOS/SplitBar"; then
+            echo "binary contains absolute /Users/ paths"; exit 1
+          fi
+
+          # No toolchain rpath.
+          if otool -l "$app/Contents/MacOS/SplitBar" | grep -q "Xcode.app"; then
+            echo "binary contains an Xcode rpath"; exit 1
+          fi
+
+          echo "bundle OK"
