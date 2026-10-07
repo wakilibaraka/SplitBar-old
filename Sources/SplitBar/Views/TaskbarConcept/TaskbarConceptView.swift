@@ -1422,6 +1422,12 @@ final class TaskbarConceptState: ObservableObject {
     @Published var flyoutHeightPreset = FlyoutHeightPreset.tall {
         didSet { UserDefaults.standard.set(flyoutHeightPreset.rawValue, forKey: "flyouts.heightPreset") }
     }
+    @Published var showsOnboarding = !UserDefaults.standard.bool(forKey: "onboarding.v1.complete")
+
+    func completeOnboarding() {
+        UserDefaults.standard.set(true, forKey: "onboarding.v1.complete")
+        showsOnboarding = false
+    }
     @Published var showWindowPreviews = false {
         didSet { UserDefaults.standard.set(showWindowPreviews, forKey: "taskbar.windowPreviews") }
     }
@@ -2282,6 +2288,14 @@ public struct TaskbarConceptView: View {
                     onTaskbarTileAction: onTaskbarTileAction
                 )
                 .zIndex(3)
+
+                if model.showsOnboarding {
+                    OnboardingView(model: model, accent: model.clockTint, isDarkMode: model.isDarkMode) {
+                        model.completeOnboarding()
+                    }
+                    .transition(.opacity)
+                    .zIndex(10)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
