@@ -59,6 +59,11 @@ final class TaskbarConceptState: ObservableObject {
     @Published var surfaceStyle = SurfaceStyle.glassmorphism {
         didSet { UserDefaults.standard.set(surfaceStyle.rawValue, forKey: "surface.style") }
     }
+    /// Maximize (green button / ⌘-zoom) keeps the taskbar strip visible by
+    /// insetting the window's bottom edge (HYBRID_PLAN D1/D2).
+    @Published var maximizeAvoidsTaskbar: Bool = true {
+        didSet { UserDefaults.standard.set(maximizeAvoidsTaskbar, forKey: "taskbar.maximizeAvoids") }
+    }
     @Published var isDarkMode = false
     @Published var wallpaperPreset = WallpaperPreset.pastelBloom {
         didSet { UserDefaults.standard.set(wallpaperPreset.rawValue, forKey: "wallpaper.preset") }
@@ -438,6 +443,9 @@ final class TaskbarConceptState: ObservableObject {
         }
         if let savedStyle = defaults.string(forKey: "surface.style").flatMap(SurfaceStyle.init(rawValue:)) {
             surfaceStyle = savedStyle
+        }
+        if defaults.object(forKey: "taskbar.maximizeAvoids") != nil {
+            maximizeAvoidsTaskbar = defaults.bool(forKey: "taskbar.maximizeAvoids")
         }
         if let values = defaults.array(forKey: "wallpaper.customStart") as? [Double],
            let color = Color.fromStoredRGBA(values) {

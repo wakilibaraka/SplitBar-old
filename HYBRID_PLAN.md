@@ -1,132 +1,146 @@
-# SplitBar Hybrid Architecture: Next-Gen Shell & Theming Plan
+# SplitBar Hybrid Plan — Chunked Roadmap (v2)
 
-Status: IN PROGRESS · Saved 2026-10-08 · Owner-approved direction.
+Status: **WAVES 1–7 IMPLEMENTED · 2026-10-08** (commit on
+`integrate-taskbar-prototype`). Per-chunk verification: `-warnings-as-errors`
+build + full `swift test` + `smoke_test.sh` green after every wave.
 
 > Note: this is **not** `SPLITBAR_HYBRID_PLAN.md` (the older three-repo merge
 > plan). This document is the AppKit + SwiftUI hybrid direction for *this*
 > repo: shell mechanics in AppKit, faces in SwiftUI, theme decoration in a
 > Core Graphics `LayerFX` engine.
 
-## 1. Executive Summary & Core Objectives
+**Decisions locked:** 5 islands (Start / AppTiles / StatusTray / Clock /
+Widget); maximize = window frame inset so the taskbar stays visible.
 
-SplitBar is evolving from an all-SwiftUI prototype into a **Pragmatic Hybrid
-(AppKit + SwiftUI) Desktop Shell**.
+**Contracts never broken:** `TaskbarPanelPlanTests` (panel lifecycle),
+`-warnings-as-errors`, LayerFX kill switch (`SPLITBAR_LAYERFX=0`), lazy
+permissions, no secrets/window titles in logs.
 
-While SwiftUI provides unmatched developer velocity for menus, forms, and
-reactive data flow, an OS-level taskbar with extreme stylistic fidelity
-requires the low-level rendering precision of **`CALayer`**, Core Graphics
-(**`CGContext`**), and AppKit (**`NSPanel`**).
+---
 
-### Primary Objectives
+## Wave 1 — Modular taskbar (Phase 1) ✅
 
-1. **Zero-Glitch Shell Mechanics:** window tracking, panel lifecycle, and
-   desktop struts in native AppKit to eliminate focus glitches, click-through
-   issues, and multi-monitor stutter.
-2. **Hardware-Accelerated Visual Fidelity:** a `LayerFX` engine using
-   `CALayer`/Core Graphics via `NSViewRepresentable` — authentic Neumorphism
-   (true dual-directional inner shadows), Windows Aero (specular reflections
-   and hover glows), Windows 98 (pixel-perfect 3D bevels).
-3. **Modular Taskbar Island Architecture:** break the rigid taskbar into
-   independent, pluggable, reorderable modules (Start, Apps, Status Tray,
-   Clock, Widgets).
+- [x] **A1** — `TaskbarStripViews.swift` split 937 → 151 lines (facade) with
+  `TaskbarStrip/Islands/{StartIsland,AppTilesIsland,StatusTrayIsland,ClockIsland,WidgetIsland}.swift`
+  + `TaskbarTiles.swift`. Zero behavior change; tests green.
+- [x] **A2** — `ModularTaskbarContainer` routes `.docked`/`.floating`/`.split`.
+  Split islands are self-sizing `HStack` rows (user `islandGap` spacing, one
+  `.taskbarSurface` per island); the old `TaskbarSplitRow` CGRect/offset math
+  is gone. `TaskbarStripMetrics` remains for *capacity* + live panel frames
+  (AppKit geometry, not view layout).
+- [x] **A3** — `LayoutTokens` (8pt grid): islandInner=8, barOuter=16,
+  docked=8, trailingTray=12, dividerGutter=8; live per-island panel padding
+  uses the same token.
+- [x] **A4** — `ModularLayoutTests`: mode routing, island composition per
+  mode, token grid invariants. 93 → then 101 tests.
 
-### Division of Labor
+## Wave 2 — Platform/Core/UI (Tungsten Edge 3-tier) ✅
 
-```
-AppKit (The Engine)
-  • Floating desktop panels (zero-glitch, all Spaces)
-  • Window focus & mouse click handling
-  • CALayer / CGContext (hardware-accelerated shadows & 3D bevels)
-        │ hosts via NSHostingView
-SwiftUI (The Face)
-  • Settings Flyout & Personalisation UI
-  • Start Menu grid & search
-  • Reactive state (changing a theme updates instantly)
-```
+- [x] **B1** — folders: `Platform/` (WindowManager, Dock, Display, panels,
+  Fullscreen, tooltip), `Core/` (TaskbarState, StripModel,
+  ConfigurationPersistence), `UI/TaskbarConcept/` (islands, flyouts,
+  DesignSystem). Single SPM target; folder = boundary.
+- [x] **B2** — `Platform/WindowTracking.swift` protocol over AX
+  (`frontmostWindowFrame`, `setFrontmostWindowFrame`, raise/minimize/tile);
+  `WindowManagerService` is the single implementation. Private/undocumented
+  APIs stay behind this seam.
 
-## 2. Pillar 1: Modular Taskbar Architecture
+## Wave 3 — Shell hardening (Phase 3) ✅
 
-Refactor `TaskbarStripViews.swift` (937 lines) from mixed layout/section
-conditional trees into a **Slot-and-Module Architecture**.
+- [x] **C1** — `taskbarStripCollectionBehavior()` gained
+  `.fullScreenAuxiliary` (parity with edge panels); audit table below.
+  `PanelBehaviorTests` locks the parity.
+- [x] **C2** — one shared rule `FlyoutDismissal.shouldDismiss(location:protected:)`
+  used by *all four* monitor paths; taskbar flyout gained a **local mouse
+  monitor** (own-app clicks) and **`resignKey` dismissal**
+  (`KeyablePanel.onResignKey` → `openPanel = nil`). 6 unit tests.
+- [x] **C3** — `didChangeScreenParametersNotification` → re-anchors open
+  flyout (`syncTaskbarFlyout`) + edge dock (`syncPanels`) in place; strip
+  already refreshes via `DisplayCoordinator`. 2 notification tests.
 
-### 2.1 Island Module Protocol
+## Wave 4 — Maximized-window avoidance ✅
 
-```swift
-public protocol TaskbarIslandModule: View {
-    var id: String { get }
-    var preferredAlignment: IslandAlignment { get } // .leading, .center, .trailing
-    var intrinsicWidth: CGFloat? { get }
-    var dragOrderIndex: Int { get set }
-}
-```
+- [x] **D1** — `WindowTilingGeometry.calculateCocoaTargetFrame(..., bottomStrut:)`:
+  `.maximize` reserves the strip band; other actions unchanged (4 tests).
+  `WindowManagerService.bottomStrut` closure wired to the live strip frame,
+  gated on the toggle, primary-screen only.
+- [x] **D2** — `ZoomAvoidanceObserver` (AX: window created/resized/moved on
+  the frontmost app) + pure `ZoomAvoidance` detection (7 tests incl. the
+  no-loop guarantee). Toggle **"Maximize keeps taskbar visible"** in the
+  taskbar context menu, default **on**, persisted
+  (`taskbar.maximizeAvoids`). Observer attaches on *activation* (never at
+  launch); the Accessibility prompt fires only when the user flips the
+  toggle (lazy first use).
+- [x] **D3** — `FullscreenMonitor` untouched; smoke green.
 
-### 2.2 Decoupled Modules
+## Wave 5 — LayerFX parity + per-panel ✅
 
-* **`StartIsland`** — Start button, search trigger, OS emblems.
-* **`AppTilesIsland`** — pinned/running apps, badges, jump-lists, dots.
-* **`SystemTrayIsland`** — Wi-Fi, Bluetooth, battery, volume, input, status.
-* **`ClockIsland`** — time, date, notification bell, calendar trigger.
-* **`WidgetIsland`** — weather badge, now-playing pill, telemetry.
+- [x] **E1** — `LayerFX.State {normal, pressed, hover}` through
+  `spec`/`activeSpec` and all three modifiers (`layerFXState` param,
+  default `.normal`). Neumorphism `.pressed` inverts the dual band (surface
+  sinks); Aero `.hover` adds an in-bounds radial specular glow. Kill switch
+  covers states.
+- [x] **E2** — each island renders its own `LayerFXView` post-A2; test proves
+  independent specs + equality contract.
+- [x] **E3** — `LayerFXNSView` same-spec assignment requests **zero** redraws
+  (layer `needsDisplay` test); different spec requests one.
 
-### 2.3 Dynamic Layout Engine
+## Wave 6 — Theme expansion (Phase 4) ✅
 
-`ModularTaskbarContainer` arranges active modules per layout mode:
+- [x] **F1** — Skeuomorphism (dual shading + dashed inset **stitch**, renderer
+  dash test) and Aqua (gloss cap + inner ridge + rim light, bitmap test)
+  now render through LayerFX.
+- [x] **F2** — Frutiger Aero (deterministic water-drop glints, sparkle test)
+  and Y2K (diagonal iridescent chrome ring, blue-dominance test).
 
-* **Unified Floating** — one continuous surface shell.
-* **Split Islands** — each module its own floating shell + spacing.
-* **Windows Edge** — edge-to-edge docked strip.
+> **Deviation from the original plan text:** the theme *cases* for these four
+> already existed in `SurfaceStyle` (the 16-theme contract is unchanged);
+> what they lacked was LayerFX ownership, which is what F1/F2 delivered.
+> LayerFX now owns **9 of 16** styles; the rest keep legacy SwiftUI strokes.
 
-## 3. Pillar 2: The `LayerFX` Engine (Phase 2 — DONE)
+## Wave 7 — Micro-interactions + previews ✅
 
-`LayerFXView` (`NSViewRepresentable`) renders in-bounds theme decoration with
-Core Graphics, one pass per layout change:
+- [x] **G1** — running-indicator pill springs in on app launch
+  (scale+opacity transition, `MotionTokens.spring(0.3/0.6)`), disabled under
+  Reduce Motion (`model.reduceMotion` threaded into `TaskbarTiles`).
+- [x] **G2** — tile press/hover springs moved into
+  `MotionTokens.spring(response:dampingFraction:reduceMotion:)` with
+  `accessibilityReduceMotion` read from the environment.
+- [x] **H1** — *verified already implemented*: `AppWindowPreviewService`
+  captures live `SCScreenshotManager` thumbnails per window; preview card
+  shows up to 6 windows, title + click-to-select (switch), icon fallback.
+- [x] **H2** — *verified*: capture starts only when the preview opens
+  (hover-driven, never at launch); denial shows "Grant Screen Recording for
+  live thumbnails."; **no window titles or images are ever logged** (grep-
+  verified; the only title log carries `privacy: .private`).
 
-| Theme | `LayerFX` technique |
-| :--- | :--- |
-| **Neumorphism** | inverted-clip dual-axis inner shadows (light top-left, dark bottom-right) + extruded drop shadows in SwiftUI |
-| **Windows Aero** | 45° diagonal specular sweep gradient + 1 pt bright inner glass ridge |
-| **Windows 98** | crisp four-tone bevel: `#FFFFFF` / `#DFDFDF` / `#808080` / `#000000`, antialiasing off, sRGB-explicit tones |
-| **Claymorphism** | specular top highlight + bottom rim light vertical fades |
-| **Neobrutalism** | 2–3 pt solid black borders; hard offset shadow (radius 0, offset 4) in SwiftUI |
+## Wave 8 — Measure (Phase 4 tail)
 
-Design contract:
+- [~] **I1 · partial (headless baseline done; GUI Instruments session
+  pending)** — automated micro-benchmark recorded:
+  - **LayerFX render cost: 492.8 µs/spec** (600×80 panel, neumorphism dual
+    inner shadows, *debug* build — release will be lower; benchmark:
+    `LayerFXBenchmarkTests`, prints, no flaky assertion).
+  - Test suite: **124 tests in 0.62 s**; smoke test PASS (launch → 6 s →
+    clean SIGTERM).
+  - **Manual checklist for the Instruments session** (needs GUI):
+    Core Animation FPS while switching all 9 LayerFX themes on a flyout;
+    FPS while dragging the split-bar resize handle; memory (leaks) over
+    10 min with previews hovering; Space-switch frame time. Record numbers
+    here; any regression fails the wave.
 
-* **Fills stay in SwiftUI** (`GlassProvider`); outer drop shadows stay in the
-  SwiftUI surface modifiers. LayerFX draws *in-bounds decoration only*.
-* Spec is pure/`Equatable` (`LayerFXSpec`); renderer is pure `CGContext`
-  (`LayerFXRenderer`), testable via bitmap rasterization.
-* Screen coords y-down in the spec, converted to CG y-up for shadow offsets.
-* **Kill switch:** `SPLITBAR_LAYERFX=0` env or `layerfx.enabled` UserDefaults
-  (default true) reverts every surface to the legacy SwiftUI rendering.
-* Hookup: all three modifiers in `SurfaceModifiers.swift`
-  (`.flyoutSurface` / `.widgetCard` / `.taskbarSurface`) consume
-  `LayerFX.activeSpec(...)`; legacy stroke/gradient overlays remain behind
-  `layerFX == nil`.
+---
 
-## 4. Pillar 3: AppKit Window & Shell Hardening (Phase 3 — TODO)
+## Appendix · NSPanel audit table (C1, done)
 
-1. **Window levels & collections:** taskbar `NSPanel.level = .floating`;
-   `collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle,
-   .fullScreenAuxiliary]`. (Audit anchor: `taskbarStripCollectionBehavior()`
-   in `Support/PanelGeometry.swift` currently omits `.fullScreenAuxiliary`
-   vs `edgePanelCollectionBehavior()`.)
-2. **Key window & focus:** taskbar strictly non-activating
-   (`canBecomeKey = false`); flyouts take key only while open, dismiss on
-   `resignKey()`.
-3. **Multi-monitor sync:** hook `NSApplication.didChangeScreenParametersNotification`
-   to re-anchor islands without screen flash or coordinate drift.
+| Panel | File | level | collectionBehavior | canBecomeKey | hidesOnDeactivate |
+|---|---|---|---|---|---|
+| Taskbar strip (`NonActivatingTaskbarPanel`) | Platform/TaskbarPanelController | .floating | all four incl. **`.fullScreenAuxiliary` (fixed)** | false / main false | false |
+| Taskbar flyouts (`KeyablePanel`) | Platform/FlyoutPanelController | .floating | all four | true (search input) | false |
+| Edge dock + activation handle | Platform/EdgePanelController | .floating | all four | false (borderless) | false |
+| Dock tooltip | Platform/DockTooltipPanelController | .popUpMenu | all four (inline) | false | false |
 
-## 5. Phase 4: Theme Expansion & Polish (TODO)
+## Appendix · I1 Instruments checklist
 
-* Remaining visual-atlas styles: Skeuomorphism (stitched leather/paper), Aqua
-  (gel/candy), Frutiger Aero (glossy nature glass), Y2K (chrome/metal).
-* Final smoke tests + Instruments profiling (Core Animation FPS, memory).
-
-## 6. Phased Roadmap & Status
-
-| Phase | Scope | Status |
-| :--- | :--- | :--- |
-| 1 | Taskbar modularization (`StartIsland` etc. + `ModularTaskbarContainer`) | TODO |
-| 2 | `LayerFX` surface engine + `SurfaceModifiers` hookup | **DONE** (build green, 88 tests) |
-| 3 | Shell & panel hardening audit | TODO (pre-findings above) |
-| 4 | Theme expansion + Instruments profiling | TODO |
+See Wave 8. Baseline: 492.8 µs/spec render (debug), 124 tests/0.62 s,
+smoke PASS. GUI numbers TBD.

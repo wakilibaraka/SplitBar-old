@@ -6,6 +6,12 @@ import OSLog
 public final class WindowManagerService: @unchecked Sendable {
     public let configuration: WindowTilingConfiguration
 
+    /// Receives the target screen's visible frame (Cocoa coords) and returns
+    /// the bottom band that must stay clear — the taskbar strip's height over
+    /// that screen, or 0 when the strip is elsewhere / avoidance is off
+    /// (HYBRID_PLAN D1/D2). Set by the app layer; nil means no avoidance.
+    public var bottomStrut: ((CGRect) -> CGFloat)?
+
     public init(configuration: WindowTilingConfiguration) {
         self.configuration = configuration
     }
@@ -18,6 +24,53 @@ public final class WindowManagerService: @unchecked Sendable {
         let promptKey = "AXTrustedCheckOptionPrompt" as CFString
         let options = [promptKey: kCFBooleanTrue] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
+    }
+
+    /// Focused window of the frontmost app, skipping SplitBar's own panels
+    /// (shared lookup for the WindowTracking seam).
+    private func frontmostFocusedWindowElement() -> AXUIElement? {
+        guard AXIsProcessTrusted() else { return nil }
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else { return nil }
+        if frontmostApp.bundleIdentifier == Bundle.main.bundleIdentifier { return nil }
+        let appElement = AXUIElementCreateApplication(frontmostApp.processIdentifier)
+        var focusedWindowValue: AnyObject?
+        guard AXUIElementCopyAttributeValue(
+            appElement,
+            kAXFocusedWindowAttribute as CFString,
+            &focusedWindowValue
+        ) == .success, let windowRef = focusedWindowValue else { return nil }
+        return unsafeDowncast(windowRef, to: AXUIElement.self)
+    }
+
+    public func frontmostWindowFrame() -> CGRect? {
+        guard let windowElement = frontmostFocusedWindowElement() else { return nil }
+        var positionValue: AnyObject?
+        var sizeValue: AnyObject?
+        guard AXUIElementCopyAttributeValue(windowElement, kAXPositionAttribute as CFString, &positionValue) == .success,
+              AXUIElementCopyAttributeValue(windowElement, kAXSizeAttribute as CFString, &sizeValue) == .success,
+              let positionRef = positionValue, let sizeRef = sizeValue
+        else { return nil }
+        var point = CGPoint.zero
+        var size = CGSize.zero
+        guard AXValueGetValue(unsafeDowncast(positionRef, to: AXValue.self), .cgPoint, &point),
+              AXValueGetValue(unsafeDowncast(sizeRef, to: AXValue.self), .cgSize, &size)
+        else { return nil }
+        return CGRect(origin: point, size: size)
+    }
+
+    @discardableResult
+    public func setFrontmostWindowFrame(_ frame: CGRect) -> Bool {
+        guard let windowElement = frontmostFocusedWindowElement() else { return false }
+        var origin = frame.origin
+        var size = frame.size
+        guard let positionAXValue = AXValueCreate(.cgPoint, &origin),
+              let sizeAXValue = AXValueCreate(.cgSize, &size)
+        else { return false }
+        // Position → size → position: mirrors tileFrontmostWindow so size
+        // constraints cannot drag the origin back.
+        _ = AXUIElementSetAttributeValue(windowElement, kAXPositionAttribute as CFString, positionAXValue)
+        _ = AXUIElementSetAttributeValue(windowElement, kAXSizeAttribute as CFString, sizeAXValue)
+        return AXUIElementSetAttributeValue(windowElement, kAXPositionAttribute as CFString, positionAXValue) == .success
     }
 
     @discardableResult
@@ -148,10 +201,12 @@ public final class WindowManagerService: @unchecked Sendable {
         let screen = targetScreen
         let screenVisibleFrame = screen.visibleFrame
 
+        let bottomStrutHeight = bottomStrut?(screenVisibleFrame) ?? 0
         let targetCocoaFrame = WindowTilingGeometry.calculateCocoaTargetFrame(
             action: action,
             screenVisibleFrame: screenVisibleFrame,
-            configuration: configuration
+            configuration: configuration,
+            bottomStrut: bottomStrutHeight
         )
 
         let targetAXFrame = WindowTilingGeometry.convertCocoaToAXFrame(
@@ -183,3 +238,7 @@ public final class WindowManagerService: @unchecked Sendable {
         }
     }
 }
+
+// MARK: - WindowTracking
+
+extension WindowManagerService: WindowTracking {}

@@ -22,7 +22,14 @@ public final class FlyoutPanelController {
         panel.hidesOnDeactivate = false
         panel.acceptsMouseMovedEvents = true
         self.panel = panel
+        panel.onResignKey = { [weak self] in
+            self?.onResignKey?()
+        }
     }
+
+    /// Fired when the visible flyout resigns key (HYBRID_PLAN C2) — the
+    /// owner clears its panel state, which routes back through `hide()`.
+    public var onResignKey: (() -> Void)?
 
     public func show(content: AnyView, frame: CGRect) {
         panel.contentView = makeFixedFrameHostingView(rootView: content)

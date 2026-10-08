@@ -42,19 +42,45 @@ For the review-driven improvement backlog, invariants and per-task status, read
   in `DisplayCoordinator` (primary display only for now).
 - **Hybrid architecture** ([HYBRID_PLAN.md](./HYBRID_PLAN.md)): AppKit for
   shell mechanics, SwiftUI for faces, plus a Core Graphics **LayerFX** engine
-  (Phase 2, done):
+  (Waves 1–7 of the chunked plan, done):
+  - **Folder boundaries** (single SPM target): `Sources/SplitBar/Platform/`
+    (AX, panels, display, dock mechanics), `Core/` (TaskbarState, StripModel,
+    ConfigurationPersistence), `UI/TaskbarConcept/` (islands, flyouts,
+    DesignSystem). New shell code goes in the matching folder.
+  - **Taskbar islands**: `TaskbarStripViews.swift` is a thin facade (151
+    lines); the five islands live in `TaskbarStrip/Islands/` (Start, AppTiles,
+    StatusTray, Clock, Widget) and `ModularTaskbarContainer` routes the three
+    layout modes (.docked/.floating/.split). Split islands are self-sizing —
+    never reintroduce manual CGRect/offset layout; paddings come from
+    `LayoutTokens` (8pt grid).
   - `LayerFX` (DesignSystem/LayerFX.swift) draws *in-bounds decoration only*
-    for 5 owned styles: neumorphism, windowsAero, classic98, claymorphism,
-    neobrutalism. Fills stay in `GlassProvider`; outer shadows stay in the
-    SwiftUI surface modifiers.
+    for **9 owned styles**: neumorphism, windowsAero, classic98,
+    claymorphism, neobrutalism, skeuomorphism, aqua, frutigerAero, y2k.
+    Fills stay in `GlassProvider`; outer shadows stay in the SwiftUI surface
+    modifiers. `LayerFX.State` (.normal/.pressed/.hover) variants exist;
+    modifiers take `layerFXState:` (default .normal).
   - `LayerFXSpec` is pure/Equatable; `LayerFXRenderer` is pure `CGContext`
-    (bitmap-tested in `Tests/SplitBarTests/LayerFXTests.swift`). Specs use
-    screen coords (y-down); renderer converts to CG y-up.
+    (bitmap-tested in `Tests/SplitBarTests/LayerFXTests.swift`; headless
+    benchmark in `LayerFXBenchmarkTests`). Specs use screen coords (y-down);
+    renderer converts to CG y-up.
   - Kill switch: `SPLITBAR_LAYERFX=0` env or `layerfx.enabled` UserDefaults
     (default on) reverts surfaces to legacy SwiftUI rendering.
   - The three surface modifiers (`.flyoutSurface`/`.widgetCard`/`.taskbarSurface`)
     consume `LayerFX.activeSpec(...)`; legacy strokes/gradients remain behind
     `layerFX == nil` for unsupported styles.
+- **Shell contracts** (post-Wave-3/4):
+  - `WindowTracking` (Platform/WindowTracking.swift) is the AX seam — shell
+    policy talks to the protocol, never raw AXUIElement.
+  - Flyout dismissal: one pure rule (`FlyoutDismissal.shouldDismiss`) used by
+    every event monitor, plus `KeyablePanel.onResignKey` → clear panel state.
+    Don't add ad-hoc dismissal closures.
+  - Maximize-avoids-the-taskbar: `.maximize` geometry takes a `bottomStrut`;
+    `ZoomAvoidanceObserver` re-insets externally zoomed windows. Toggle
+    `taskbar.maximizeAvoids` (default on); Accessibility prompt fires **only
+    when the user flips the toggle**, never at launch; observer attaches on
+    app activation only.
+  - Screen-parameter changes re-anchor flyout + edge dock via the
+    `didChangeScreenParametersNotification` observer in AppRuntimeController.
 - **DockController constraints** (never break these):
   - Persist original Dock orientation + autohide state to disk *before* mutating,
     atomically, in a versioned file.

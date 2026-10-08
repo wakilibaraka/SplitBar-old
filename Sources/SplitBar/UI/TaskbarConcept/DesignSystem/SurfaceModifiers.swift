@@ -5,10 +5,11 @@ public struct FlyoutSurfaceModifier: ViewModifier {
     let darkMode: Bool
     let transparency: Double
     let cornerRadius: CGFloat
+    var layerFXState: LayerFX.State = .normal
 
     public func body(content: Content) -> some View {
         let tokens = ThemeTokens.resolve(style: style, darkMode: darkMode)
-        let layerFX = LayerFX.activeSpec(style: style, darkMode: darkMode, role: .panel, cornerRadius: cornerRadius)
+        let layerFX = LayerFX.activeSpec(style: style, darkMode: darkMode, role: .panel, cornerRadius: cornerRadius, state: layerFXState)
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
         content
@@ -128,8 +129,8 @@ public struct FlyoutSurfaceModifier: ViewModifier {
 }
 
 public extension View {
-    func flyoutSurface(style: SurfaceStyle, darkMode: Bool, transparency: Double, cornerRadius: CGFloat) -> some View {
-        self.modifier(FlyoutSurfaceModifier(style: style, darkMode: darkMode, transparency: transparency, cornerRadius: cornerRadius))
+    func flyoutSurface(style: SurfaceStyle, darkMode: Bool, transparency: Double, cornerRadius: CGFloat, layerFXState: LayerFX.State = .normal) -> some View {
+        self.modifier(FlyoutSurfaceModifier(style: style, darkMode: darkMode, transparency: transparency, cornerRadius: cornerRadius, layerFXState: layerFXState))
     }
 }
 
@@ -138,6 +139,7 @@ public struct WidgetCardModifier: ViewModifier {
     let darkMode: Bool
     let transparency: Double
     let showsBorder: Bool
+    var layerFXState: LayerFX.State = .normal
 
     public func body(content: Content) -> some View {
         let tokens = ThemeTokens.resolve(style: style, darkMode: darkMode)
@@ -147,7 +149,8 @@ public struct WidgetCardModifier: ViewModifier {
             darkMode: darkMode,
             role: .card,
             cornerRadius: cornerRadius,
-            showsBorder: showsBorder
+            showsBorder: showsBorder,
+            state: layerFXState
         )
 
         content
@@ -258,8 +261,8 @@ public struct WidgetCardModifier: ViewModifier {
 }
 
 public extension View {
-    func widgetCard(style: SurfaceStyle, darkMode: Bool, transparency: Double, showsBorder: Bool = true) -> some View {
-        self.modifier(WidgetCardModifier(style: style, darkMode: darkMode, transparency: transparency, showsBorder: showsBorder))
+    func widgetCard(style: SurfaceStyle, darkMode: Bool, transparency: Double, showsBorder: Bool = true, layerFXState: LayerFX.State = .normal) -> some View {
+        self.modifier(WidgetCardModifier(style: style, darkMode: darkMode, transparency: transparency, showsBorder: showsBorder, layerFXState: layerFXState))
     }
 }
 
@@ -268,10 +271,11 @@ public struct TaskbarSurfaceModifier: ViewModifier {
     let darkMode: Bool
     let transparency: Double
     let cornerRadius: CGFloat
+    var layerFXState: LayerFX.State = .normal
 
     public func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        let layerFX = LayerFX.activeSpec(style: style, darkMode: darkMode, role: .taskbar, cornerRadius: cornerRadius)
+        let layerFX = LayerFX.activeSpec(style: style, darkMode: darkMode, role: .taskbar, cornerRadius: cornerRadius, state: layerFXState)
 
         return content
             .background(
@@ -338,7 +342,7 @@ public struct TaskbarSurfaceModifier: ViewModifier {
 }
 
 public extension View {
-    func taskbarSurface(style: SurfaceStyle, darkMode: Bool, transparency: Double, cornerRadius: CGFloat) -> some View {
-        self.modifier(TaskbarSurfaceModifier(style: style, darkMode: darkMode, transparency: transparency, cornerRadius: cornerRadius))
+    func taskbarSurface(style: SurfaceStyle, darkMode: Bool, transparency: Double, cornerRadius: CGFloat, layerFXState: LayerFX.State = .normal) -> some View {
+        self.modifier(TaskbarSurfaceModifier(style: style, darkMode: darkMode, transparency: transparency, cornerRadius: cornerRadius, layerFXState: layerFXState))
     }
 }

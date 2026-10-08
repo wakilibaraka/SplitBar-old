@@ -179,6 +179,7 @@ public final class AppRuntimeController {
     private let taskbarPanelController = TaskbarPanelController()
     private let displayCoordinator = DisplayCoordinator()
     private let taskbarFlyoutController = FlyoutPanelController()
+    private let zoomAvoidanceObserver = ZoomAvoidanceObserver()
     private let windowPreviewController = FlyoutPanelController()
     private var taskbarFlyoutKindShown: OpenPanel?
     private var taskbarFlyoutLocalMonitor: Any?
@@ -292,6 +293,93 @@ public final class AppRuntimeController {
         })
         self.panelController = panel
         controllerRef = self
+
+        // C2: the visible taskbar flyout dismisses when its panel resigns key
+        // (cmd-tab, another SplitBar window taking key). Ordering out already
+        // routes through `openPanel = nil`, so this is idempotent.
+        taskbarFlyoutController.onResignKey = { [weak self] in
+            self?.taskbarConceptState.openPanel = nil
+        }
+
+        // C3: screen-configuration changes (resolution, display connect,
+        // dock-size changes) re-anchor the open flyout and the edge dock
+        // *in place* — no close/reopen flash. The strip refreshes through
+        // DisplayCoordinator inside TaskbarPanelController. The observer is
+        // process-lifetime like the controller itself; the block holds self
+        // weakly.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                if self.taskbarConceptState.openPanel != nil {
+                    self.syncTaskbarFlyout(self.taskbarConceptState.openPanel)
+                }
+                self.syncPanels()
+            }
+        }
+
+        // D1/D2: maximize-avoids-the-taskbar. The strut closure feeds SplitBar's
+        // own tiling shortcuts; the observer catches green-button/⌘-zoom from
+        // outside. Both are gated on the toggle and the strip's own frame.
+        zoomAvoidanceObserver.context = { [weak self] in
+            guard let self, self.taskbarConceptState.maximizeAvoidsTaskbar else { return nil }
+            guard let strip = self.taskbarPanelController.currentFrame, strip.height > 0 else { return nil }
+            guard let screen = self.screenService.primaryScreen() else { return nil }
+            let visible = screen.visibleFrame
+            guard strip.intersects(visible) else { return nil }
+            let primaryHeight = NSScreen.screens.first?.frame.height ?? 1080
+            let strut = strip.maxY - visible.minY
+            guard strut > 0 else { return nil }
+            return (ZoomAvoidance.visibleAX(fromCocoa: visible, primaryScreenHeight: primaryHeight), strut)
+        }
+        zoomAvoidanceObserver.applyInset = { [weak self] frame in
+            self?.windowManagerService.setFrontmostWindowFrame(frame) ?? false
+        }
+        windowManagerService.bottomStrut = { [weak self] screenFrame in
+            guard let self, self.taskbarConceptState.maximizeAvoidsTaskbar else { return 0 }
+            guard let strip = self.taskbarPanelController.currentFrame, strip.height > 0 else { return 0 }
+            guard strip.intersects(screenFrame) else { return 0 }
+            return strip.maxY - screenFrame.minY
+        }
+
+        // Attach on activation — never at launch; silently dormant without
+        // the Accessibility permission.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            Task { @MainActor in
+                guard let self, self.taskbarConceptState.maximizeAvoidsTaskbar else { return }
+                let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+                guard let pid = app?.processIdentifier, pid != ProcessInfo.processInfo.processIdentifier else { return }
+                self.zoomAvoidanceObserver.attach(to: pid)
+            }
+        }
+
+        // Toggling the setting is the *first use* of the feature — that's
+        // where the Accessibility prompt fires (never at launch).
+        taskbarConceptState.$maximizeAvoidsTaskbar
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] enabled in
+                guard let self else { return }
+                if enabled {
+                    if !self.windowManagerService.isAccessibilityGranted() {
+                        self.windowManagerService.promptAccessibilityPermission()
+                    }
+                    if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+                       pid != ProcessInfo.processInfo.processIdentifier {
+                        self.zoomAvoidanceObserver.attach(to: pid)
+                    }
+                } else {
+                    self.zoomAvoidanceObserver.detach()
+                }
+            }
+            .store(in: &taskbarPanelSubscriptions)
 
         weak var statusSelf: AppRuntimeController?
         let statusBar = StatusBarController(
@@ -540,7 +628,7 @@ public final class AppRuntimeController {
                         maxAppTiles: islands?.visibleAppTiles,
                         showOverflowChevron: islands?.showsOverflow ?? false
                     )
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, LayoutTokens.islandInnerPadding)
                     .background {
                         RoundedRectangle(cornerRadius: radius, style: .continuous)
                             .fill(.ultraThinMaterial)
@@ -695,11 +783,23 @@ public final class AppRuntimeController {
 
     private func setupTaskbarFlyoutDismissal() {
         if taskbarFlyoutLocalMonitor == nil {
-            taskbarFlyoutLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            taskbarFlyoutLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) { [weak self] event in
                 guard let self else { return event }
-                if event.keyCode == 53, self.taskbarFlyoutController.panel.isVisible {
+                if event.type == .keyDown {
+                    if event.keyCode == 53, self.taskbarFlyoutController.panel.isVisible {
+                        self.taskbarConceptState.openPanel = nil
+                        return nil
+                    }
+                    return event
+                }
+                // Own-app click: dismiss when it landed outside the flyout
+                // and outside the strip (buttons there toggle panels themselves).
+                guard self.taskbarFlyoutController.panel.isVisible else { return event }
+                if FlyoutDismissal.shouldDismiss(
+                    location: NSEvent.mouseLocation,
+                    protected: self.taskbarFlyoutProtectedFrames()
+                ) {
                     self.taskbarConceptState.openPanel = nil
-                    return nil
                 }
                 return event
             }
@@ -707,17 +807,25 @@ public final class AppRuntimeController {
         if taskbarFlyoutGlobalMonitor == nil {
             taskbarFlyoutGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
                 Task { @MainActor in
-                    guard let self else { return }
-                    let location = NSEvent.mouseLocation
-                    let inFlyout = self.taskbarFlyoutController.panel.isVisible
-                        && self.taskbarFlyoutController.panel.frame.contains(location)
-                    let stripFrame = self.taskbarPanelController.currentFrame ?? .zero
-                    if !inFlyout, !stripFrame.contains(location) {
+                    guard let self, self.taskbarFlyoutController.panel.isVisible else { return }
+                    if FlyoutDismissal.shouldDismiss(
+                        location: NSEvent.mouseLocation,
+                        protected: self.taskbarFlyoutProtectedFrames()
+                    ) {
                         self.taskbarConceptState.openPanel = nil
                     }
                 }
             }
         }
+    }
+
+    /// Frames that own their own click handling while a taskbar flyout is up.
+    private func taskbarFlyoutProtectedFrames() -> [CGRect] {
+        FlyoutDismissal.protectedFrames(
+            flyoutFrame: taskbarFlyoutController.panel.frame,
+            flyoutVisible: taskbarFlyoutController.panel.isVisible,
+            stripFrame: taskbarPanelController.currentFrame
+        )
     }
 
     private func closeTaskbarFlyout() {
@@ -1690,9 +1798,10 @@ public final class AppRuntimeController {
                 self.flyoutGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
                     Task { @MainActor in
                         guard let self = self else { return }
-                        let mouseLocation = NSEvent.mouseLocation
-                        if !self.flyoutController.panel.frame.contains(mouseLocation) &&
-                           !self.panelController.dockPanel.frame.contains(mouseLocation) {
+                        if FlyoutDismissal.shouldDismiss(
+                            location: NSEvent.mouseLocation,
+                            protected: [self.flyoutController.panel.frame, self.panelController.dockPanel.frame]
+                        ) {
                             self.dispatch(action: .flyout(.close))
                             self.flyoutController.hide()
                             self.closeFlyoutMonitors()
@@ -1710,9 +1819,10 @@ public final class AppRuntimeController {
                         return nil
                     }
                     if event.type == .leftMouseDown || event.type == .rightMouseDown {
-                        let mouseLocation = NSEvent.mouseLocation
-                        if !self.flyoutController.panel.frame.contains(mouseLocation) &&
-                           !self.panelController.dockPanel.frame.contains(mouseLocation) {
+                        if FlyoutDismissal.shouldDismiss(
+                            location: NSEvent.mouseLocation,
+                            protected: [self.flyoutController.panel.frame, self.panelController.dockPanel.frame]
+                        ) {
                             self.dispatch(action: .flyout(.close))
                             self.flyoutController.hide()
                             self.closeFlyoutMonitors()

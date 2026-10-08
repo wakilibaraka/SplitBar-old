@@ -7,19 +7,25 @@ import Foundation
 /// Phase 2 of the hybrid plan: the LayerFX engine is pure spec + pure
 /// CGContext code, so these tests rasterize it into a bitmap and sample
 /// pixels instead of trusting that it "looks right".
+@Suite(.serialized)
 struct LayerFXTests {
+    // Serialized: the kill-switch tests share the `layerfx.enabled` UserDefaults
+    // key and would race when run in parallel.
 
     // MARK: - Spec coverage
 
     @Test func unsupportedStylesGetNoSpec() {
-        for style: SurfaceStyle in [.glassmorphism, .liquidGlass, .minimalism, .aqua, .visionOS] {
+        for style: SurfaceStyle in [.glassmorphism, .liquidGlass, .minimalism, .visionOS] {
             #expect(LayerFX.spec(style: style, darkMode: false, role: .panel, cornerRadius: 12) == nil)
             #expect(LayerFX.supports(style) == false)
         }
     }
 
     @Test func supportedStylesGetSpecs() {
-        for style: SurfaceStyle in [.neumorphism, .windowsAero, .classic98, .claymorphism, .neobrutalism] {
+        for style: SurfaceStyle in [
+            .neumorphism, .windowsAero, .classic98, .claymorphism, .neobrutalism,
+            .skeuomorphism, .aqua, .frutigerAero, .y2k,
+        ] {
             #expect(LayerFX.spec(style: style, darkMode: false, role: .panel, cornerRadius: 12) != nil)
             #expect(LayerFX.supportedStyles.contains(style))
         }
@@ -155,6 +161,163 @@ struct LayerFXTests {
 
         #expect(topLeading.a > 0)
         #expect(topLeading.luminance > bottomTrailing.luminance)
+    }
+
+    // MARK: - E1: interaction states
+
+    @Test func pressedNeumorphismInvertsTheBand() throws {
+        let normal = try #require(LayerFX.spec(style: .neumorphism, darkMode: false, role: .panel, cornerRadius: 12))
+        let pressed = try #require(
+            LayerFX.spec(style: .neumorphism, darkMode: false, role: .panel, cornerRadius: 12, state: .pressed)
+        )
+        #expect(pressed != normal)
+        #expect(pressed.state == .pressed)
+        // Top-left band: light when normal, dark when pressed (the surface
+        // sinks) — compare rendered luminance, not Color equality.
+        let size = 40
+        let normalBitmap = render(normal, width: size, height: size)
+        let pressedBitmap = render(pressed, width: size, height: size)
+        let normalTop = normalBitmap.pixel(size / 2, 2).luminance
+        let pressedTop = pressedBitmap.pixel(size / 2, 2).luminance
+        #expect(normalTop > pressedTop + 0.15)
+    }
+
+    @Test func aeroHoverAddsSpecularGlow() throws {
+        let normal = try #require(LayerFX.spec(style: .windowsAero, darkMode: false, role: .panel, cornerRadius: 12))
+        let hover = try #require(
+            LayerFX.spec(style: .windowsAero, darkMode: false, role: .panel, cornerRadius: 12, state: .hover)
+        )
+        #expect(normal.hoverGlow == nil)
+        #expect(hover.hoverGlow != nil)
+
+        let size = 40
+        let normalBitmap = render(normal, width: size, height: size)
+        let hoverBitmap = render(hover, width: size, height: size)
+        // Top-center is where the radial glow peaks.
+        let normalTop = normalBitmap.pixel(size / 2, 2).luminance
+        let hoverTop = hoverBitmap.pixel(size / 2, 2).luminance
+        #expect(hoverTop > normalTop)
+    }
+
+    @Test func killSwitchAlsoCoversStates() {
+        let saved = UserDefaults.standard.object(forKey: "layerfx.enabled")
+        defer {
+            if let saved { UserDefaults.standard.set(saved, forKey: "layerfx.enabled") }
+            else { UserDefaults.standard.removeObject(forKey: "layerfx.enabled") }
+        }
+        UserDefaults.standard.set(false, forKey: "layerfx.enabled")
+        #expect(
+            LayerFX.activeSpec(style: .neumorphism, darkMode: false, role: .panel, cornerRadius: 8, state: .pressed) == nil
+        )
+        #expect(
+            LayerFX.activeSpec(style: .windowsAero, darkMode: false, role: .panel, cornerRadius: 8, state: .hover) == nil
+        )
+    }
+
+    // MARK: - E2: per-island independence
+
+    @Test func islandsProduceIndependentSpecs() {
+        // Two islands (different radii) must produce distinct specs so each
+        // LayerFXView redraws only its own surface.
+        let a = LayerFX.spec(style: .neumorphism, darkMode: false, role: .taskbar, cornerRadius: 10)
+        let b = LayerFX.spec(style: .neumorphism, darkMode: false, role: .taskbar, cornerRadius: 16)
+        #expect(a != nil && b != nil)
+        #expect(a != b)
+        // Equal inputs stay equal — that's the no-redraw contract.
+        let a2 = LayerFX.spec(style: .neumorphism, darkMode: false, role: .taskbar, cornerRadius: 10)
+        #expect(a == a2)
+    }
+
+    // MARK: - E3: no-op spec updates draw nothing
+
+    @Test func assigningTheSameSpecDoesNotRequestRedraw() {
+        let spec = LayerFXSpec(cornerRadius: 12, borderWidth: 1, borderColor: .black)
+        let view = LayerFXNSView()
+        view.spec = spec
+        // The view is layer-backed, so the dirty flag lives on the layer.
+        view.layer?.setNeedsDisplay()
+        view.layer?.displayIfNeeded()
+        #expect(view.layer?.needsDisplay() == false)
+        // Equal spec → didSet's `spec != oldValue` guard stays quiet.
+        view.spec = spec
+        #expect(view.layer?.needsDisplay() == false)
+        // Different spec → exactly one redraw requested.
+        var changed = spec
+        changed.borderWidth = 3
+        view.spec = changed
+        #expect(view.layer?.needsDisplay() == true)
+    }
+
+    // MARK: - F1/F2: expanded theme ownership
+
+    @Test func skeuomorphismCarriesStitchAndShading() throws {
+        let spec = try #require(LayerFX.spec(style: .skeuomorphism, darkMode: false, role: .panel, cornerRadius: 12))
+        #expect(spec.stitchColor != nil)
+        #expect(spec.innerShadows.count == 2)
+        let plain = try #require(
+            LayerFX.spec(style: .skeuomorphism, darkMode: false, role: .panel, cornerRadius: 12, showsBorder: false)
+        )
+        #expect(plain.stitchColor == nil)
+    }
+
+    /// Renderer-level dash check with a synthetic spec (no shading to
+    /// interfere): the stitch ring must show segments *and* gaps.
+    @Test func stitchRendersAsDashedRing() {
+        var spec = LayerFXSpec(cornerRadius: 0)
+        spec.stitchColor = .black
+        let bitmap = render(spec, width: 40, height: 40)
+
+        // The stitch sits ~4pt inside the edge; find the row with coverage.
+        var bestRow = -1
+        var bestOn = 0
+        for row in 2...6 {
+            let on = (6..<34).filter { bitmap.pixel($0, row).a > 60 }.count
+            if on > bestOn { bestOn = on; bestRow = row }
+        }
+        #expect(bestRow >= 0, "stitch ring must render")
+        #expect(bestOn >= 5, "dash segments must cover part of the ring")
+        let gaps = (6..<34).filter { bitmap.pixel($0, bestRow).a < 20 }.count
+        #expect(gaps >= 2, "dash gaps must show between segments")
+    }
+
+    @Test func aquaGlossCapIsBrighterThanTheBody() throws {
+        let spec = try #require(LayerFX.spec(style: .aqua, darkMode: false, role: .panel, cornerRadius: 12))
+        #expect(spec.topHighlight != nil)
+        #expect(spec.ridge != nil)
+        let size = 40
+        let bitmap = render(spec, width: size, height: size)
+        let cap = bitmap.pixel(size / 2, 1).luminance
+        let body = bitmap.pixel(size / 2, 20).luminance
+        #expect(cap > 0.3)
+        #expect(cap > body)
+    }
+
+    @Test func frutigerAeroDropsSparkle() throws {
+        let spec = try #require(LayerFX.spec(style: .frutigerAero, darkMode: false, role: .panel, cornerRadius: 12))
+        #expect(spec.drops)
+        var without = spec
+        without.drops = false
+
+        let size = 40
+        let withBitmap = render(spec, width: size, height: size)
+        let withoutBitmap = render(without, width: size, height: size)
+        // Drop #2 sits at (58%, 90%-from-top).
+        let spot = (x: 23, row: 36)
+        let withDrop = withBitmap.pixel(spot.x, spot.row).luminance
+        let withoutDrop = withoutBitmap.pixel(spot.x, spot.row).luminance
+        #expect(withDrop > withoutDrop + 0.05)
+    }
+
+    @Test func y2kRingIsIridescent() throws {
+        let spec = try #require(LayerFX.spec(style: .y2k, darkMode: false, role: .panel, cornerRadius: 12))
+        #expect(spec.iridescentBorder)
+        #expect(spec.borderWidth == 2)
+
+        let bitmap = render(spec, width: 40, height: 40)
+        // Left edge of the ring runs through the blue chrome stop.
+        let left = bitmap.pixel(1, 20)
+        #expect(left.a > 100)
+        #expect(Int(left.b) - Int(left.r) > 20, "left ring must be blue-dominant")
     }
 
     // MARK: - Bitmap helpers

@@ -2,10 +2,15 @@ import CoreGraphics
 import Foundation
 
 public struct WindowTilingGeometry {
+    /// - Parameter bottomStrut: Height (Cocoa points) of the band at the
+    ///   bottom of the screen that windows must keep clear — the taskbar
+    ///   strip. Only `.maximize` reserves it; other tiling actions already
+    ///   stay inside the work area (HYBRID_PLAN D1).
     public static func calculateCocoaTargetFrame(
         action: WindowTilingAction,
         screenVisibleFrame: CGRect,
-        configuration: WindowTilingConfiguration
+        configuration: WindowTilingConfiguration,
+        bottomStrut: CGFloat = 0
     ) -> CGRect {
         let gap = configuration.gap
         let margin = configuration.edgeMargin
@@ -22,7 +27,14 @@ public struct WindowTilingGeometry {
 
         switch action {
         case .maximize:
-            return workArea
+            let strut = max(0, min(bottomStrut, workArea.height - 100))
+            guard strut > 0 else { return workArea }
+            return CGRect(
+                x: workArea.minX,
+                y: workArea.minY + strut,
+                width: workArea.width,
+                height: workArea.height - strut
+            )
 
         case .almostMaximize:
             let inset: CGFloat = 24.0

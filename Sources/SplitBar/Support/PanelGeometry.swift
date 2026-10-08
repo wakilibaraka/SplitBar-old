@@ -140,5 +140,7 @@ public func edgePanelCollectionBehavior() -> NSWindow.CollectionBehavior {
 }
 
 public func taskbarStripCollectionBehavior() -> NSWindow.CollectionBehavior {
-    return [.canJoinAllSpaces, .stationary, .ignoresCycle]
+    // .fullScreenAuxiliary keeps the strip visible over full-screen apps —
+    // parity with edgePanelCollectionBehavior() (HYBRID_PLAN C1).
+    return [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 }

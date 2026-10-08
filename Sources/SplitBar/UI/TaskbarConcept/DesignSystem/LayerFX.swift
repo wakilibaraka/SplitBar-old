@@ -13,12 +13,13 @@ import SwiftUI
 // surface modifiers, so panels keep their existing compositing. The renderer
 // is pure `CGContext` code (`LayerFXRenderer`) so tests can rasterize it into
 // a bitmap and sample pixels.
-enum LayerFX {
+public enum LayerFX {
 
     /// Styles the CG renderer takes over. Everything else keeps the legacy
     /// SwiftUI stroke/gradient overlays.
     static let supportedStyles: Set<SurfaceStyle> = [
-        .neumorphism, .windowsAero, .classic98, .claymorphism, .neobrutalism
+        .neumorphism, .windowsAero, .classic98, .claymorphism, .neobrutalism,
+        .skeuomorphism, .aqua, .frutigerAero, .y2k
     ]
 
     /// Surface role — mirrors the three SwiftUI surface modifiers.
@@ -26,6 +27,15 @@ enum LayerFX {
         case panel
         case card
         case taskbar
+    }
+
+    /// Interaction state the decoration renders for (HYBRID_PLAN E1).
+    /// `.pressed` inverts Neumorphism's dual band (the surface sinks);
+    /// `.hover` adds the Aero specular halo.
+    public enum State: Equatable {
+        case normal
+        case pressed
+        case hover
     }
 
     /// Kill switch: `SPLITBAR_LAYERFX=0` in the environment or the
@@ -50,33 +60,71 @@ enum LayerFX {
         darkMode: Bool,
         role: Role,
         cornerRadius: CGFloat,
-        showsBorder: Bool = true
+        showsBorder: Bool = true,
+        state: State = .normal
     ) -> LayerFXSpec? {
         guard supportedStyles.contains(style) else { return nil }
 
         var spec = LayerFXSpec(cornerRadius: cornerRadius)
+        spec.state = state
 
         switch style {
         case .neumorphism:
-            // Plan: authentic dual-axis inner shading — light top-left,
-            // dark bottom-right — for the soft extruded edge.
-            spec.innerShadows = [
-                LayerFXSpec.InnerShadow(
-                    color: .white.opacity(darkMode ? 0.09 : 0.85),
-                    offset: CGSize(width: 3, height: 3),
-                    blur: 5
-                ),
-                LayerFXSpec.InnerShadow(
-                    color: .black.opacity(darkMode ? 0.55 : 0.20),
-                    offset: CGSize(width: -3, height: -3),
-                    blur: 7
-                )
-            ]
+            // Authentic dual-axis inner shading. Normal/hover: light
+            // top-left, dark bottom-right (the soft extruded edge).
+            // Pressed: the band inverts — the surface sinks into itself,
+            // matching ThemeButtonStyle's press physics.
+            let lightOpacity: CGFloat
+            let darkOpacity: CGFloat
+            switch state {
+            case .normal:
+                lightOpacity = darkMode ? 0.09 : 0.85
+                darkOpacity = darkMode ? 0.55 : 0.20
+            case .hover:
+                lightOpacity = darkMode ? 0.14 : 0.95
+                darkOpacity = darkMode ? 0.62 : 0.28
+            case .pressed:
+                lightOpacity = darkMode ? 0.12 : 0.55
+                darkOpacity = darkMode ? 0.70 : 0.38
+            }
+            if state == .pressed {
+                // Inverted: dark carves the top-left, light catches the
+                // bottom-right rim of the depression.
+                spec.innerShadows = [
+                    LayerFXSpec.InnerShadow(
+                        color: .black.opacity(darkOpacity),
+                        offset: CGSize(width: 3, height: 3),
+                        blur: 6
+                    ),
+                    LayerFXSpec.InnerShadow(
+                        color: .white.opacity(lightOpacity),
+                        offset: CGSize(width: -3, height: -3),
+                        blur: 5
+                    )
+                ]
+            } else {
+                spec.innerShadows = [
+                    LayerFXSpec.InnerShadow(
+                        color: .white.opacity(lightOpacity),
+                        offset: CGSize(width: 3, height: 3),
+                        blur: 5
+                    ),
+                    LayerFXSpec.InnerShadow(
+                        color: .black.opacity(darkOpacity),
+                        offset: CGSize(width: -3, height: -3),
+                        blur: 7
+                    )
+                ]
+            }
             spec.borderWidth = showsBorder ? 1 : 0
             spec.borderColor = cardBorder(role: role, style: .neumorphism)
 
         case .windowsAero:
             spec.sweep = aeroSweep(role: role)
+            if state == .hover {
+                // Specular halo (HYBRID_PLAN E1) — in-bounds radial glow.
+                spec.hoverGlow = .white.opacity(darkMode ? 0.16 : 0.24)
+            }
             if showsBorder {
                 spec.ridge = Color.white.opacity(darkMode ? 0.28 : 0.55)
                 spec.borderWidth = 1
@@ -102,6 +150,57 @@ enum LayerFX {
                 spec.borderColor = .black
             }
 
+        case .skeuomorphism:
+            // Warm stitched leather: soft extruded shading plus a dashed
+            // inset stitch line (HYBRID_PLAN F1).
+            spec.innerShadows = [
+                LayerFXSpec.InnerShadow(
+                    color: .white.opacity(darkMode ? 0.10 : 0.55),
+                    offset: CGSize(width: 3, height: 3),
+                    blur: 6
+                ),
+                LayerFXSpec.InnerShadow(
+                    color: .black.opacity(darkMode ? 0.55 : 0.28),
+                    offset: CGSize(width: -3, height: -3),
+                    blur: 8
+                )
+            ]
+            if showsBorder {
+                spec.borderWidth = 1
+                spec.borderColor = darkMode ? .black.opacity(0.6) : .black.opacity(0.35)
+                spec.stitchColor = darkMode ? .white.opacity(0.35) : .white.opacity(0.85)
+            }
+
+        case .aqua:
+            // Candy-gel: bright top gloss cap, bottom rim light, glossy
+            // inner ridge (HYBRID_PLAN F1).
+            spec.topHighlight = .white.opacity(darkMode ? 0.30 : 0.60)
+            spec.bottomRim = .white.opacity(darkMode ? 0.15 : 0.35)
+            if showsBorder {
+                spec.ridge = .white.opacity(0.85)
+                spec.borderWidth = 1
+                spec.borderColor = .white.opacity(0.65)
+            }
+
+        case .frutigerAero:
+            // Glossy nature glass: top gloss plus deterministic water-drop
+            // glints (HYBRID_PLAN F2).
+            spec.topHighlight = .white.opacity(darkMode ? 0.35 : 0.65)
+            spec.drops = true
+            if showsBorder {
+                spec.borderWidth = 1
+                spec.borderColor = .white.opacity(0.80)
+            }
+
+        case .y2k:
+            // Liquid chrome: diagonal sheen + iridescent blue-silver ring
+            // (HYBRID_PLAN F2).
+            spec.topHighlight = .white.opacity(darkMode ? 0.20 : 0.40)
+            if showsBorder {
+                spec.iridescentBorder = true
+                spec.borderWidth = 2
+            }
+
         default:
             return nil
         }
@@ -115,7 +214,8 @@ enum LayerFX {
         darkMode: Bool,
         role: Role,
         cornerRadius: CGFloat,
-        showsBorder: Bool = true
+        showsBorder: Bool = true,
+        state: State = .normal
     ) -> LayerFXSpec? {
         guard isEnabled else { return nil }
         return spec(
@@ -123,7 +223,8 @@ enum LayerFX {
             darkMode: darkMode,
             role: role,
             cornerRadius: cornerRadius,
-            showsBorder: showsBorder
+            showsBorder: showsBorder,
+            state: state
         )
     }
 
@@ -157,6 +258,11 @@ enum LayerFX {
 /// Everything LayerFX draws for one surface, in screen coordinates
 /// (origin top-left, y grows downward).
 struct LayerFXSpec: Equatable {
+    /// Interaction state this spec was built for.
+    var state: LayerFX.State = .normal
+    /// Aero hover: in-bounds radial specular glow (E1).
+    var hoverGlow: Color?
+
     struct InnerShadow: Equatable {
         /// Shadow colour; the visible band inside the surface uses this alpha.
         var color: Color
@@ -182,6 +288,12 @@ struct LayerFXSpec: Equatable {
     var bottomRim: Color?
     /// Windows 98 four-tone bevel; replaces the solid border.
     var bevel98: Bool = false
+    /// Skeuomorphism: dashed inset stitch line.
+    var stitchColor: Color?
+    /// Frutiger Aero: deterministic water-drop glints.
+    var drops: Bool = false
+    /// Y2K: diagonal iridescent chrome ring instead of a solid border.
+    var iridescentBorder: Bool = false
 
     func path(in bounds: CGRect) -> CGPath {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -211,16 +323,27 @@ enum LayerFXRenderer {
         if let bottom = spec.bottomRim {
             drawVerticalFade(bottom, path: path, bounds: bounds, ctx: ctx, fromTop: false, depth: 18)
         }
+        if spec.drops {
+            drawDrops(path: path, bounds: bounds, ctx: ctx)
+        }
         for shadow in spec.innerShadows {
             drawInnerShadow(shadow, path: path, bounds: bounds, ctx: ctx)
+        }
+        if let glow = spec.hoverGlow {
+            drawHoverGlow(glow, path: path, bounds: bounds, ctx: ctx)
         }
         if let ridge = spec.ridge {
             drawRidge(ridge, spec: spec, path: path, bounds: bounds, ctx: ctx)
         }
         if spec.bevel98 {
             drawBevel98(spec: spec, path: path, bounds: bounds, ctx: ctx)
+        } else if spec.iridescentBorder {
+            drawIridescentBorder(spec: spec, path: path, bounds: bounds, ctx: ctx)
         } else if spec.borderWidth > 0 {
             drawBorder(spec: spec, path: path, bounds: bounds, ctx: ctx)
+        }
+        if let stitch = spec.stitchColor {
+            drawStitch(stitch, spec: spec, path: path, bounds: bounds, ctx: ctx)
         }
     }
 
@@ -288,6 +411,26 @@ enum LayerFXRenderer {
         ctx.beginPath()
         ctx.addPath(insetPath(spec, depth: 1.5, bounds: bounds))
         ctx.strokePath()
+        ctx.restoreGState()
+    }
+
+    // MARK: Aero hover glow
+
+    private static func drawHoverGlow(_ color: Color, path: CGPath, bounds: CGRect, ctx: CGContext) {
+        guard let gradient = cgGradient([color, .clear]) else { return }
+        ctx.saveGState()
+        ctx.beginPath()
+        ctx.addPath(path)
+        ctx.clip()
+        let center = CGPoint(x: bounds.midX, y: bounds.maxY)
+        ctx.drawRadialGradient(
+            gradient,
+            startCenter: center,
+            startRadius: 0,
+            endCenter: center,
+            endRadius: max(bounds.width, bounds.height) * 0.7,
+            options: []
+        )
         ctx.restoreGState()
     }
 
@@ -399,6 +542,69 @@ enum LayerFXRenderer {
         ctx.beginPath()
         ctx.addPath(insetPath(spec, depth: inset, bounds: bounds))
         ctx.strokePath()
+        ctx.restoreGState()
+    }
+
+    // MARK: Skeuomorphism stitch
+
+    private static func drawStitch(_ color: Color, spec: LayerFXSpec, path: CGPath, bounds: CGRect, ctx: CGContext) {
+        ctx.saveGState()
+        ctx.beginPath()
+        ctx.addPath(path)
+        ctx.clip()
+        ctx.setStrokeColor(cgColor(color))
+        ctx.setLineWidth(1)
+        ctx.setLineDash(phase: 0, lengths: [3, 2])
+        ctx.beginPath()
+        ctx.addPath(insetPath(spec, depth: 4, bounds: bounds))
+        ctx.strokePath()
+        ctx.restoreGState()
+    }
+
+    // MARK: Frutiger Aero water-drop glints
+
+    private static func drawDrops(path: CGPath, bounds: CGRect, ctx: CGContext) {
+        // Deterministic positions (fraction of width, fraction from the top):
+        // three round highlights that read as water droplets on the glass.
+        let spots: [(CGFloat, CGFloat)] = [(0.28, 0.80), (0.58, 0.90), (0.80, 0.76)]
+        ctx.saveGState()
+        ctx.beginPath()
+        ctx.addPath(path)
+        ctx.clip()
+        let radius = max(4, min(bounds.width, bounds.height) * 0.06)
+        for (fx, fy) in spots {
+            guard let gradient = cgGradient([.white.opacity(0.9), .clear]) else { continue }
+            let center = CGPoint(x: bounds.minX + bounds.width * fx, y: bounds.maxY - bounds.height * fy)
+            ctx.drawRadialGradient(
+                gradient,
+                startCenter: center,
+                startRadius: 0,
+                endCenter: center,
+                endRadius: radius * 2.2,
+                options: []
+            )
+        }
+        ctx.restoreGState()
+    }
+
+    // MARK: Y2K iridescent chrome ring
+
+    private static func drawIridescentBorder(spec: LayerFXSpec, path: CGPath, bounds: CGRect, ctx: CGContext) {
+        let chrome = Color(red: 0.35, green: 0.55, blue: 1.0)
+        let aquaBlue = Color(red: 0.40, green: 0.90, blue: 1.0)
+        guard let gradient = cgGradient([chrome, .white, aquaBlue, .white]) else { return }
+        ctx.saveGState()
+        // Ring between the outer edge and `borderWidth` in.
+        ctx.beginPath()
+        ctx.addPath(path)
+        ctx.addPath(insetPath(spec, depth: spec.borderWidth, bounds: bounds))
+        ctx.clip(using: .evenOdd)
+        ctx.drawLinearGradient(
+            gradient,
+            start: CGPoint(x: bounds.minX, y: bounds.maxY),
+            end: CGPoint(x: bounds.maxX, y: bounds.minY),
+            options: []
+        )
         ctx.restoreGState()
     }
 

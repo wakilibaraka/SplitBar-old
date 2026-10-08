@@ -149,10 +149,15 @@ struct TaskbarDividerView: View {
 
 
 struct TilePressButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.72), value: configuration.isPressed)
+            .animation(
+                MotionTokens.spring(response: 0.25, dampingFraction: 0.72, reduceMotion: reduceMotion),
+                value: configuration.isPressed
+            )
     }
 }
 
@@ -165,6 +170,7 @@ struct AppTile<Icon: View, Indicator: View>: View {
     let menu: AnyView
     let onHoverChanged: (Bool) -> Void
     @State private var isHovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: onActivate) {
@@ -177,7 +183,10 @@ struct AppTile<Icon: View, Indicator: View>: View {
             }
             .offset(y: isHovering ? -2 : 0)
             .scaleEffect(isHovering ? 1.03 : 1.0)
-            .animation(.spring(response: 0.24, dampingFraction: 0.78), value: isHovering)
+            .animation(
+                MotionTokens.spring(response: 0.24, dampingFraction: 0.78, reduceMotion: reduceMotion),
+                value: isHovering
+            )
         }
         .buttonStyle(TilePressButtonStyle())
         .help(title)
