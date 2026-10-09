@@ -1,11 +1,14 @@
 import AppKit
 import SwiftUI
 
-// The six settings tabs, split out to keep this file readable. They are all
-// computed properties, so holding them in an extension changes nothing. Their
-// access level widens because `private` inside an extension is scoped to the
-// extension, not to the type, and the other half of the type lives elsewhere.
 extension SettingsFlyout {
+    var state: TaskbarConceptState {
+        fatalError("state must be provided by the owning view")
+    }
+
+    // MARK: - Tab 1: Taskbar
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
     // MARK: - Tab 1: Taskbar
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     var taskbarTab: some View {
@@ -25,25 +28,35 @@ extension SettingsFlyout {
 
     var taskbarModeCard: some View {
         settingsSection("Taskbar mode") {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 ForEach(TaskbarMode.allCases) { mode in
                     Button { taskbarMode = mode } label: {
-                        TaskbarModeThumbnail(mode: mode, isSelected: taskbarMode == mode)
+                        VStack(spacing: 6) {
+                            TaskbarModeThumbnail(mode: mode, isSelected: taskbarMode == mode)
+                            Text(mode.title)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(taskbarMode == mode ? accent : .primary)
+                                .lineLimit(1)
+                        }
                     }
                     .buttonStyle(.plain)
                     .help(mode.detail)
                 }
             }
-            VStack(alignment: .leading, spacing: 4) {
+            .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 6) {
                 Text(taskbarMode.title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 15, weight: .semibold))
                 Text(taskbarMode.detail)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.bottom, 4)
+
             if taskbarMode.isSplit {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("Island gap")
                             .font(.system(size: 13, weight: .medium))
@@ -53,23 +66,24 @@ extension SettingsFlyout {
                     ThemeSlider(value: $islandGap, in: 0...40, step: 1).tint(accent)
                 }
             }
-            VStack(alignment: .leading, spacing: 8) {
+
+            VStack(alignment: .leading, spacing: 12) {
                 Text("Taskbar height")
                     .font(.system(size: 13, weight: .medium))
                 // Height presets: XS/S/M/L/XL
-                HStack(spacing: 6) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
                     let presets: [(String, CGFloat)] = [("XS", 32), ("S", 38), ("M", 42), ("L", 46), ("XL", 52)]
                     ForEach(presets, id: \.0) { label, h in
                         Button {
                             withAnimation(.spring(response: 0.25)) { taskbarHeight = h }
                         } label: {
                             Text(label)
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
+                                .padding(.vertical, 10)
                                 .background(
-                                    abs(taskbarHeight - h) < 1 ? accent.opacity(0.14) : Color.primary.opacity(0.045),
-                                    in: RoundedRectangle(cornerRadius: 8)
+                                    abs(taskbarHeight - h) < 1 ? accent.opacity(0.16) : Color.primary.opacity(0.05),
+                                    in: RoundedRectangle(cornerRadius: 10)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -80,7 +94,9 @@ extension SettingsFlyout {
                     sliderValueLabel("\(Int(taskbarHeight)) pt")
                 }
             }
-            VStack(alignment: .leading, spacing: 10) {
+            .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 12) {
                 Toggle(isOn: $showsTaskbarPanel) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Screen-edge panel")
@@ -247,6 +263,33 @@ extension SettingsFlyout {
             Text("Theme applies across the taskbar, all flyouts, and widget cards.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+            glassMaterialSelector
+        }
+    }
+
+    var glassMaterialSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Glass material")
+                    .font(.system(size: 13, weight: .medium))
+                Spacer()
+                Picker("", selection: state.glassMaterialBinding()) {
+                    ForEach(GlassMaterial.allCases) { material in
+                        Text(material.title).tag(material)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 240)
+            }
+            if state.glassMaterialForSettings == .clear {
+                Text(GlassMaterial.clear.subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(GlassMaterial.frosted.subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -254,16 +297,13 @@ extension SettingsFlyout {
         Button { surfaceStyle = style } label: {
             VStack(spacing: 6) {
                 ZStack(alignment: .bottom) {
-                    // Panel fill preview
                     RoundedRectangle(cornerRadius: max(4, style.cornerRadius * 0.45), style: .continuous)
-                        .fill(style.panelFill(darkMode: isDarkMode))
-                    // Mini taskbar strip
+                        .fill(state.glassMaterial.background(style: style, darkMode: isDarkMode))
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(style.taskbarFill(darkMode: isDarkMode))
+                        .fill(state.glassMaterial.taskbar(style: style, darkMode: isDarkMode))
                         .frame(height: 10)
                         .padding(.horizontal, 2)
                         .padding(.bottom, 2)
-                    // Mini accent dots
                     HStack(spacing: 3) {
                         ForEach(0..<3, id: \.self) { _ in
                             Circle()
@@ -272,12 +312,10 @@ extension SettingsFlyout {
                         }
                     }
                     .padding(.bottom, 14)
-                    // Selection ring
                     if surfaceStyle == style {
                         RoundedRectangle(cornerRadius: max(4, style.cornerRadius * 0.45), style: .continuous)
                             .strokeBorder(accent, lineWidth: 2.5)
                     }
-                    // Neobrutalism: hard black border
                     if style == .neobrutalism {
                         Rectangle()
                             .strokeBorder(Color.black, lineWidth: 2)

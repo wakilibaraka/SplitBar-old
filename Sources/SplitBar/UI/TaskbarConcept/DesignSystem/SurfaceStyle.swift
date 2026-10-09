@@ -18,7 +18,6 @@ enum OpenPanel: Equatable {
     }
 }
 
-
 // MARK: - SurfaceStyle — 14 named design-language themes
 public enum SurfaceStyle: String, CaseIterable, Identifiable {
 
@@ -99,7 +98,7 @@ public enum SurfaceStyle: String, CaseIterable, Identifiable {
             case .glassmorphism: Color(red: 0.10, green: 0.12, blue: 0.17)
             case .liquidGlass:   Color(red: 0.10, green: 0.12, blue: 0.18)
             case .windowsAero:   Color(red: 0.08, green: 0.16, blue: 0.25)
-            case .neumorphism:   Color(red: 0.122, green: 0.125, blue: 0.188)
+            case .neumorphism:   Color(red: 0.12, green: 0.126, blue: 0.15)
             case .claymorphism:  Color(red: 0.17, green: 0.14, blue: 0.18)
             case .skeuomorphism: Color(red: 0.14, green: 0.10, blue: 0.08)
             case .flatDesign:    Color(red: 0.12, green: 0.16, blue: 0.22)
@@ -142,7 +141,7 @@ public enum SurfaceStyle: String, CaseIterable, Identifiable {
             case .glassmorphism: Color(red: 0.15, green: 0.18, blue: 0.24)
             case .liquidGlass:   Color(red: 0.16, green: 0.19, blue: 0.26)
             case .windowsAero:   Color(red: 0.12, green: 0.23, blue: 0.31)
-            case .neumorphism:   Color(red: 0.145, green: 0.150, blue: 0.222)
+            case .neumorphism:   Color(red: 0.145, green: 0.150, blue: 0.175)
             case .claymorphism:  Color(red: 0.23, green: 0.18, blue: 0.23)
             case .skeuomorphism: Color(red: 0.20, green: 0.16, blue: 0.12)
             case .flatDesign:    Color(red: 0.17, green: 0.22, blue: 0.30)
@@ -161,7 +160,7 @@ public enum SurfaceStyle: String, CaseIterable, Identifiable {
             case .glassmorphism: .white.opacity(0.72)
             case .liquidGlass:   .white.opacity(0.78)
             case .windowsAero:   Color(red: 0.84, green: 0.93, blue: 0.99)
-            case .neumorphism:   Color(red: 0.940, green: 0.945, blue: 0.965)
+            case .neumorphism:   Color(red: 0.935, green: 0.940, blue: 0.948)
             case .claymorphism:  Color(red: 0.99, green: 0.95, blue: 0.94)
             case .skeuomorphism: Color(red: 0.90, green: 0.84, blue: 0.76)
             case .flatDesign:    Color(red: 0.25, green: 0.54, blue: 0.97)
@@ -199,6 +198,7 @@ public enum SurfaceStyle: String, CaseIterable, Identifiable {
         case .cyberdeck:     0
         }
     }
+
 
     // MARK: Taskbar bar fill
     func taskbarFill(darkMode: Bool) -> Color {
@@ -242,7 +242,7 @@ public enum SurfaceStyle: String, CaseIterable, Identifiable {
             case .windowsAero:
                 Color(red: 0.42, green: 0.69, blue: 0.88).opacity(0.65)
             case .neumorphism:
-                Color(red: 0.878, green: 0.886, blue: 0.910)
+                Color(red: 0.872, green: 0.878, blue: 0.886)
             case .claymorphism:
                 Color(red: 0.96, green: 0.88, blue: 0.88)
             case .skeuomorphism:
@@ -254,11 +254,11 @@ public enum SurfaceStyle: String, CaseIterable, Identifiable {
             case .minimalism:
                 .white
             case .aqua:
-                Color(red: 0.18, green: 0.52, blue: 0.92)
+                Color(red: 0.115, green: 0.42, blue: 0.85)
             case .frutigerAero:
-                Color(red: 0.36, green: 0.76, blue: 0.88)
+                Color(red: 0.22, green: 0.625, blue: 0.8)
             case .y2k:
-                Color(red: 0.58, green: 0.72, blue: 0.96)
+                Color(red: 0.40, green: 0.52, blue: 0.76)
             case .windowsXP:
                 Color(red: 0.70, green: 0.82, blue: 0.98)
             case .classic98:
@@ -377,14 +377,32 @@ public enum SurfaceStyle: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Surface helpers (delegated to GlassProviders)
 
 func panelBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
     GlassProviders.current.panelBackground(style: style, darkMode: darkMode, transparency: transparency)
 }
 
+func glassMaterialBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
+    return _glassMaterial(style: style, darkMode: darkMode, transparency: transparency, isCard: false)
+}
 
-func cardBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
-    GlassProviders.current.cardBackground(style: style, darkMode: darkMode, transparency: transparency)
+
+func glassMaterialCardBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
+    return _glassMaterial(style: style, darkMode: darkMode, transparency: transparency, isCard: true)
+}
+
+
+private func _glassMaterial(style: SurfaceStyle, darkMode: Bool, transparency: Double, isCard: Bool) -> AnyShapeStyle {
+    let state = GlassProviderState.current
+    if state == .clear {
+        return isCard
+            ? AnyShapeStyle(style.cardFill(darkMode: darkMode).opacity(1 - transparency * 0.42))
+            : AnyShapeStyle(style.panelFill(darkMode: darkMode).opacity(1 - transparency * 0.55))
+    }
+    return isCard
+        ? GlassProviders.current.cardBackground(style: style, darkMode: darkMode, transparency: transparency)
+        : GlassProviders.current.panelBackground(style: style, darkMode: darkMode, transparency: transparency)
 }
 
 
@@ -410,16 +428,66 @@ func surfaceWash(style: SurfaceStyle, darkMode: Bool) -> Color {
     }
 }
 
+func cardBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
+    GlassProviders.current.cardBackground(style: style, darkMode: darkMode, transparency: transparency)
+}
+
+func taskbarBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
+    GlassProviders.current.taskbarBackground(style: style, darkMode: darkMode, transparency: transparency)
+}
+
+extension SurfaceStyle {
+    var usesMaterial: Bool {
+        switch self {
+        case .glassmorphism, .liquidGlass, .windowsAero, .visionOS:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+// MARK: - Environment keys
 
 struct SurfaceStyleKey: EnvironmentKey {
     static let defaultValue = SurfaceStyle.glassmorphism
 }
 
-
 struct TransparencyKey: EnvironmentKey {
     static let defaultValue = 0.40
 }
 
+struct WidgetOutlineKey: EnvironmentKey {
+    static let defaultValue = WidgetOutlineStyle()
+}
+
+struct IconBackgroundKey: EnvironmentKey {
+    static let defaultValue = IconBackgroundStyle()
+}
+
+extension EnvironmentValues {
+    var surfaceStyle: SurfaceStyle {
+        get { self[SurfaceStyleKey.self] }
+        set { self[SurfaceStyleKey.self] = newValue }
+    }
+
+    var surfaceTransparency: Double {
+        get { self[TransparencyKey.self] }
+        set { self[TransparencyKey.self] = newValue }
+    }
+
+    var widgetOutline: WidgetOutlineStyle {
+        get { self[WidgetOutlineKey.self] }
+        set { self[WidgetOutlineKey.self] = newValue }
+    }
+
+    var iconBackground: IconBackgroundStyle {
+        get { self[IconBackgroundKey.self] }
+        set { self[IconBackgroundKey.self] = newValue }
+    }
+}
+
+// MARK: - Aero sheen overlay
 
 struct AeroSheen: ViewModifier {
     var cornerRadius: CGFloat?
@@ -447,57 +515,8 @@ struct AeroSheen: ViewModifier {
     }
 }
 
-
 extension View {
     func aeroSheen(cornerRadius: CGFloat? = nil) -> some View {
         modifier(AeroSheen(cornerRadius: cornerRadius))
-    }
-}
-
-
-struct WidgetOutlineKey: EnvironmentKey {
-    static let defaultValue = WidgetOutlineStyle()
-}
-
-
-struct IconBackgroundKey: EnvironmentKey {
-    static let defaultValue = IconBackgroundStyle()
-}
-
-
-extension EnvironmentValues {
-    var surfaceStyle: SurfaceStyle {
-        get { self[SurfaceStyleKey.self] }
-        set { self[SurfaceStyleKey.self] = newValue }
-    }
-
-    var surfaceTransparency: Double {
-        get { self[TransparencyKey.self] }
-        set { self[TransparencyKey.self] = newValue }
-    }
-
-    var widgetOutline: WidgetOutlineStyle {
-        get { self[WidgetOutlineKey.self] }
-        set { self[WidgetOutlineKey.self] = newValue }
-    }
-
-    var iconBackground: IconBackgroundStyle {
-        get { self[IconBackgroundKey.self] }
-        set { self[IconBackgroundKey.self] = newValue }
-    }
-}
-
-func taskbarBackground(style: SurfaceStyle, darkMode: Bool, transparency: Double) -> AnyShapeStyle {
-    GlassProviders.current.taskbarBackground(style: style, darkMode: darkMode, transparency: transparency)
-}
-
-extension SurfaceStyle {
-    var usesMaterial: Bool {
-        switch self {
-        case .glassmorphism, .liquidGlass, .windowsAero, .visionOS:
-            return true
-        default:
-            return false
-        }
     }
 }

@@ -1,4 +1,38 @@
 import SwiftUI
+import AppKit
+
+extension Color {
+    var hueComponent: CGFloat {
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        NSColor(self).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        return hue
+    }
+
+    var saturationComponent: CGFloat {
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        NSColor(self).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        return saturation
+    }
+
+    var brightnessComponent: CGFloat {
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        NSColor(self).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        return brightness
+    }
+
+    var alphaComponent: CGFloat {
+        NSColor(self).alphaComponent
+    }
+}
 
 struct LauncherApp: Identifiable {
     let bundleIdentifier: String
@@ -78,6 +112,18 @@ final class TaskbarConceptState: ObservableObject {
         didSet { persist(key: "wallpaper.gradientAngle", value: gradientAngle) }
     }
     @Published var interfaceTransparency = 0.40
+    @Published var glassMaterial: GlassMaterial = .frosted {
+        didSet { UserDefaults.standard.set(glassMaterial.rawValue, forKey: "ui.glassMaterial") }
+    }
+    var glassMaterialForSettings: GlassMaterial {
+        glassMaterial
+    }
+    func glassMaterialBinding() -> Binding<GlassMaterial> {
+        Binding(
+            get: { self.glassMaterial },
+            set: { self.glassMaterial = $0 }
+        )
+    }
     @Published var usesTaskbarGradient = false
     @Published var taskbarGradientStart = Color(red: 0.78, green: 0.48, blue: 0.86)
     @Published var taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)
@@ -783,6 +829,7 @@ final class TaskbarConceptState: ObservableObject {
         gradientEndTint = Color(red: 0.47, green: 0.70, blue: 0.86)
         gradientAngle = 35.0
         interfaceTransparency = 0.40
+        glassMaterial = .frosted
         usesTaskbarGradient = false
         taskbarGradientStart = Color(red: 0.78, green: 0.48, blue: 0.86)
         taskbarGradientEnd = Color(red: 0.96, green: 0.38, blue: 0.42)

@@ -92,6 +92,59 @@ struct SolidFillGlass: GlassProviding {
     }
 }
 
+/// Global glass family material toggle. Default `.frosted`; `.clear` keeps the
+/// wallpaper even more visible by using the pure theme fill at a lighter opacity.
+enum GlassMaterial: String, CaseIterable, Identifiable {
+    case frosted
+    case clear
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .frosted: "Frosted"
+        case .clear: "Clear (see-through)"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .frosted: "Soft blurred glass with wallpaper bleed"
+        case .clear: "Stronger bleed for stronger wallpaper colour"
+        }
+    }
+}
+
+struct GlassProviderState: @unchecked Sendable {
+    private init() {}
+
+    static var current: GlassMaterial {
+        get { GlassMaterial(rawValue: UserDefaults.standard.string(forKey: "ui.glassMaterial") ?? "") ?? .frosted }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "ui.glassMaterial") }
+    }
+}
+
+extension GlassMaterial {
+    func taskbar(style: SurfaceStyle, darkMode: Bool) -> AnyShapeStyle {
+        if appliesTo(style: style) {
+            return GlassProviders.current.taskbarBackground(style: style, darkMode: darkMode, transparency: 0)
+        }
+        return AnyShapeStyle(style.taskbarFill(darkMode: darkMode))
+    }
+
+    func background(style: SurfaceStyle, darkMode: Bool) -> AnyShapeStyle {
+        if appliesTo(style: style) {
+            return GlassProviders.current.panelBackground(style: style, darkMode: darkMode, transparency: 0)
+        }
+        return AnyShapeStyle(style.panelFill(darkMode: darkMode))
+    }
+
+    fileprivate func appliesTo(style: SurfaceStyle) -> Bool {
+        guard GlassProviderState.current == .clear else { return false }
+        return style == .glassmorphism || style == .liquidGlass || style == .windowsAero || style == .visionOS
+    }
+}
+
 enum GlassProviders {
     static var current: GlassProviding {
         let workspace = NSWorkspace.shared

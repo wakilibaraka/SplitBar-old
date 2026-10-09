@@ -39,18 +39,18 @@ private final class SpyMonitor: ClipboardMonitoring {
 
 /// Records disk work, and can be made to fail.
 private final class SpyPersistence: ClipboardPersisting {
-    private(set) var savedHistories: [[ClipboardEntry]] = []
-    private(set) var savedBlobs: [(data: Data, path: String)] = []
-    private(set) var cleanups: [Set<String>] = []
-    private(set) var quarantined = false
-    var loadError: Error?
-    var saveError: Error?
+    nonisolated(unsafe) private(set) var savedHistories: [[ClipboardEntry]] = []
+    nonisolated(unsafe) private(set) var savedBlobs: [(data: Data, path: String)] = []
+    nonisolated(unsafe) private(set) var cleanups: [Set<String>] = []
+    nonisolated(unsafe) private(set) var quarantined = false
+    nonisolated(unsafe) var loadError: Error?
+    nonisolated(unsafe) var saveError: Error?
 
     init(initialHistory: [ClipboardEntry] = []) {
         storedHistory = initialHistory
     }
 
-    private var storedHistory: [ClipboardEntry]
+    nonisolated(unsafe) private var storedHistory: [ClipboardEntry]
 
     func loadHistory() throws -> [ClipboardEntry] {
         if let loadError { throw loadError }
