@@ -119,6 +119,12 @@ public enum ProcessRunner {
                 return false
             }
 
+        // Reap the child before waiting for the pipes: Foundation keeps the
+        // parent's pipe handles alive until the process is reaped, which would
+        // otherwise hide EOF from the readers on a fast command.
+        if !process.isRunning {
+            process.waitUntilExit()
+        }
         _ = group.wait(timeout: .now() + 5.0)
 
         let status: Int32 = process.isRunning ? -1 : process.terminationStatus
