@@ -45,11 +45,15 @@ struct TaskbarTiles {
                 size: glyphSize
             )
             .frame(width: tileSide, height: tileSide)
-            .taskbarTile(highlighted: isRunning && indicatorStyle == .highlight, highlightFill: indicatorFill),
+            .taskbarTile(
+                highlighted: isRunning && indicatorStyle == .highlight,
+                isActive: isFrontmost,
+                highlightFill: indicatorFill
+            ),
             indicator: Group {
                 if isRunning, indicatorStyle != .highlight {
                     runningIndicator(isFrontmost: isFrontmost, windowCount: windowCount)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, LayoutTokens.indicatorBottomInset)
                         // G1: the pill springs in when an app launches.
                         .transition(.scale(scale: 0.3, anchor: .bottom).combined(with: .opacity))
                 }
@@ -65,11 +69,11 @@ struct TaskbarTiles {
         .overlay(alignment: .topTrailing) {
             if windowCount > 1 {
                 Text("\(min(windowCount, 9))")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(.system(size: 8, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                    .frame(width: 15, height: 15)
-                    .background(Circle().fill(Color.red))
-                    .offset(x: 3, y: -3)
+                    .frame(width: 12, height: 12)
+                    .background(Circle().fill(Color.red.opacity(0.9)))
+                    .padding(2)
                     .accessibilityLabel("\(windowCount) windows open")
             }
         }
@@ -81,40 +85,17 @@ struct TaskbarTiles {
         }
     }
 
+    @ViewBuilder
     private func runningIndicator(isFrontmost: Bool, windowCount: Int = 0) -> some View {
-        let opacity = isFrontmost ? 1.0 : 0.55
-        let multiWindow = windowCount > 1 && !isFrontmost
-        return Group {
-            switch indicatorStyle {
-            case .dot:
-                if isFrontmost {
-                    Capsule()
-                        .fill(indicatorFill.style(opacity: opacity))
-                        .frame(width: max(indicatorSize.dotDiameter + 8, 12), height: 4)
-                } else if multiWindow {
-                    ZStack {
-                        Capsule()
-                            .fill(indicatorFill.style(opacity: opacity))
-                            .frame(width: max(indicatorSize.dotDiameter + 8, 12), height: 4)
-                            .offset(x: 2.5, y: -2.5)
-                        Capsule()
-                            .fill(indicatorFill.style(opacity: opacity))
-                            .frame(width: max(indicatorSize.dotDiameter + 8, 12), height: 4)
-                            .offset(x: -2.5, y: 2.5)
-                    }
-                } else {
-                    Capsule()
-                        .fill(indicatorFill.style(opacity: opacity))
-                        .frame(width: max(indicatorSize.dotDiameter, 8), height: 4)
-                }
-            case .dash:
-                Capsule()
-                    .fill(indicatorFill.style(opacity: opacity))
-                    .frame(width: indicatorSize.dashWidth + (isFrontmost ? 6 : 0), height: indicatorSize.dashHeight)
-            case .highlight:
-                EmptyView()
-            }
-        }
+        let state: TaskbarIndicatorMetrics.State = isFrontmost
+            ? .frontmost
+            : (windowCount > 1 ? .multipleWindows : .running)
+        Capsule()
+            .fill(indicatorFill.style(opacity: isFrontmost ? 1.0 : 0.75))
+            .frame(
+                width: TaskbarIndicatorMetrics.width(for: indicatorStyle, size: indicatorSize, state: state),
+                height: TaskbarIndicatorMetrics.height(for: indicatorStyle)
+            )
     }
 
     @ViewBuilder
@@ -254,7 +235,7 @@ struct TaskbarTiles {
     }
 
     var trashCluster: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: LayoutTokens.tileGap) {
             ForEach(clusterOrder, id: \.self) { key in
                 clusterTile(key)
             }

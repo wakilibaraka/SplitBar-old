@@ -470,10 +470,13 @@ extension SettingsFlyout {
             }
             .disabled(!widgetOutlineBorder)
             Toggle(isOn: $iconBackgroundVisible) {
-                Text("Icon tile background")
+                Text("Always show tile backgrounds")
                     .font(.system(size: 13, weight: .medium))
             }
             .toggleStyle(ThemeToggleStyle())
+            Text("Hover and the frontmost app always get a plate; running apps show an accent bar.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
             HStack(spacing: 8) {
                 ForEach(IconShape.allCases) { shape in
                     Button { iconBackgroundShape = shape } label: {

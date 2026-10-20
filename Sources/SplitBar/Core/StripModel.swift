@@ -367,12 +367,42 @@ enum RunningIndicatorSize: String, CaseIterable, Identifiable {
         case .large: 24
         }
     }
+}
 
-    var dashHeight: CGFloat {
-        switch self {
-        case .small: 3
-        case .medium: 4
-        case .large: 5
+/// Pure geometry for the running-app indicator. The bar draws one capsule
+/// whose width encodes running / multiple windows / frontmost.
+enum TaskbarIndicatorMetrics {
+    enum State: Equatable {
+        case running
+        case multipleWindows
+        case frontmost
+    }
+
+    /// Shared underline thickness: a thin Windows 11-style bar.
+    static func height(for style: RunningIndicatorStyle) -> CGFloat {
+        style == .highlight ? 0 : 3
+    }
+
+    static func width(
+        for style: RunningIndicatorStyle,
+        size: RunningIndicatorSize,
+        state: State
+    ) -> CGFloat {
+        switch style {
+        case .highlight:
+            return 0
+        case .dot:
+            switch state {
+            case .running: return max(6, size.dotDiameter)
+            case .multipleWindows: return size.dotDiameter + 6
+            case .frontmost: return size.dashWidth
+            }
+        case .dash:
+            switch state {
+            case .running: return size.dashWidth
+            case .multipleWindows: return size.dashWidth + 4
+            case .frontmost: return size.dashWidth + 6
+            }
         }
     }
 }

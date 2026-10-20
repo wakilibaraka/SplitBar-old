@@ -51,7 +51,7 @@ struct AppTilesIsland: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: LayoutTokens.tileGap) {
             ForEach(visibleItems, id: \.self) { item in
                 switch item {
                 case .app(let bundleID):
@@ -75,7 +75,7 @@ struct AppTilesIsland: View {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 28, height: max(28, model.taskbarHeight - 4))
+                        .frame(width: 28, height: LayoutTokens.tileSide(for: model.taskbarHeight))
                 }
                 .buttonStyle(.plain)
                 .help("More apps in the launcher")

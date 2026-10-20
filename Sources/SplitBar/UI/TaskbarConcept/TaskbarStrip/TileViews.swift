@@ -142,7 +142,7 @@ struct TrashTile: View {
 struct TaskbarDividerView: View {
     var body: some View {
         Rectangle()
-            .fill(Color.primary.opacity(0.14))
+            .fill(Color.primary.opacity(0.10))
             .frame(width: 1)
     }
 }
@@ -153,7 +153,7 @@ struct TilePressButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .animation(
                 MotionTokens.spring(response: 0.25, dampingFraction: 0.72, reduceMotion: reduceMotion),
                 value: configuration.isPressed
@@ -169,8 +169,6 @@ struct AppTile<Icon: View, Indicator: View>: View {
     let onActivate: () -> Void
     let menu: AnyView
     let onHoverChanged: (Bool) -> Void
-    @State private var isHovering = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: onActivate) {
@@ -181,71 +179,70 @@ struct AppTile<Icon: View, Indicator: View>: View {
                     indicator
                 }
             }
-            .offset(y: isHovering ? -2 : 0)
-            .scaleEffect(isHovering ? 1.03 : 1.0)
-            .animation(
-                MotionTokens.spring(response: 0.24, dampingFraction: 0.78, reduceMotion: reduceMotion),
-                value: isHovering
-            )
         }
         .buttonStyle(TilePressButtonStyle())
         .help(title)
         .contextMenu { menu }
-        .onHover { hovering in
-            isHovering = hovering
-            onHoverChanged(hovering)
-        }
+        .onHover(perform: onHoverChanged)
     }
 }
 
 
 struct TaskbarTileStyle: ViewModifier {
     var highlighted = false
+    var isActive = false
     var highlightFill = IndicatorFill.solid(.blue)
-    @Environment(\.surfaceStyle) private var surfaceStyle
-    @Environment(\.colorScheme) private var colorScheme
+    @State private var isHovering = false
     @Environment(\.iconBackground) private var iconBackground
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
-        Group {
-            if iconBackground.isVisible {
-                content
-                    .background { tileBackground }
-                    .contentShape(tileShape)
-            } else {
-                content
-                    .contentShape(Rectangle())
+        content
+            .background {
+                if showsPlate {
+                    tileBackground
+                }
             }
-        }
-        .onHover { hovering in
-            if hovering {
-                NSCursor.pointingHand.push()
-            } else {
-                NSCursor.pop()
+            .contentShape(tileShape)
+            .onHover { hovering in
+                isHovering = hovering
             }
-        }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovering)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isActive)
     }
 
-    private var tileFill: AnyShapeStyle {
+    /// Hover and the frontmost app always get a plate; the idle plate is the
+    /// user's "always show tile backgrounds" option.
+    private var showsPlate: Bool {
+        highlighted || isActive || isHovering || iconBackground.isVisible
+    }
+
+    private var plateFill: AnyShapeStyle {
         if highlighted {
             return highlightFill.style(opacity: 0.22)
         }
-        return AnyShapeStyle(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10))
-    }
-
-    private var tileStroke: AnyShapeStyle {
-        if highlighted {
-            return highlightFill.style(opacity: 0.55)
+        let opacity: Double
+        if isActive {
+            opacity = 0.11
+        } else if isHovering {
+            opacity = 0.08
+        } else {
+            opacity = 0.045
         }
-        return AnyShapeStyle(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.5))
+        return AnyShapeStyle(Color.primary.opacity(opacity))
     }
 
+    @ViewBuilder
     private var tileBackground: some View {
-        tileShape
-            .fill(tileFill)
-            .overlay {
-                tileShape.stroke(tileStroke, lineWidth: 1)
-            }
+        if highlighted {
+            tileShape
+                .fill(plateFill)
+                .overlay {
+                    tileShape.stroke(highlightFill.style(opacity: 0.45), lineWidth: 1)
+                }
+        } else {
+            tileShape.fill(plateFill)
+        }
     }
 
     private var tileShape: AnyShape {
@@ -260,10 +257,13 @@ struct TaskbarTileStyle: ViewModifier {
     }
 }
 
-
 extension View {
-    func taskbarTile(highlighted: Bool = false, highlightFill: IndicatorFill = .solid(.blue)) -> some View {
-        modifier(TaskbarTileStyle(highlighted: highlighted, highlightFill: highlightFill))
+    func taskbarTile(
+        highlighted: Bool = false,
+        isActive: Bool = false,
+        highlightFill: IndicatorFill = .solid(.blue)
+    ) -> some View {
+        modifier(TaskbarTileStyle(highlighted: highlighted, isActive: isActive, highlightFill: highlightFill))
     }
 }
 

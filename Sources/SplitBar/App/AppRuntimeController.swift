@@ -618,10 +618,11 @@ public final class AppRuntimeController {
             islands: islands,
             islandContent: { [weak self] _, sections in
                 guard let self else { return AnyView(EmptyView()) }
+                let state = self.taskbarConceptState
                 return AnyView(
                     TaskbarIslandContent(
                         sections: sections,
-                        model: self.taskbarConceptState,
+                        model: state,
                         onLaunchApplication: { [weak self] in self?.launchPinnedApplication(bundleIdentifier: $0) },
                         onTaskbarIconClick: { [weak self] in self?.handleTaskbarIconClick(bundleIdentifier: $0) },
                         onTaskbarTileAction: { [weak self] in self?.handleTaskbarTileAction($0) },
@@ -629,15 +630,16 @@ public final class AppRuntimeController {
                         showOverflowChevron: islands?.showsOverflow ?? false
                     )
                     .padding(.horizontal, LayoutTokens.islandInnerPadding)
-                    .background {
-                        RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                                    .strokeBorder(Color.white.opacity(0.38), lineWidth: 1)
-                            }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                    .taskbarSurface(
+                        style: state.surfaceStyle,
+                        darkMode: state.isDarkMode,
+                        transparency: state.interfaceTransparency,
+                        cornerRadius: radius
+                    )
+                    .environment(\.surfaceTransparency, state.interfaceTransparency)
+                    .environment(\.iconBackground, state.iconBackground)
+                    .environment(\.widgetOutline, state.widgetOutline)
+                    .preferredColorScheme(state.isDarkMode ? .dark : .light)
                 )
             }
         )

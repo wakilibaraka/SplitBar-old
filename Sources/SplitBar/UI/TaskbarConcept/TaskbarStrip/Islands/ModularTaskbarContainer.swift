@@ -116,8 +116,10 @@ struct ModularTaskbarContainer: View {
 
     // MARK: Docked / floating — one shell (moved verbatim from `Taskbar`)
 
-    private var glyphSize: CGFloat { height * model.taskbarIconSize.glyphFraction }
-    private var tileSide: CGFloat { max(28, height - 4) }
+    private var glyphSize: CGFloat {
+        LayoutTokens.glyphSize(barHeight: height, iconSize: model.taskbarIconSize)
+    }
+    private var tileSide: CGFloat { LayoutTokens.tileSide(for: height) }
     private var isFloating: Bool { mode == .macOS }
     private var isConstrained: Bool { isFloating || mode == .centered }
     private var showsDividers: Bool { !isFloating }
@@ -190,14 +192,21 @@ struct ModularTaskbarContainer: View {
     @ViewBuilder
     private var barBackground: some View {
         let radius = model.shellRadius(for: .taskbar)
-        if isFloating {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.42), lineWidth: 1)
-                }
-                .padding(.vertical, 3)
+        if isConstrained {
+            if model.usesTaskbarGradient {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(LinearGradient(colors: [model.taskbarGradientStart, model.taskbarGradientEnd], startPoint: .leading, endPoint: .trailing))
+                    .padding(.vertical, isFloating ? 3 : 0)
+            } else {
+                Color.clear
+                    .taskbarSurface(
+                        style: model.surfaceStyle,
+                        darkMode: model.isDarkMode,
+                        transparency: model.interfaceTransparency,
+                        cornerRadius: radius
+                    )
+                    .padding(.vertical, isFloating ? 3 : 0)
+            }
         } else if model.usesTaskbarGradient {
             Rectangle()
                 .fill(LinearGradient(colors: [model.taskbarGradientStart, model.taskbarGradientEnd], startPoint: .leading, endPoint: .trailing))
@@ -216,42 +225,26 @@ struct ModularTaskbarContainer: View {
                     )
                 }
         } else {
-            let fill: AnyShapeStyle = {
-                switch model.surfaceStyle {
-                case .windowsXP:
-                    return AnyShapeStyle(LinearGradient(
-                        colors: [Color(red: 0.15, green: 0.44, blue: 0.88), Color(red: 0.04, green: 0.22, blue: 0.61)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
-                case .aqua:
-                    return AnyShapeStyle(LinearGradient(
-                        colors: [Color(red: 0.30, green: 0.65, blue: 0.96), Color(red: 0.10, green: 0.40, blue: 0.88)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
-                case .frutigerAero:
-                    return AnyShapeStyle(LinearGradient(
-                        colors: [Color(red: 0.42, green: 0.78, blue: 0.96), Color(red: 0.18, green: 0.62, blue: 0.82)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
-                case .y2k:
-                    return AnyShapeStyle(LinearGradient(
-                        colors: [Color(red: 0.72, green: 0.82, blue: 1.0), Color(red: 0.44, green: 0.60, blue: 0.96)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
-                default:
-                    return AnyShapeStyle(model.surfaceStyle.taskbarFill(darkMode: model.isDarkMode))
-                }
-            }()
             Rectangle()
-                .fill(fill)
+                .fill(
+                    taskbarBackground(
+                        style: model.surfaceStyle,
+                        darkMode: model.isDarkMode,
+                        transparency: model.interfaceTransparency
+                    )
+                )
                 .overlay(alignment: .top) {
                     if model.surfaceStyle == .neobrutalism {
                         Rectangle()
                             .fill(Color.black)
                             .frame(height: 3)
-                    } else {
+                    } else if model.surfaceStyle == .classic98 {
                         Rectangle()
                             .fill(Color.white.opacity(0.42))
+                            .frame(height: 1)
+                    } else {
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.10))
                             .frame(height: 1)
                     }
                 }
@@ -259,7 +252,7 @@ struct ModularTaskbarContainer: View {
     }
 
     private var trailingTrayCluster: some View {
-        HStack(spacing: model.trashPlacement(for: mode) == .beforeClock ? 4 : 8) {
+        HStack(spacing: model.trashPlacement(for: mode) == .beforeClock ? LayoutTokens.tileGap : 8) {
             if model.trashPlacement(for: mode) == .beforeTray {
                 tiles.trashCluster
             }

@@ -28,8 +28,8 @@ struct TaskbarIslandContent: View {
             systemStatus: model.systemStatus,
             statusIconPreset: model.statusIconPreset,
             statusIconCustomSymbol: model.statusIconCustomSymbol,
-            tileSide: max(28, model.taskbarHeight - 4),
-            glyphSize: model.taskbarHeight * model.taskbarIconSize.glyphFraction,
+            tileSide: LayoutTokens.tileSide(for: model.taskbarHeight),
+            glyphSize: LayoutTokens.glyphSize(barHeight: model.taskbarHeight, iconSize: model.taskbarIconSize),
             previewsEnabled: model.showWindowPreviews,
             previewBundleID: $model.previewBundleID,
             clusterOrder: model.clusterOrder,
@@ -44,13 +44,13 @@ struct TaskbarIslandContent: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: LayoutTokens.tileGap) {
             ForEach(sections, id: \.self) { section in
                 switch section {
                 case .weather:
                     WidgetIsland(model: model)
                 case .apps:
-                    HStack(spacing: 4) {
+                    HStack(spacing: LayoutTokens.tileGap) {
                         StartIsland(model: model)
                         AppTilesIsland(
                             model: model,
@@ -73,7 +73,6 @@ struct TaskbarIslandContent: View {
 struct Taskbar: View {
     @ObservedObject var model: TaskbarConceptState
     @Binding var height: CGFloat
-    @State private var dragStartHeight: CGFloat?
     let onLaunchApplication: (String) -> Void
     let onTaskbarIconClick: (String) -> Void
     let onTaskbarTileAction: (TaskbarTileAction) -> Void
@@ -93,9 +92,6 @@ struct Taskbar: View {
         .frame(maxWidth: .infinity)
         .frame(height: height)
         .environment(\.surfaceTransparency, model.interfaceTransparency)
-        .overlay(alignment: .top) {
-            resizeHandle
-        }
         .overlay(alignment: .top) {
             if !isFloating, model.surfaceStyle == .classic98 {
                 Rectangle()
@@ -124,31 +120,4 @@ struct Taskbar: View {
         }
     }
 
-    private var resizeHandle: some View {
-        Color.clear
-            .frame(maxWidth: .infinity)
-            .frame(height: 12)
-            .overlay(alignment: .top) {
-                Capsule()
-                    .fill(Color.primary.opacity(0.16))
-                    .frame(width: 42, height: 3)
-                    .padding(.top, 3)
-            }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 1)
-                    .onChanged { value in
-                        if dragStartHeight == nil {
-                            dragStartHeight = height
-                        }
-                        if let dragStartHeight {
-                            height = min(48, max(32, dragStartHeight - value.translation.height))
-                        }
-                    }
-                    .onEnded { _ in
-                        dragStartHeight = nil
-                    }
-            )
-            .help("Drag to resize the taskbar")
-    }
 }
