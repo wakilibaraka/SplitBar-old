@@ -75,6 +75,12 @@ public enum ProcessRunner {
             throw Failure.launchFailed(executablePath, underlying: error.localizedDescription)
         }
 
+        // Close the parent's copies of the pipe write ends. The child holds its
+        // own descriptors; keeping the parent's open hides EOF from the
+        // readers, which captures nothing when a fast command exits first.
+        outPipe.fileHandleForWriting.closeFile()
+        errPipe.fileHandleForWriting.closeFile()
+
         if let standardInput {
             inPipe.fileHandleForWriting.write(standardInput)
             try? inPipe.fileHandleForWriting.close()
@@ -113,7 +119,7 @@ public enum ProcessRunner {
                 return false
             }
 
-        _ = group.wait(timeout: .now() + 1.0)
+        _ = group.wait(timeout: .now() + 5.0)
 
         let status: Int32 = process.isRunning ? -1 : process.terminationStatus
         let output = collector.result()
