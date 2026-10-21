@@ -86,18 +86,30 @@ public enum ProcessRunner {
             try? inPipe.fileHandleForWriting.close()
         }
 
-        // Drain both pipes concurrently so neither can fill its buffer and
-        // deadlock the child while we wait.
+        // Drain both pipes as data arrives so neither can fill its buffer and
+        // deadlock the child. Reading into an EOF-terminated buffer would also
+        // wait forever on runners where a write handle outlives the child.
         let collector = OutputCollector(cap: maximumOutputBytes)
         let group = DispatchGroup()
-        let queue = DispatchQueue(label: "com.baraka.splitbar.processrunner", attributes: .concurrent)
 
-        queue.async(group: group) {
-            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+        group.enter()
+        outPipe.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty else {
+                handle.readabilityHandler = nil
+                group.leave()
+                return
+            }
             collector.appendStandardOutput(data)
         }
-        queue.async(group: group) {
-            let data = errPipe.fileHandleForReading.readDataToEndOfFile()
+        group.enter()
+        errPipe.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty else {
+                handle.readabilityHandler = nil
+                group.leave()
+                return
+            }
             collector.appendStandardError(data)
         }
 
@@ -119,13 +131,20 @@ public enum ProcessRunner {
                 return false
             }
 
-        // Reap the child before waiting for the pipes: Foundation keeps the
-        // parent's pipe handles alive until the process is reaped, which would
-        // otherwise hide EOF from the readers on a fast command.
+        // Reap the child before joining the readers, then take whatever the
+        // handlers delivered. Do not block on EOF: a stray write handle must
+        // not turn a fast command into a timeout.
         if !process.isRunning {
             process.waitUntilExit()
         }
-        _ = group.wait(timeout: .now() + 5.0)
+        _ = group.wait(timeout: .now() + 0.5)
+        outPipe.fileHandleForReading.readabilityHandler = nil
+        errPipe.fileHandleForReading.readabilityHandler = nil
+
+        // A fast child can exit before its readability handler is ever
+        // scheduled, so take what is already buffered without waiting.
+        drain(outPipe.fileHandleForReading, appending: collector.appendStandardOutput)
+        drain(errPipe.fileHandleForReading, appending: collector.appendStandardError)
 
         let status: Int32 = process.isRunning ? -1 : process.terminationStatus
         let output = collector.result()
@@ -147,6 +166,20 @@ public enum ProcessRunner {
         process.executableURL = URL(fileURLWithPath: executablePath)
         process.arguments = arguments
         try process.run()
+    }
+
+    /// Non-blocking read of whatever is buffered in `handle`, stopping at EOF
+    /// or as soon as no more data is ready.
+    private static func drain(_ handle: FileHandle, appending: (Data) -> Void) {
+        let fd = handle.fileDescriptor
+        let flags = fcntl(fd, F_GETFL)
+        guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) >= 0 else { return }
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        while true {
+            let count = read(fd, &buffer, buffer.count)
+            guard count > 0 else { return }
+            appending(Data(buffer[0..<count]))
+        }
     }
 
     /// Test seam: trims a captured buffer to `cap` bytes.
