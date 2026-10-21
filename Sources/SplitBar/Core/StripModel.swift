@@ -148,7 +148,9 @@ enum TaskbarSection: String, CaseIterable, Identifiable, Hashable {
 
 
 enum TaskbarStripMetrics {
-    static func tileStride(barHeight: CGFloat) -> CGFloat { max(28, barHeight - 4) + 4 }
+    static func tileStride(barHeight: CGFloat) -> CGFloat {
+        LayoutTokens.tileSide(for: barHeight) + LayoutTokens.tileGap
+    }
 
     /// Width for a centered bar, expanded from the user's width whenever the
     /// content at the given tile count would not fit, and clipped to the screen.
