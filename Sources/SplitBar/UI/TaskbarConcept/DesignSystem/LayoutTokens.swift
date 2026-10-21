@@ -26,4 +26,20 @@ enum LayoutTokens {
 
     /// Gutter between the weather island and the first divider.
     static let dividerGutter: CGFloat = 8
+
+    /// Gap between taskbar buttons.
+    static let tileGap: CGFloat = 4
+
+    /// Distance from the bar's bottom edge to the running indicator.
+    static let indicatorBottomInset: CGFloat = 3
+
+    /// Side length of a square taskbar button for a given bar height.
+    static func tileSide(for barHeight: CGFloat) -> CGFloat {
+        max(28, barHeight - 4)
+    }
+
+    /// Glyph size inside a taskbar button for the user's icon-size step.
+    static func glyphSize(barHeight: CGFloat, iconSize: TaskbarIconSize) -> CGFloat {
+        barHeight * iconSize.glyphFraction
+    }
 }

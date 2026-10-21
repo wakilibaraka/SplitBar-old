@@ -8,7 +8,9 @@ import SwiftUI
 struct WidgetIsland: View {
     @ObservedObject var model: TaskbarConceptState
 
-    private var glyphSize: CGFloat { model.taskbarHeight * model.taskbarIconSize.glyphFraction }
+    private var glyphSize: CGFloat {
+        LayoutTokens.glyphSize(barHeight: model.taskbarHeight, iconSize: model.taskbarIconSize)
+    }
 
     var body: some View {
         Button {

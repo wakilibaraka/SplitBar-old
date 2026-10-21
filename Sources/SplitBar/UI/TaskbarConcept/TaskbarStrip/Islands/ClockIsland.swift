@@ -16,7 +16,7 @@ struct ClockIsland: View {
 
     var body: some View {
         if let tiles {
-            HStack(spacing: 4) {
+            HStack(spacing: LayoutTokens.tileGap) {
                 if model.trashPlacement(for: model.taskbarMode) == .beforeClock {
                     tiles.trashCluster
                 }

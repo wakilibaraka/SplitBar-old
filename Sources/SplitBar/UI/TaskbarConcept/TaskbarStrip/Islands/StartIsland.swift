@@ -8,8 +8,10 @@ import SwiftUI
 struct StartIsland: View {
     @ObservedObject var model: TaskbarConceptState
 
-    private var glyphSize: CGFloat { model.taskbarHeight * model.taskbarIconSize.glyphFraction }
-    private var tileSide: CGFloat { max(28, model.taskbarHeight - 4) }
+    private var glyphSize: CGFloat {
+        LayoutTokens.glyphSize(barHeight: model.taskbarHeight, iconSize: model.taskbarIconSize)
+    }
+    private var tileSide: CGFloat { LayoutTokens.tileSide(for: model.taskbarHeight) }
 
     var body: some View {
         Button {
@@ -17,7 +19,7 @@ struct StartIsland: View {
         } label: {
             MacOSAppIcon(
                 bundleIdentifier: "com.apple.launchpad",
-                fallbackSymbol: "square.grid.3x3.fill",
+                fallbackSymbol: "square.grid.2x2.fill",
                 fallbackColor: model.isDarkMode ? Color(red: 0.54, green: 0.76, blue: 1) : .blue,
                 size: glyphSize
             )

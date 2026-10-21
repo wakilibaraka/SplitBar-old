@@ -146,7 +146,7 @@ final class TaskbarConceptState: ObservableObject {
     @Published var widgetOutlineWidth: CGFloat = 1.0 {
         didSet { UserDefaults.standard.set(Double(widgetOutlineWidth), forKey: "widgets.outlineWidth") }
     }
-    @Published var iconBackgroundVisible = true {
+    @Published var iconBackgroundVisible = false {
         didSet { UserDefaults.standard.set(iconBackgroundVisible, forKey: "icons.backgroundVisible") }
     }
     @Published var iconBackgroundShape = IconShape.roundedRect {
@@ -249,7 +249,7 @@ final class TaskbarConceptState: ObservableObject {
     @Published var runningBundleIDs: Set<String> = []
     @Published var runningAppOrder: [String] = []
     @Published var frontmostBundleID: String?
-    @Published var runningIndicatorStyle = RunningIndicatorStyle.dot {
+    @Published var runningIndicatorStyle = RunningIndicatorStyle.dash {
         didSet { UserDefaults.standard.set(runningIndicatorStyle.rawValue, forKey: "taskbar.indicatorStyle") }
     }
     @Published var runningIndicatorSize = RunningIndicatorSize.medium {
@@ -535,7 +535,7 @@ final class TaskbarConceptState: ObservableObject {
         if defaults.object(forKey: "widgets.outlineWidth") != nil {
             widgetOutlineWidth = max(0.5, min(3, CGFloat(defaults.double(forKey: "widgets.outlineWidth"))))
         }
-        iconBackgroundVisible = defaults.object(forKey: "icons.backgroundVisible") == nil ? true : defaults.bool(forKey: "icons.backgroundVisible")
+        iconBackgroundVisible = defaults.bool(forKey: "icons.backgroundVisible")
         if let savedIconShape = defaults.string(forKey: "icons.backgroundShape").flatMap(IconShape.init(rawValue:)) {
             iconBackgroundShape = savedIconShape
         }
@@ -848,7 +848,7 @@ final class TaskbarConceptState: ObservableObject {
         statusIconCustomSymbol = "battery.75percent"
         widgetOutlineBorder = true
         widgetOutlineWidth = 1.0
-        iconBackgroundVisible = true
+        iconBackgroundVisible = false
         iconBackgroundShape = .roundedRect
         trashPlacement = .withApps
         panelWidths = [:]
