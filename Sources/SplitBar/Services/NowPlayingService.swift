@@ -21,7 +21,9 @@ public final class NowPlayingService {
         onUpdate: @escaping @MainActor @Sendable (NowPlayingState) -> Void
     ) {
         stopMonitoring()
-        onUpdate(fetchCurrentState())
+        // Query off the main thread: an Apple Event to an unresponsive player
+        // blocks for the full system timeout, and this runs during launch.
+        refreshInBackground(onUpdate: onUpdate)
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
